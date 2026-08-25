@@ -1,0 +1,74 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo "Installing dependencies..."
+
+  pre_build:
+    commands:
+      - echo "========================================="
+      - echo "Extracting Build Version"
+      - echo "========================================="
+
+      # Debug Information
+      - echo "APP_ENV=${APP_ENV}"
+      - echo "GIT_TAG=${GIT_TAG}"
+      - echo "CODEBUILD_SOURCE_VERSION=${CODEBUILD_SOURCE_VERSION}"
+      - echo "CODEBUILD_RESOLVED_SOURCE_VERSION=${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+
+      # Validate APP_ENV
+      - |
+        if [ -z "$APP_ENV" ]; then
+          echo "ERROR: APP_ENV environment variable is empty."
+          exit 1
+        fi
+
+      # Validate GIT_TAG
+      - |
+        if [ -z "$GIT_TAG" ]; then
+          echo "ERROR: GIT_TAG environment variable is empty."
+          exit 1
+        fi
+
+      # Extract Version
+      - |
+        if [ "$APP_ENV" = "stage" ]; then
+          VERSION="${GIT_TAG#vs}"
+        elif [ "$APP_ENV" = "production" ]; then
+          VERSION="${GIT_TAG#vp}"
+        else
+          echo "ERROR: Invalid APP_ENV: $APP_ENV"
+          exit 1
+        fi
+
+      # Validate extracted version
+      - |
+        if [ -z "$VERSION" ] || [ "$VERSION" = "$GIT_TAG" ]; then
+          echo "ERROR: Invalid tag format for $APP_ENV."
+          exit 1
+        fi
+
+      - echo "VERSION=${VERSION}"
+
+      # Save version for deployment scripts
+      - echo "${VERSION}" > build_version.txt
+
+      - echo "build_version.txt contents:"
+      - cat build_version.txt
+
+# ── Version Update Detection ──────────────────────────────────────────
+      # Expose the full Git commit SHA so the /api/version endpoint can return it.
+      # CODEBUILD_RESOLVED_SOURCE_VERSION is the full 40-char commit SHA set by CodeBuild.
+      - export NEXT_PUBLIC_APP_VERSION="${CODEBUILD_RESOLVED_SOURCE_VERSION:-${VERSION}}"
+      - export NEXT_PUBLIC_BUILD_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+      - echo "NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}"
+      - echo "NEXT_PUBLIC_BUILD_TIME=${NEXT_PUBLIC_BUILD_TIME}"
+      
+  build:
+    commands:
+      - chmod +x scripts/*.sh
+
+artifacts:
+  files:
+    - '**/*'

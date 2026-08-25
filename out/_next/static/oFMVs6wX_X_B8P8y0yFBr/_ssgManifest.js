@@ -1,0 +1,1 @@
+self.__SSG_MANIFEST=new Set(["\u002F[contentType]\u002F[...slugAndId]","\u002Fbrowse\u002F[...slugAndId]","\u002Fkids\u002F[...slugAndId]","\u002Fmovies\u002F[...slugAndId]","\u002Fnataks\u002F[...slugAndId]","\u002Fshows\u002F[...slugAndId]"]);self.__SSG_MANIFEST_CB&&self.__SSG_MANIFEST_CB()

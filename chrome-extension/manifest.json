@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "JOJO Analytics Helper",
+  "version": "1.0.0",
+  "description": "Internal developer tool to monitor JOJO analytics events (Clevertap, Firebase, Meta Pixel, Google Tag).",
+  "action": {
+    "default_title": "Open JOJO Analytics Helper Side Panel"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "sidePanel"
+  ]
+}
