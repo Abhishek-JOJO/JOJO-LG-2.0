@@ -23,7 +23,7 @@ import { useEffect } from "react";
 
 function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: number; isAuthenticated: boolean }) {
   const router = useRouter();
-  
+
   const handleArrowPress = (direction: string) => {
     if (direction === 'up') return false;
     if (direction === 'left') {
@@ -57,11 +57,10 @@ function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: n
     <div
       ref={ref as any}
       onClick={() => router.push(ROUTES.SUBSCRIPTION)}
-      className={`cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 text-base sm:text-lg font-bold whitespace-nowrap rounded-full transition-all duration-200 shrink-0 ${
-        focused
+      className={`cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 text-base sm:text-lg font-bold whitespace-nowrap rounded-full transition-all duration-200 shrink-0 ${focused
           ? "scale-105 ring-2 ring-white text-black bg-gradient-to-r from-[#FAAF3F] via-[#FFD691] to-[#FAAF3F] shadow-[0_0_18px_rgba(250,175,63,0.7)]"
           : "text-[#FAAF3F] hover:text-[#FFD691] hover:bg-amber-500/10"
-      }`}
+        }`}
     >
       Get Gold
     </div>
@@ -70,7 +69,7 @@ function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: n
 
 function FocusableSearch({ totalNavItems }: { totalNavItems: number }) {
   const router = useRouter();
-  
+
   const handleArrowPress = (direction: string) => {
     if (direction === 'up') return false;
     if (direction === 'left') return false;
@@ -101,11 +100,10 @@ function FocusableSearch({ totalNavItems }: { totalNavItems: number }) {
     <div
       ref={ref as any}
       onClick={() => router.push(`${ROUTES.SEARCH}?from=app`)}
-      className={`p-2.5 rounded-full cursor-pointer flex items-center justify-center transition-all duration-200 shrink-0 ${
-        focused
+      className={`p-2.5 rounded-full cursor-pointer flex items-center justify-center transition-all duration-200 shrink-0 ${focused
           ? "bg-white text-black scale-110 shadow-[0_0_14px_rgba(255,255,255,0.6)] ring-2 ring-white"
           : "text-white/90 hover:text-white hover:bg-white/10"
-      }`}
+        }`}
       aria-label="Search"
     >
       <Search className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -225,11 +223,11 @@ export function Navbar() {
                   const isItemActive = pathname === targetUrl;
 
                   return (
-                    <FocusableNavLink 
-                      key={`${item?.url}-${item?.title}`} 
-                      item={item} 
-                      isItemActive={isItemActive} 
-                      targetUrl={targetUrl} 
+                    <FocusableNavLink
+                      key={`${item?.url}-${item?.title}`}
+                      item={item}
+                      isItemActive={isItemActive}
+                      targetUrl={targetUrl}
                       index={index}
                       totalNavItems={visibleNavItems.length}
                       isGold={isGold}
@@ -238,9 +236,9 @@ export function Navbar() {
                   );
                 })}
                 {!isGold && (
-                  <FocusableGetGold 
-                    totalNavItems={visibleNavItems.length} 
-                    isAuthenticated={isAuthenticated} 
+                  <FocusableGetGold
+                    totalNavItems={visibleNavItems.length}
+                    isAuthenticated={isAuthenticated}
                   />
                 )}
               </div>
@@ -323,16 +321,16 @@ export function Navbar() {
         </div>
       )}
 
-      <MobileSidebar 
-        isOpen={isMobileMenuOpen} 
-        onClose={() => setIsMobileMenuOpen(false)} 
-        isGold={isGold} 
-        visibleNavItems={visibleNavItems} 
-        pathname={pathname} 
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        isGold={isGold}
+        visibleNavItems={visibleNavItems}
+        pathname={pathname}
       />
 
       {isBrowsingMode && (
-        <BottomNav 
+        <BottomNav
           navItems={navItems}
           onSearchClick={() => router.push(`${ROUTES.SEARCH}?from=app`)}
           onMenuClick={() => setIsMobileMenuOpen(true)}

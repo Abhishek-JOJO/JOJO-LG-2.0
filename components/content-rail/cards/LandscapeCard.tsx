@@ -17,6 +17,9 @@ import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
 
 import { GenreCard } from "./GenreCard";
 
+import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
+import { motion, AnimatePresence } from "framer-motion";
+
 interface Props {
   item: ContentRailItem;
   config: RailCardDesignConfig;
@@ -28,7 +31,7 @@ interface Props {
   focusKey?: string;
   /** Shows the focus ring on this card even when spatial-nav focus is on a sibling (spotlight rails). */
   forceFocusRing?: boolean;
-  /** True while spatial-nav focus is anywhere within this rail — drives the poster-\>preview-video transition. */
+  /** True while spatial-nav focus is anywhere within this rail — drives the poster->preview-video transition. */
   railActive?: boolean;
   /** Spotlight rails: Left/Right presses cycle which item occupies each slot in the row instead of moving focus off this card. */
   onArrowLeftRight?: (direction: "left" | "right") => void;
@@ -54,7 +57,7 @@ export const LandscapeCard = React.memo(function LandscapeCard({ item, config, i
   // Spotlight rails: card 0 shows the current lead item's poster first,
   // then — once the rail has held spatial-nav focus for a beat — cross-fades
   // into its autoplaying muted preview trailer, mirroring the Hero
-  // Carousel's poster-\>video pattern. Cycling to a different item (via
+  // Carousel's poster->video pattern. Cycling to a different item (via
   // Left/Right) resets the delay so the new poster gets its own beat first.
   const isMixedSeries = (config as any).isMixedSeries;
   const [spotlightVideoReady, setSpotlightVideoReady] = useState(false);
@@ -127,18 +130,56 @@ export const LandscapeCard = React.memo(function LandscapeCard({ item, config, i
       forceFocusRing={forceFocusRing}
       onArrowLeftRight={onArrowLeftRight}
     >
-      {/* Persistent title/genre overlay for spotlight rails — the lead slot
-          always identifies whichever item currently occupies it. */}
+      {/* Animated Image Transition for Spotlight Lead Card */}
+      {isMixedSeries && (
+        <div className="absolute inset-0 z-0 overflow-hidden rounded-[inherit] pointer-events-none">
+          <AnimatePresence mode="sync" initial={false}>
+            <motion.div
+              key={item?.id}
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}
+              className="absolute inset-0 w-full h-full"
+            >
+              <JOJOCommonImage
+                src={imageUrl}
+                alt={item?.title || ""}
+                fill
+                contentMode="cover"
+                className="object-cover pointer-events-none select-none"
+                wrapperClassName="w-full h-full pointer-events-none select-none"
+              />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* Persistent title/genre overlay for spotlight rails — smoothly animates when item changes */}
       {isMixedSeries && (
         <div className="absolute inset-0 z-10 pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-          {item?.title && (
-            <div className="absolute bottom-0 left-0 right-0 p-4">
-              <h3 className="text-base font-bold text-theme_1 drop-shadow-md truncate">
-                {item.title}
-              </h3>
-            </div>
-          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+          <AnimatePresence mode="sync" initial={false}>
+            <motion.div
+              key={`title-${item?.id}`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 text-left"
+            >
+              {item?.title && (
+                <h3 className="text-base sm:text-lg font-bold text-white drop-shadow-md truncate">
+                  {item.title}
+                </h3>
+              )}
+              {item?.genres && item.genres.length > 0 && (
+                <p className="text-xs font-semibold text-white/70 truncate mt-0.5">
+                  {item.genres.join(" • ")}
+                </p>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       )}
 

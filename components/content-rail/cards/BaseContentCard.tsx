@@ -261,30 +261,29 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         outlineOffset: "-2px",
       }}
     >
-      <JOJOCommonImage
-        src={imageUrl}
-        alt={item.title}
-        fill
-        contentMode="cover"
-        sizes={
-          config.width >= 1000
-            ? "100vw"
-            : config.width >= 500
-              ? "(max-width: 768px) 100vw, 50vw"
-              : config.width >= 300
-                ? "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                : "(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw"
-        }
-        // For card-type hover: no scale, no dim — card stays clean
-        // For other types: subtle zoom on hover
-        className={`object-cover transition-all duration-300 pointer-events-none select-none ${config.hover.type !== "card" && !isSimple ? "" : ""
-          }`}
-        wrapperClassName="w-full h-full pointer-events-none select-none"
-        onLoad={() => setImageLoaded(true)}
-      />
+      {!((config as any)?.isMixedSeries && config.variant === RailCardVariant.LANDSCAPE) && (
+        <JOJOCommonImage
+          src={imageUrl}
+          alt={item.title}
+          fill
+          contentMode="cover"
+          sizes={
+            config.width >= 1000
+              ? "100vw"
+              : config.width >= 500
+                ? "(max-width: 768px) 100vw, 50vw"
+                : config.width >= 300
+                  ? "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                  : "(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw"
+          }
+          className={`object-cover transition-all duration-300 pointer-events-none select-none`}
+          wrapperClassName="w-full h-full pointer-events-none select-none"
+          onLoad={() => setImageLoaded(true)}
+        />
+      )}
 
       {/* Title shown while image is loading */}
-      {!imageLoaded && !!imageUrl && (
+      {!((config as any)?.isMixedSeries && config.variant === RailCardVariant.LANDSCAPE) && !imageLoaded && !!imageUrl && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-neutral-900 px-2 pointer-events-none select-none">
           <span className="text-[11px] sm:text-xs text-theme_1/50 font-semibold text-center line-clamp-3 leading-snug px-1">
             {item.title}

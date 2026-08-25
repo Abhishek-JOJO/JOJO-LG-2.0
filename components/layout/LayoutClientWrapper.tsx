@@ -18,7 +18,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   const isLegalPage = pathname === ROUTES.TERMS || pathname === ROUTES.PRIVACY;
   const isMobileDevice = searchParams?.get("device") === "mobile";
   const isMobileLegalPage = isLegalPage && isMobileDevice;
-  
+
   const isStandalonePage =
     pathname === ROUTES.DOWNLOAD_APP ||
     pathname === ROUTES.APP_INSTALL ||
@@ -28,7 +28,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
     pathname.startsWith(ROUTES.WATCH_BASE + "/") ||
     pathname === ROUTES.LOGIN ||
     pathname === ROUTES.LOGIN_OTP;
-    
+
   const isKidsPage = pathname === ROUTES.KIDS;
   const isHotAndNewPage = pathname === ROUTES.HOT_AND_NEW;
 
@@ -46,8 +46,8 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   return (
     <>
       {showNavbar && !hideHeaderFooter && <Navbar />}
-      <main 
-        className={mainClassName} 
+      <main
+        className={mainClassName}
         style={{ background: "var(--theme_12)" }}
       >
         {children}
