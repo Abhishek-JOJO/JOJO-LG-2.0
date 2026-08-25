@@ -3,22 +3,32 @@
 import React, { useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { motion } from "framer-motion";
 
 interface FocusableNavLinkProps {
   item: any;
   isItemActive: boolean;
   targetUrl: string;
   index: number;
+  totalNavItems?: number;
+  isGold?: boolean;
+  isAuthenticated?: boolean;
 }
 
-import { motion } from "framer-motion";
-
-export const FocusableNavLink = React.memo(({ item, isItemActive, targetUrl, index }: FocusableNavLinkProps) => {
+export const FocusableNavLink = React.memo(({
+  item,
+  isItemActive,
+  targetUrl,
+  index,
+  totalNavItems = 1,
+  isGold = false,
+  isAuthenticated = false
+}: FocusableNavLinkProps) => {
   const router = useRouter();
-  
+
   const handleArrowPress = useCallback((direction: string) => {
     if (direction === 'up') {
-      return false; // Prevent focus from escaping off the top of the screen
+      return false; // Prevent focus escaping off top
     }
 
     if (direction === 'down') {
@@ -28,13 +38,22 @@ export const FocusableNavLink = React.memo(({ item, isItemActive, targetUrl, ind
       }
     }
     
-    // Prevent focus from dropping when pressing left on the very first nav item (e.g. "Home")
     if (direction === 'left' && index === 0) {
+      setFocus('navbar-search');
+      return false;
+    }
+
+    if (direction === 'right' && index === totalNavItems - 1) {
+      if (!isGold) {
+        setFocus('navbar-get-gold');
+      } else {
+        setFocus(isAuthenticated ? 'navbar-profile-trigger' : 'navbar-login');
+      }
       return false;
     }
     
     return true;
-  }, [index]);
+  }, [index, totalNavItems, isGold, isAuthenticated]);
 
   const handleEnterPress = useCallback(() => {
     router.push(targetUrl);
@@ -62,41 +81,16 @@ export const FocusableNavLink = React.memo(({ item, isItemActive, targetUrl, ind
   return (
     <div
       ref={ref}
-      className={`relative cursor-pointer px-5 py-2 rounded-full transition-colors duration-300 z-10`}
+      className={`relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full transition-all duration-200 z-10 flex items-center justify-center shrink-0 ${
+        focused
+          ? "bg-white text-black font-bold scale-105 shadow-[0_0_18px_rgba(255,255,255,0.7)] ring-2 ring-white"
+          : isItemActive
+          ? "bg-white text-black font-bold shadow-md"
+          : "text-white/80 hover:text-white font-semibold hover:bg-white/10"
+      }`}
       onClick={handleClick}
     >
-      {/* Sliding Focus Pill */}
-      {focused && (
-        <motion.div
-          layoutId="navbar-focus-pill"
-          className="absolute inset-0 rounded-full bg-theme_13_samecolour/20 ring-2 ring-theme_13_samecolour shadow-[0_0_12px_rgba(255,255,255,0.4)]"
-          initial={false}
-          transition={{
-            type: "spring",
-            stiffness: 400,
-            damping: 30,
-            mass: 0.8
-          }}
-          style={{ zIndex: -1 }}
-        />
-      )}
-      
-      {/* Active Underline (Optional, looks premium) */}
-      {isItemActive && !focused && (
-        <motion.div
-          layoutId="navbar-active-underline"
-          className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-theme_13_samecolour"
-          initial={false}
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
-        />
-      )}
-
-      <span className={`relative z-10 body-md-regular transition-colors duration-300 ${
-        isItemActive || focused
-          ? "text-theme_13_samecolour body-md-semibold"
-          : "text-theme_1_5"
-        }`}
-      >
+      <span className="text-base sm:text-lg whitespace-nowrap tracking-wide">
         {item?.title}
       </span>
     </div>
@@ -104,3 +98,4 @@ export const FocusableNavLink = React.memo(({ item, isItemActive, targetUrl, ind
 });
 
 FocusableNavLink.displayName = "FocusableNavLink";
+

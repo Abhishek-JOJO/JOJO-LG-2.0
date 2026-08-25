@@ -96,7 +96,12 @@ function FocusableDropdownLogout({ onLogout, t }: any) {
   );
 }
 
-export function ProfileDropdown() {
+interface ProfileDropdownProps {
+  totalNavItems?: number;
+  isGold?: boolean;
+}
+
+export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDropdownProps) {
   const pathname = usePathname();
   const selectedProfile = useProfileStore((state) => state.selectedProfile);
   const { isAppReady } = useBootstrap();
@@ -264,6 +269,20 @@ export function ProfileDropdown() {
     focusKey: 'navbar-profile-trigger',
     onArrowPress: (direction) => {
       if (direction === 'up') return false;
+      if (direction === 'left') {
+        if (!isGold) {
+          setFocus('navbar-get-gold');
+        } else if (totalNavItems > 0) {
+          setFocus(`nav-link-${totalNavItems - 1}`);
+        }
+        return false;
+      }
+      if (direction === 'down') {
+        if (document.getElementById('hero-carousel-container')) {
+          setFocus('hero-carousel');
+          return false;
+        }
+      }
       return true;
     },
     onEnterPress: toggleDropdown,
@@ -275,25 +294,27 @@ export function ProfileDropdown() {
         <div
           ref={focusableRef as any}
           onClick={toggleDropdown}
-          className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 ${focused ? "scale-110 ring-2 ring-white rounded-full" : ""}`}
+          className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full border-2 border-[#FF6B00] bg-gradient-to-br from-[#FF6B00]/40 to-amber-500/20 ${
+            focused ? "scale-110 ring-4 ring-white shadow-[0_0_16px_rgba(255,255,255,0.7)]" : "hover:scale-105"
+          }`}
           aria-label="Profile Menu"
         >
           {selectedProfile?.avatar && (selectedProfile.avatar.startsWith("http") || selectedProfile.avatar.startsWith("/")) ? (
-            <div id="navbar-profile-avatar" className="w-[30px] h-[26px] sm:w-[30px] sm:h-[30px] rounded-full overflow-hidden hover:scale-105 transition-transform duration-200">
+            <div id="navbar-profile-avatar" className="w-[32px] h-[32px] sm:w-[38px] sm:h-[38px] rounded-full overflow-hidden shrink-0">
               <JOJOCommonImage
                 src={selectedProfile.avatar}
                 alt={selectedProfile.profile_name}
                 preset={JOJOImagePreset.Avatar}
-                width={30}
-                height={30}
+                width={38}
+                height={38}
                 radius={JOJOImageRadius.Full}
                 contentMode={JOJOImageContentMode.Cover}
               />
             </div>
           ) : (
-            <div id="navbar-profile-avatar" className="w-[26px] h-[26px] sm:w-[30px] sm:h-[30px] rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold text-theme_1 hover:scale-105 transition-transform duration-200">
+            <div id="navbar-profile-avatar" className="w-[32px] h-[32px] sm:w-[38px] sm:h-[38px] rounded-full flex items-center justify-center text-xs font-bold text-white bg-theme_13_samecolour shrink-0">
               {selectedProfile?.profile_name?.charAt(0).toUpperCase() ||
-                <UserCircle className="w-5 h-5" />}
+                <UserCircle className="w-5 h-5 text-white" />}
             </div>
           )}
         </div>
@@ -306,3 +327,4 @@ export function ProfileDropdown() {
     </>
   );
 }
+

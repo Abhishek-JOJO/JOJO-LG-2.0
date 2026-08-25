@@ -21,14 +21,28 @@ import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-function FocusableGetGold() {
+function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: number; isAuthenticated: boolean }) {
   const router = useRouter();
   
   const handleArrowPress = (direction: string) => {
     if (direction === 'up') return false;
-    if (direction === 'right') {
-      setFocus('navbar-search');
+    if (direction === 'left') {
+      if (totalNavItems > 0) {
+        setFocus(`nav-link-${totalNavItems - 1}`);
+      } else {
+        setFocus('navbar-search');
+      }
       return false;
+    }
+    if (direction === 'right') {
+      setFocus(isAuthenticated ? 'navbar-profile-trigger' : 'navbar-login');
+      return false;
+    }
+    if (direction === 'down') {
+      if (document.getElementById('hero-carousel-container')) {
+        setFocus('hero-carousel');
+        return false;
+      }
     }
     return true;
   };
@@ -43,22 +57,36 @@ function FocusableGetGold() {
     <div
       ref={ref as any}
       onClick={() => router.push(ROUTES.SUBSCRIPTION)}
-      className={`cursor-pointer px-4 py-1.5 text-black body-md-semibold whitespace-nowrap rounded-full transition-transform duration-200 ${focused ? "scale-110 ring-2 ring-white" : ""}`}
-      style={{ background: "linear-gradient(44.13deg, #FAAF3F 21.63%, #FFD691 49.52%, #FAAF3F 81.68%)" }}
+      className={`cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 text-base sm:text-lg font-bold whitespace-nowrap rounded-full transition-all duration-200 shrink-0 ${
+        focused
+          ? "scale-105 ring-2 ring-white text-black bg-gradient-to-r from-[#FAAF3F] via-[#FFD691] to-[#FAAF3F] shadow-[0_0_18px_rgba(250,175,63,0.7)]"
+          : "text-[#FAAF3F] hover:text-[#FFD691] hover:bg-amber-500/10"
+      }`}
     >
       Get Gold
     </div>
   );
 }
 
-function FocusableSearch() {
+function FocusableSearch({ totalNavItems }: { totalNavItems: number }) {
   const router = useRouter();
   
   const handleArrowPress = (direction: string) => {
     if (direction === 'up') return false;
-    if (direction === 'left') {
-      setFocus('navbar-get-gold');
+    if (direction === 'left') return false;
+    if (direction === 'right') {
+      if (totalNavItems > 0) {
+        setFocus('nav-link-0');
+      } else {
+        setFocus('navbar-get-gold');
+      }
       return false;
+    }
+    if (direction === 'down') {
+      if (document.getElementById('hero-carousel-container')) {
+        setFocus('hero-carousel');
+        return false;
+      }
     }
     return true;
   };
@@ -73,17 +101,37 @@ function FocusableSearch() {
     <div
       ref={ref as any}
       onClick={() => router.push(`${ROUTES.SEARCH}?from=app`)}
-      className={`text-theme_1 hover:text-theme_13_samecolour transition-colors p-1.5 rounded-full hover:bg-theme_1/5 cursor-pointer flex items-center justify-center ${focused ? "scale-110 ring-2 ring-white bg-theme_1/10" : ""}`}
+      className={`p-2.5 rounded-full cursor-pointer flex items-center justify-center transition-all duration-200 shrink-0 ${
+        focused
+          ? "bg-white text-black scale-110 shadow-[0_0_14px_rgba(255,255,255,0.6)] ring-2 ring-white"
+          : "text-white/90 hover:text-white hover:bg-white/10"
+      }`}
       aria-label="Search"
     >
-      <Search className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
+      <Search className="w-5 h-5 sm:w-6 sm:h-6" />
     </div>
   );
 }
 
-function FocusableLoginButton({ t, router }: { t: any; router: any }) {
+function FocusableLoginButton({ t, router, totalNavItems, isGold }: { t: any; router: any; totalNavItems: number; isGold: boolean }) {
   const handleArrowPress = (direction: string) => {
     if (direction === 'up') return false;
+    if (direction === 'left') {
+      if (!isGold) {
+        setFocus('navbar-get-gold');
+      } else if (totalNavItems > 0) {
+        setFocus(`nav-link-${totalNavItems - 1}`);
+      } else {
+        setFocus('navbar-search');
+      }
+      return false;
+    }
+    if (direction === 'down') {
+      if (document.getElementById('hero-carousel-container')) {
+        setFocus('hero-carousel');
+        return false;
+      }
+    }
     return true;
   };
 
@@ -145,65 +193,69 @@ export function Navbar() {
       />
 
       {isBrowsingMode ? (
-        <div className="relative py-4 lg:pt-8 sm:pt-4 flex items-center justify-between px-2 sm:px-6 lg:px-8">
-          <div
-            className="h-12 sm:h-[60px] flex items-center gap-3 lg:gap-6 bg-theme_10_80 rounded-full px-4 sm:px-8 shadow-lg transition-all duration-300"
-            style={{ WebkitBackdropFilter: "blur(4px)", backdropFilter: "blur(4px)" }}
-          >
+        <div className="relative py-5 sm:py-6 lg:py-8 px-6 sm:px-12 lg:px-16 w-full flex items-center justify-between z-50">
+          {/* 1. Left JOJO Logo */}
+          <div className="flex items-center shrink-0">
+            <Link
+              href={ROUTES.HOME}
+              aria-label="JOJO Home"
+              className="flex items-center shrink-0"
+            >
+              <div className="w-[95px] h-[42px] sm:w-[135px] sm:h-[54px] relative flex items-center">
+                <JOJOCommonImage
+                  src={isGold ? LOGOS.JOJO_GOLD : LOGOS.JOJO_LOGO}
+                  alt="JOJO"
+                  fill
+                  preset={JOJOImagePreset.Logo}
+                  wrapperClassName="w-full h-full cursor-pointer animate-fade-in"
+                />
+              </div>
+            </Link>
+          </div>
+
+          {/* 2. Center Navigation Links */}
+          <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
             {navItems?.length === 0 ? (
               <NavMenuListSkeleton />
             ) : (
-              <>
-                <div className="flex items-center gap-3">
-                  <Link
-                    href={ROUTES.HOME}
-                    aria-label="JOJO Home"
-                    className="flex items-center shrink-0"
-                  >
-                    <div className="w-[70px] h-[32px] sm:w-[110px] sm:h-[42px] relative flex items-center">
-                      <JOJOCommonImage
-                        src={isGold ? LOGOS.JOJO_GOLD : LOGOS.JOJO_LOGO}
-                        alt="JOJO"
-                        fill
-                        preset={JOJOImagePreset.Logo}
-                        wrapperClassName="w-full h-full cursor-pointer animate-fade-in"
-                      />
-                    </div>
-                  </Link>
-                </div>
+              <div className="flex items-center gap-2 sm:gap-3 lg:gap-5">
+                <FocusableSearch totalNavItems={visibleNavItems.length} />
+                {visibleNavItems.map((item, index) => {
+                  const targetUrl = item?.url === ROUTES.HOMEPAGE ? ROUTES.HOME : item?.url;
+                  const isItemActive = pathname === targetUrl;
 
-                <div className="hidden lg:flex items-center gap-4 lg:gap-5 text-sm font-semibold">
-                  {visibleNavItems.map((item, index) => {
-                    const targetUrl = item?.url === ROUTES.HOMEPAGE ? ROUTES.HOME : item?.url;
-                    const isItemActive = pathname === targetUrl;
-
-                    return (
-                      <FocusableNavLink 
-                        key={`${item?.url}-${item?.title}`} 
-                        item={item} 
-                        isItemActive={isItemActive} 
-                        targetUrl={targetUrl} 
-                        index={index}
-                      />
-                    );
-                  })}
-                  {!isGold && <FocusableGetGold />}
-                </div>
-              </>
+                  return (
+                    <FocusableNavLink 
+                      key={`${item?.url}-${item?.title}`} 
+                      item={item} 
+                      isItemActive={isItemActive} 
+                      targetUrl={targetUrl} 
+                      index={index}
+                      totalNavItems={visibleNavItems.length}
+                      isGold={isGold}
+                      isAuthenticated={isAuthenticated}
+                    />
+                  );
+                })}
+                {!isGold && (
+                  <FocusableGetGold 
+                    totalNavItems={visibleNavItems.length} 
+                    isAuthenticated={isAuthenticated} 
+                  />
+                )}
+              </div>
             )}
           </div>
-            <div
-              className="h-10 sm:h-[60px] flex items-center gap-2 bg-theme_10_80 border-none rounded-full px-4"
-              style={{ WebkitBackdropFilter: "blur(4px)", backdropFilter: "blur(4px)" }}
-            >
-              <FocusableSearch />
+
+          {/* 3. Right User Avatar Profile / Login */}
+          <div className="flex items-center gap-3 shrink-0">
             {isShowLanguageDropdown && (
               <LanguageSwitcher className="h-9! bg-theme_9!" />
             )}
             {!isGuest ? (
-              <ProfileDropdown />
+              <ProfileDropdown totalNavItems={visibleNavItems.length} isGold={isGold} />
             ) : (
-              <FocusableLoginButton t={t} router={router} />
+              <FocusableLoginButton t={t} router={router} totalNavItems={visibleNavItems.length} isGold={isGold} />
             )}
           </div>
         </div>
