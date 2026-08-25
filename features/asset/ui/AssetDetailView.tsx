@@ -844,10 +844,18 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     }
   };
 
+  const navigateUpFromActions = () => {
+    if (!isStandalone) {
+      setFocus('asset-close-btn');
+    } else if (previewsList?.length > 1) {
+      setFocus('preview-dot-0');
+    }
+  };
+
   const { ref: watchNowRef, focused: watchNowFocused } = useFocusable({
     focusKey: `asset-watch-now-${assetId}`,
     onArrowPress: (direction) => {
-      if (direction === 'up') return false;
+      if (direction === 'up') { navigateUpFromActions(); return false; }
       if (direction === 'left') return false;
       if (direction === 'down') {
         navigateDownFromActions();
@@ -864,7 +872,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const { ref: watchlistRef, focused: watchlistFocused } = useFocusable({
     focusKey: `asset-watchlist-${assetId}`,
     onArrowPress: (direction) => {
-      if (direction === 'up') return false;
+      if (direction === 'up') { navigateUpFromActions(); return false; }
       if (direction === 'down') {
         navigateDownFromActions();
         return false;
@@ -897,7 +905,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const { ref: shareRef, focused: shareFocused } = useFocusable({
     focusKey: `asset-share-${assetId}`,
     onArrowPress: (direction) => {
-      if (direction === 'up') return false;
+      if (direction === 'up') { navigateUpFromActions(); return false; }
       if (direction === 'down') {
         navigateDownFromActions();
         return false;
@@ -934,7 +942,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const { ref: likeRef, focused: likeFocused } = useFocusable({
     focusKey: `asset-like-${assetId}`,
     onArrowPress: (direction) => {
-      if (direction === 'up') return false;
+      if (direction === 'up') { navigateUpFromActions(); return false; }
       if (direction === 'down') {
         navigateDownFromActions();
         return false;
@@ -962,7 +970,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const { ref: muteRef, focused: muteFocused } = useFocusable({
     focusKey: `asset-mute-${assetId}`,
     onArrowPress: (direction) => {
-      if (direction === 'up') return false;
+      if (direction === 'up') { navigateUpFromActions(); return false; }
       if (direction === 'right') return false;
       if (direction === 'down') {
         navigateDownFromActions();
@@ -1183,13 +1191,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     >
       {/* Absolute Close Button */}
       {!isStandalone && (
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-50 flex items-center justify-center w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 transition-colors border border-theme_1/10 cursor-pointer"
-          aria-label="Close details"
-        >
-          <X size={20} className="text-theme_1/80" />
-        </button>
+        <FocusableCloseButton onClose={onClose} />
       )}
 
       {/* Top Banner Section */}
@@ -1290,12 +1292,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             {/* Bar indicators — only width animates, height is always h-1 */}
             <div className="flex items-center gap-1.5">
               {previewsList.map((_, idx) => (
-                <button
+                <FocusablePreviewDot
                   key={idx}
+                  idx={idx}
                   onClick={() => handleSlideChange(idx)}
-                  aria-label={`Go to preview ${idx + 1}`}
-                  className="cursor-pointer flex items-center justify-center"
-                  style={{ background: "none", border: "none", padding: 0 }}
+                  assetId={assetId}
                 >
                   <span
                     style={{
@@ -1324,17 +1325,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                       }}
                     />
                   </span>
-                </button>
+                </FocusablePreviewDot>
               ))}
             </div>
             {/* Next arrow */}
-            <button
-              onClick={handleNextSlide}
-              className="text-theme_1/80 hover:text-theme_1 transition-colors flex items-center justify-center cursor-pointer active:scale-90"
-              aria-label="Next slide"
-            >
-              <ChevronRight size={30} />
-            </button>
+            <FocusablePreviewNextButton onClick={handleNextSlide} />
           </div>
         )}
       </div>
@@ -2041,6 +2036,65 @@ function FocusableCastItem({ castItem, idx, asset, assetId, setSelectedProfessio
         {cast.role}
       </span>
     </div>
+  );
+}
+
+function FocusableCloseButton({ onClose }: { onClose?: () => void }) {
+  const { ref, focused } = useFocusable({
+    focusKey: 'asset-close-btn',
+    onEnterPress: () => onClose?.(),
+  });
+  return (
+    <button
+      ref={ref as any}
+      onClick={onClose}
+      className={`absolute top-4 right-4 z-50 flex items-center justify-center w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 transition-colors border border-theme_1/10 cursor-pointer outline-none ${focused ? "ring-2 ring-white scale-110" : ""}`}
+      aria-label="Close details"
+    >
+      <X size={20} className="text-theme_1/80" />
+    </button>
+  );
+}
+
+function FocusablePreviewDot({ idx, onClick, assetId, children }: any) {
+  const { ref, focused } = useFocusable({
+    focusKey: `preview-dot-${idx}`,
+    onEnterPress: onClick,
+    onArrowPress: (direction: string) => {
+      if (direction === 'down') {
+        setFocus(`asset-watch-now-${assetId}`);
+        return false;
+      }
+      return true;
+    },
+  });
+  return (
+    <button
+      ref={ref as any}
+      onClick={onClick}
+      aria-label={`Go to preview ${idx + 1}`}
+      className={`cursor-pointer flex items-center justify-center outline-none ${focused ? "ring-2 ring-white rounded-full scale-125" : ""}`}
+      style={{ background: "none", border: "none", padding: 0 }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function FocusablePreviewNextButton({ onClick }: { onClick: () => void }) {
+  const { ref, focused } = useFocusable({
+    focusKey: 'preview-next-btn',
+    onEnterPress: onClick,
+  });
+  return (
+    <button
+      ref={ref as any}
+      onClick={onClick}
+      className={`text-theme_1/80 hover:text-theme_1 transition-colors flex items-center justify-center cursor-pointer active:scale-90 outline-none ${focused ? "ring-2 ring-white rounded-full scale-110" : ""}`}
+      aria-label="Next slide"
+    >
+      <ChevronRight size={30} />
+    </button>
   );
 }
 

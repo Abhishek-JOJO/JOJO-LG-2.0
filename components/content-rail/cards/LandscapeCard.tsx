@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Play, Plus, Share2, ThumbsUp, Volume2, VolumeX, Trash2 } from "lucide-react";
 
-import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
 import JOJOCommonVideo from "@/components/ui/JOJOCommonVideo";
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
 import { usePlayerStore } from "@/store/usePlayerStore";
@@ -25,17 +24,19 @@ interface Props {
   itemsLength?: number;
   onClick?: (item: ContentRailItem) => void;
   onFocusChange?: (index: number) => void;
-  /**
-   * When set to an item other than `item` itself, the card's artwork
-   * cross-fades to preview that item instead — used by the SERIES_MIXED
-   * rail so the fixed landscape frame mirrors whichever poster currently
-   * has spatial-nav focus. Click/enter always still targets `item`.
-   */
-  previewItem?: ContentRailItem;
   className?: string;
+  focusKey?: string;
+  /** Shows the focus ring on this card even when spatial-nav focus is on a sibling (spotlight rails). */
+  forceFocusRing?: boolean;
+  /** True while spatial-nav focus is anywhere within this rail — drives the poster-\>preview-video transition. */
+  railActive?: boolean;
+  /** Spotlight rails: Left/Right presses cycle which item occupies each slot in the row instead of moving focus off this card. */
+  onArrowLeftRight?: (direction: "left" | "right") => void;
 }
 
-export const LandscapeCard = React.memo(function LandscapeCard({ item, config, index, itemsLength, onClick, onFocusChange, previewItem, className }: Props) {
+const SPOTLIGHT_VIDEO_DELAY_MS = 1500;
+
+export const LandscapeCard = React.memo(function LandscapeCard({ item, config, index, itemsLength, onClick, onFocusChange, className, focusKey, forceFocusRing, railActive, onArrowLeftRight }: Props) {
   const tRails = useTranslations("contentRails");
   const tHover = useTranslations("hoverCard");
 
@@ -49,6 +50,24 @@ export const LandscapeCard = React.memo(function LandscapeCard({ item, config, i
 
   const [copied, setCopied] = useState(false);
   const user = useAuthStore((s) => s.user);
+
+  // Spotlight rails: card 0 shows the current lead item's poster first,
+  // then — once the rail has held spatial-nav focus for a beat — cross-fades
+  // into its autoplaying muted preview trailer, mirroring the Hero
+  // Carousel's poster-\>video pattern. Cycling to a different item (via
+  // Left/Right) resets the delay so the new poster gets its own beat first.
+  const isMixedSeries = (config as any).isMixedSeries;
+  const [spotlightVideoReady, setSpotlightVideoReady] = useState(false);
+  const [spotlightVideoDelayPassed, setSpotlightVideoDelayPassed] = useState(false);
+
+  useEffect(() => {
+    if (!isMixedSeries) return;
+    setSpotlightVideoDelayPassed(false);
+    setSpotlightVideoReady(false);
+    if (!railActive) return;
+    const timer = setTimeout(() => setSpotlightVideoDelayPassed(true), SPOTLIGHT_VIDEO_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [isMixedSeries, railActive, item?.id]);
 
   const handleShare = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -90,12 +109,8 @@ export const LandscapeCard = React.memo(function LandscapeCard({ item, config, i
   const imageUrl = item.landscapeImage || item.image;
   const showInternalHover = isHovered && config.hover.type !== "card";
 
-  // Spotlight preview (SERIES_MIXED rails): when spatial-nav focus is on a
-  // different poster in the row, that poster's art cross-fades in on top of
-  // this card's own image instead of replacing it — the frame position and
-  // its own click target never change, only what's currently displayed.
-  const isPreviewingOther = !!previewItem && previewItem.id !== item.id;
-  const previewImageUrl = previewItem ? (previewItem.landscapeImage || previewItem.image) : undefined;
+  const spotlightVideoUrl = isMixedSeries ? item?.previewUrl : undefined;
+  const shouldPlaySpotlightVideo = isMixedSeries && railActive && spotlightVideoDelayPassed && !!spotlightVideoUrl;
 
   return (
     <BaseContentCard
@@ -108,29 +123,39 @@ export const LandscapeCard = React.memo(function LandscapeCard({ item, config, i
       onHoverChange={setIsHovered}
       onFocusChange={onFocusChange}
       className={className}
+      focusKey={focusKey}
+      forceFocusRing={forceFocusRing}
+      onArrowLeftRight={onArrowLeftRight}
     >
-      {/* Spotlight preview overlay — cross-fades in/out as focus moves through the rail */}
-      {previewImageUrl && (
-        <div
-          className={`absolute inset-0 z-10 transition-opacity duration-300 ease-out ${isPreviewingOther ? "opacity-100" : "opacity-0 pointer-events-none"
-            }`}
-        >
-          <JOJOCommonImage
-            src={previewImageUrl}
-            alt={previewItem?.title ?? ""}
-            fill
-            contentMode="cover"
-            className="object-cover pointer-events-none select-none"
-            wrapperClassName="w-full h-full pointer-events-none select-none"
-          />
+      {/* Persistent title/genre overlay for spotlight rails — the lead slot
+          always identifies whichever item currently occupies it. */}
+      {isMixedSeries && (
+        <div className="absolute inset-0 z-10 pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-          {previewItem?.title && (
+          {item?.title && (
             <div className="absolute bottom-0 left-0 right-0 p-4">
               <h3 className="text-base font-bold text-theme_1 drop-shadow-md truncate">
-                {previewItem.title}
+                {item.title}
               </h3>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Spotlight preview video — fades in above the poster once the rail has held focus for a beat */}
+      {isMixedSeries && spotlightVideoUrl && (
+        <div className={`absolute inset-0 z-[15] transition-opacity duration-700 ease-out ${spotlightVideoReady && shouldPlaySpotlightVideo ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+          <JOJOCommonVideo
+            src={shouldPlaySpotlightVideo ? spotlightVideoUrl : undefined}
+            autoPlay={shouldPlaySpotlightVideo}
+            muted
+            loop
+            playsInline
+            onPlaying={() => setSpotlightVideoReady(true)}
+            fill
+            className="object-cover pointer-events-none select-none"
+            wrapperClassName="w-full h-full pointer-events-none select-none"
+          />
         </div>
       )}
 

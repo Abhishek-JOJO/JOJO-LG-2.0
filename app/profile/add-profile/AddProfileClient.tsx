@@ -21,6 +21,7 @@ import { Pencil } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useFocusable, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 import { selectAge, selectAgeError, selectCanSubmit, selectGender, selectGenderError, selectName, selectNameError, selectNameTouched, selectReset, selectSelectedAvatar, selectSetAge, selectSetGender, selectSetName, selectSubmit, selectTouchName, useCreateAccountStore } from "../../register/create-account/store";
 
 export default function AddProfileClient() {
@@ -52,6 +53,11 @@ export default function AddProfileClient() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const hasRedirected = useRef(false);
     const isNavigatingToAvatar = useRef(false);
+
+    const { ref: containerRef, focusKey: containerFocusKey } = useFocusable({
+        trackChildren: true,
+        focusKey: "add-profile-container",
+    });
 
     const getCreatedProfileId = (response: any) => {
         const data = response?.data;
@@ -169,7 +175,8 @@ export default function AddProfileClient() {
     };
 
     return (
-        <div className="relative min-h-screen overflow-hidden -mt-15 lg:-mt-25">
+        <FocusContext.Provider value={containerFocusKey}>
+        <div ref={containerRef as any} className="relative min-h-screen overflow-hidden -mt-15 lg:-mt-25">
             <PageBackground />
 
             <div className={cn(
@@ -189,15 +196,10 @@ export default function AddProfileClient() {
                         <JOJOCardContent className="w-full space-y-2" gap="5px">
 
                             <div className="flex flex-col items-center gap-3 py-2">
-                                <div
-                                    onClick={handleAvatarNavigation}
-                                    className={cn(
-                                        "group relative h-32 w-32 overflow-hidden rounded-full bg-theme_10_80 transition sm:h-36 sm:w-36",
-                                        "border border-theme_1/10 hover:border-theme_13_samecolour",
-                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme_13_samecolour",
-                                        isSubmitting && "cursor-not-allowed opacity-60"
-                                    )}
-                                    aria-label={t("avatar_label")}
+                                <FocusableAvatarPicker
+                                    onSelect={handleAvatarNavigation}
+                                    disabled={isSubmitting}
+                                    ariaLabel={t("avatar_label")}
                                 >
                                     {selectedAvatar ? (
                                         <>
@@ -228,24 +230,20 @@ export default function AddProfileClient() {
                                             </span>
                                         </div>
                                     )}
-                                </div>
+                                </FocusableAvatarPicker>
                             </div>
 
                             <div className="w-full">
                                 <label className="mb-2 block text-[15px] font-bold text-theme_1">
                                     {t("full_name_label")}
                                 </label>
-                                <JOJOCustomInput
-                                    state={JOJOInput.State.DEFAULT}
-                                    placeholder={t("full_name_placeholder")}
-                                    autoComplete="name"
+                                <FocusableNameInput
                                     value={name}
-                                    onChange={(e) => setName(e.target.value)}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
                                     onBlur={() => touchName()}
-                                    className="w-full body-sm-regular bg-theme_10"
+                                    placeholder={t("full_name_placeholder")}
                                     error={!!(nameTouched && nameError)}
                                     disabled={isSubmitting}
-                                    maxLength={25}
                                 />
                                 <div className="mt-1 flex justify-between items-center">
                                     <div>
@@ -269,6 +267,7 @@ export default function AddProfileClient() {
                                     {AGE_RANGES.map((range) => (
                                         <Chip
                                             key={range}
+                                            focusKey={`add-age-${range}`}
                                             label={range}
                                             active={age === range}
                                             onClick={() => !isSubmitting && setAge(range as AgeRange)}
@@ -290,6 +289,7 @@ export default function AddProfileClient() {
                                     {GENDERS.map((g) => (
                                         <Chip
                                             key={g}
+                                            focusKey={`add-gender-${g}`}
                                             label={t(GENDER_LABEL_KEY[g as Gender])}
                                             active={gender === g}
                                             onClick={() => !isSubmitting && setGender(g as Gender)}
@@ -304,25 +304,122 @@ export default function AddProfileClient() {
                         </JOJOCardContent>
 
                         <JOJOCardFooter className="pt-8">
-                            <JOJOCustomButton
-                                size={JOJOButton.Size.L}
-                                state={
-                                    canSubmit && !isSubmitting
-                                        ? JOJOButton.State.ACTIVE
-                                        : JOJOButton.State.DISABLED
-                                }
-                                hoverColor={themeColors.theme_13_samecolour}
-                                type="submit"
+                            <FocusableSaveButton
                                 disabled={!canSubmit || isSubmitting || createProfile.isPending || updateProfile.isPending}
                                 isLoading={isSubmitting || createProfile.isPending || updateProfile.isPending}
-                                className="mx-auto w-1/4 rounded-[100px] border-none body-sm-medium hover:opacity-90"
-                            >
-                                {t("save")}
-                            </JOJOCustomButton>
+                                active={canSubmit && !isSubmitting}
+                                label={t("save")}
+                            />
                         </JOJOCardFooter>
                     </form>
                 </JOJOCustomCard>
             </div>
         </div>
+        </FocusContext.Provider>
+    );
+}
+
+function FocusableAvatarPicker({
+    onSelect,
+    disabled,
+    ariaLabel,
+    children,
+}: {
+    onSelect: () => void;
+    disabled: boolean;
+    ariaLabel: string;
+    children: React.ReactNode;
+}) {
+    const { ref, focused } = useFocusable({
+        focusKey: "add-profile-avatar",
+        onEnterPress: onSelect,
+    });
+    return (
+        <div
+            ref={ref as any}
+            onClick={onSelect}
+            className={cn(
+                "group relative h-32 w-32 overflow-hidden rounded-full bg-theme_10_80 transition sm:h-36 sm:w-36",
+                "border border-theme_1/10 hover:border-theme_13_samecolour",
+                "focus-visible:outline-none",
+                disabled && "cursor-not-allowed opacity-60",
+                focused ? "ring-2 ring-white border-theme_13_samecolour scale-105" : ""
+            )}
+            aria-label={ariaLabel}
+        >
+            {children}
+        </div>
+    );
+}
+
+function FocusableNameInput({
+    value,
+    onChange,
+    onBlur,
+    placeholder,
+    error,
+    disabled,
+}: {
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onBlur: () => void;
+    placeholder: string;
+    error: boolean;
+    disabled: boolean;
+}) {
+    const { ref, focused } = useFocusable({
+        focusKey: "add-profile-name",
+        onEnterPress: () => (ref.current as HTMLInputElement | null)?.focus(),
+    });
+    return (
+        <>
+            <JOJOCustomInput
+                ref={ref as any}
+                state={JOJOInput.State.DEFAULT}
+                placeholder={placeholder}
+                autoComplete="name"
+                value={value}
+                onChange={onChange}
+                onBlur={onBlur}
+                className={cn("w-full body-sm-regular bg-theme_10", focused ? "ring-2 ring-white" : "")}
+                error={error}
+                disabled={disabled}
+                maxLength={25}
+            />
+        </>
+    );
+}
+
+function FocusableSaveButton({
+    disabled,
+    isLoading,
+    active,
+    label,
+}: {
+    disabled: boolean;
+    isLoading: boolean;
+    active: boolean;
+    label: string;
+}) {
+    const { ref, focused } = useFocusable({
+        focusKey: "add-profile-save",
+        onEnterPress: () => (ref.current as HTMLButtonElement | null)?.click(),
+    });
+    return (
+        <JOJOCustomButton
+            ref={ref as any}
+            size={JOJOButton.Size.L}
+            state={active ? JOJOButton.State.ACTIVE : JOJOButton.State.DISABLED}
+            hoverColor={themeColors.theme_13_samecolour}
+            type="submit"
+            disabled={disabled}
+            isLoading={isLoading}
+            className={cn(
+                "mx-auto w-1/4 rounded-[100px] border-none body-sm-medium hover:opacity-90",
+                focused ? "ring-2 ring-white scale-105" : ""
+            )}
+        >
+            {label}
+        </JOJOCustomButton>
     );
 }

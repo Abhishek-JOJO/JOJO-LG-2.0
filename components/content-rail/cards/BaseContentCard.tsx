@@ -24,6 +24,14 @@ interface BaseContentCardProps {
   index?: number;
   itemsLength?: number;
   isDragging?: boolean;
+  /** Stable focus key override — lets an ancestor target this exact card via `preferredChildFocusKey`. */
+  focusKey?: string;
+  /** Shows the focus ring even when this card itself isn't the spatial-nav focus target — used by spotlight rails' card 0. */
+  forceFocusRing?: boolean;
+  /** When false, this card is excluded from D-pad/spatial-nav entirely (still clickable by mouse) — used by spotlight rails' non-lead slots. */
+  focusable?: boolean;
+  /** When provided, Left/Right presses call this instead of the default nearest-neighbor move — used by spotlight rails' lead card to cycle which item occupies each slot. */
+  onArrowLeftRight?: (direction: "left" | "right") => void;
 }
 
 import Link from "next/link";
@@ -49,6 +57,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   index = 0,
   itemsLength = 0,
   isDragging = false,
+  focusKey: focusKeyProp,
+  forceFocusRing = false,
+  focusable = true,
+  onArrowLeftRight,
 }: BaseContentCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isFocusExpanded, setIsFocusExpanded] = useState(false);
@@ -58,7 +70,13 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   const cardRef = useRef<HTMLAnchorElement>(null);
   const t = useTranslations("contentRails");
   const { ref: focusRef, focused, focusKey } = useFocusable({
+    focusKey: focusKeyProp,
+    focusable,
     onArrowPress: (direction) => {
+      if ((direction === 'left' || direction === 'right') && onArrowLeftRight) {
+        onArrowLeftRight(direction);
+        return false;
+      }
       if (direction === 'up' || direction === 'down') {
         if (cardRef.current) {
           const currentSection = cardRef.current.closest('section');
@@ -391,6 +409,13 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     borderRadius: config.borderRadius,
   } as React.CSSProperties;
 
+  // Spotlight rails (isMixedSeries): the visible focus ring always stays on
+  // the fixed landscape card (0), not on whichever small portrait sibling is
+  // being browsed — that sibling only drives what card 0 previews, it never
+  // shows a ring of its own.
+  const isSpotlightSibling = isMixedSeries && config.variant === RailCardVariant.PORTRAIT;
+  const showFocusRing = isSpotlightSibling ? false : focused || forceFocusRing;
+
   const categorySlug = getContentTypeSlug(item.assetType, item.assetTypeCode);
   const slug = item.title ? slugify(item.title) : "watch";
   let itemUrl = `/${categorySlug}/${slug}/${item.id}`;
@@ -429,7 +454,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)] ${className} ${focused ? "ring-[4px] ring-white z-[99]" : ""}`}
+      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)] ${className} ${showFocusRing ? "ring-[4px] ring-white z-[99]" : ""}`}
       style={{
         ...cardStyle,
         // Elevate z-index when hovered so HoverCard renders above siblings

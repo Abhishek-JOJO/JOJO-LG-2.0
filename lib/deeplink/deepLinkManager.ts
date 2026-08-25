@@ -70,6 +70,22 @@ export const deepLinkManager = {
   },
 
   /**
+   * Encrypts a TV pairing code into the same `?data=` deep link format that
+   * `useDeepLinkHandler`'s "Flow A: TV/QR Pairing Link" already parses
+   * (`payload.qr_code`) — scanning this on a phone hands the code straight
+   * to that existing pairing flow.
+   */
+  generatePairingQrUrl(code: string, origin: string): string {
+    const payload: DeepLinkPayload = { path: "", type: "", qr_code: code };
+    try {
+      const encryptedHex = encrypt(JSON.stringify(payload), true);
+      return `${origin}/?data=${encryptedHex}`;
+    } catch (error) {
+      return "";
+    }
+  },
+
+  /**
    * Standardizes UTM & Campaign attribution query tags
    */
   getAdAttribution(searchParams: URLSearchParams): AdAttribution {

@@ -54,7 +54,21 @@
     "error_invalid_email": "અમાન્ય ઈમેઇલ ID",
     "error_invalid_phone": "અમાન્ય ફોન નંબર",
     "error_required": "કૃપા કરી તમારો ઈમેઇલ અથવા ફોન નંબર દાખલ કરો",
-    "error_user_not_found": "કોઈ વપરાશકર્તા મળ્યો નથી."
+    "error_user_not_found": "કોઈ વપરાશકર્તા મળ્યો નથી.",
+    "use_phone": "ફોન વાપરો",
+    "use_remote": "રિમોટ વાપરો",
+    "scan_qr_instruction": "તમારા ફોન અથવા ટેબ્લેટના કેમેરાથી QR કોડ સ્કેન કરો",
+    "qr_or": "અથવા",
+    "qr_step_open_app": "તમારા મોબાઇલ ફોન પર JOJO એપ ખોલો",
+    "qr_step_go_to": "પર જાઓ",
+    "qr_step_profile": "પ્રોફાઇલ",
+    "qr_step_click_on": "પર ક્લિક કરો",
+    "qr_step_tv_login": "TV લૉગિન",
+    "qr_step_enter_code": "ચાલુ રાખવા માટે આ યુનિક કોડ દાખલ કરો",
+    "qr_generating_code": "તમારો કોડ બની રહ્યો છે...",
+    "qr_code_expired": "આ કોડની મુદત પૂરી થઈ ગઈ છે",
+    "qr_get_new_code": "નવો કોડ મેળવો",
+    "get_otp": "OTP મેળવો"
   },
   "otpPage": {
     "verify_registration": "નોંધણીની ચકાસણી",

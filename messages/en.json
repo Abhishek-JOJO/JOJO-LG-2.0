@@ -54,7 +54,21 @@
     "error_invalid_email": "Invalid Email ID",
     "error_invalid_phone": "Invalid phone number",
     "error_required": "Please enter your email or phone number",
-    "error_user_not_found": "No user found."
+    "error_user_not_found": "No user found.",
+    "use_phone": "Use Phone",
+    "use_remote": "Use Remote",
+    "scan_qr_instruction": "Scan the QR Code using your phone or tablet's camera",
+    "qr_or": "OR",
+    "qr_step_open_app": "Open the JOJO app on your mobile phone",
+    "qr_step_go_to": "Go to",
+    "qr_step_profile": "Profile",
+    "qr_step_click_on": "Click on",
+    "qr_step_tv_login": "TV Login",
+    "qr_step_enter_code": "Enter this unique code to continue",
+    "qr_generating_code": "Generating your code...",
+    "qr_code_expired": "This code has expired",
+    "qr_get_new_code": "Get New Code",
+    "get_otp": "Get OTP"
   },
   "otpPage": {
     "verify_registration": "Verify Registration",

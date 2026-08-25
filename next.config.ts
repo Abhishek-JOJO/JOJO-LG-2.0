@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_VERSION: APP_VERSION,
     NEXT_PUBLIC_BUILD_TIME: BUILD_TIME,
   },
-  // Output export is required for Tizen TV (.wgt) packages
+  // Output export is required for LG webOS TV (.ipk) packages
   output: 'export', 
   reactStrictMode: true,
   images: {

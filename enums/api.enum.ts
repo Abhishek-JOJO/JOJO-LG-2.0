@@ -50,6 +50,9 @@ export enum ApiEndpoint {
 
   // Pairing
   PAIR = "/pair",
+  // TODO(backend): confirm this path/response shape with backend — used to poll
+  // whether a TV-displayed pairing code has been claimed by a mobile device yet.
+  PAIR_STATUS = "/pair-status",
 
   //verify subscription 
   VERIFY_SUBSCRIPTION = "/subscription/verify-subscription",

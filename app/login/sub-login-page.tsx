@@ -3,13 +3,6 @@
 import { Suspense } from "react";
 import { PageBackground } from "@/components/common/PageBackground";
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
-import {
-  JOJOCardContent,
-  JOJOCardFooter,
-  JOJOCardHeader,
-  JOJOCardTitle,
-  JOJOCustomCard,
-} from "@/components/ui/JOJOCard";
 import { StorageKey } from "@/enums/storage.enum";
 import { ErrorKey, LoginIdentifierType } from "@/enums/ui.enum";
 import { appConfig } from "@/lib/config/app.config";
@@ -36,6 +29,8 @@ import { useOtpStore } from "./otp/store";
 import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { analyticsService } from "@/shared/analytics";
 import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { LoginModeToggle, LoginMode } from "./components/LoginModeToggle";
+import { QrPairingPanel } from "./components/QrPairingPanel";
 
 export default function LoginPage() {
   return (
@@ -56,6 +51,11 @@ function LoginPageContent() {
   const { data: countries, isLoading: countriesLoading, error: countriesError } = useCountries();
   const { isAvailable, countryCode: geoCountryCode } = useGeoAvailability();
   const setAuthContext = useOtpStore(state => state.setAuthContext);
+
+  const [mode, setMode] = useState<LoginMode>(() => {
+    const m = searchParams?.get("mode");
+    return m === "remote" ? "remote" : "phone";
+  });
 
   const [value, setValue] = useState("");
   const [phoneCode, setPhoneCode] = useState<string>(
@@ -89,11 +89,12 @@ function LoginPageContent() {
   });
 
   useEffect(() => {
-    // Focus the input when the page loads
+    // Focus the input when the remote-entry form is showing
+    if (mode !== "remote") return;
     setTimeout(() => {
       setFocus('login-input');
     }, 300);
-  }, []);
+  }, [mode]);
 
   const lastTrackedErrorRef = useRef<ErrorKey | null>(null);
 
@@ -475,23 +476,32 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden -mt-15 lg:-mt-25">
+    <div className="relative min-h-screen overflow-hidden">
       <PageBackground />
 
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8">
-        <JOJOCustomCard className="w-full max-w-sm sm:max-w-md" cardConfig={{
-          borderGradient: "card_border_gradient",
-          borderWidth: 2,
-          showBorder: true,
-          background: "theme_12_60"
-        }}>
-          <form id="login-form" onSubmit={handleSubmit} noValidate>
-            <JOJOCardHeader>
-              <JOJOCardTitle>{t("title")}</JOJOCardTitle>
-            </JOJOCardHeader>
+      <div className="relative z-10 flex min-h-screen flex-col px-6 py-8 sm:px-10">
+        {/* Top bar: logo (left) + mode toggle (centered) */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+          <JOJOCommonImage
+            src={LOGOS.JOJO_LOGO}
+            altKey="img_jojo_logo"
+            width={110}
+            height={40}
+            preset={JOJOImagePreset.Logo}
+            wrapperClassName="h-9 w-[110px] justify-self-start"
+          />
+          <div className="justify-self-center">
+            <LoginModeToggle mode={mode} onChange={setMode} />
+          </div>
+          <div />
+        </div>
 
-            <JOJOCardContent className="gap-0">
-              <div className="flex flex-col pt-7">
+        <div className="flex flex-1 items-center justify-center">
+          {mode === "phone" ? (
+            <QrPairingPanel />
+          ) : (
+            <form id="login-form" onSubmit={handleSubmit} noValidate className="w-full max-w-sm sm:max-w-md">
+              <div className="flex flex-col">
                 <div ref={inputRef as any} className={`rounded-[24px] transition-all ${inputFocused ? "ring-4 ring-white shadow-xl scale-[1.02] z-10" : ""}`}>
                   <CountryWithEMailInput
                     id="login-input-field"
@@ -536,12 +546,12 @@ function LoginPageContent() {
                   </div>
                 )}
 
-                <div className="p-2 pt-3 caption-sm-regular text-theme_7">
+                <div className="p-2 pt-3 caption-sm-regular text-theme_5 text-center">
                   {t("disclaimer")}
                 </div>
               </div>
 
-              <div ref={submitRef as any} className={`w-1/3 sm:w-1/4 mx-auto mt-10 rounded-[100px] transition-all ${submitFocused ? "ring-4 ring-white shadow-xl scale-105" : ""}`}>
+              <div ref={submitRef as any} className={`w-1/2 sm:w-2/5 mx-auto mt-8 rounded-[100px] transition-all ${submitFocused ? "ring-4 ring-white shadow-xl scale-105" : ""}`}>
                 <JOJOCustomButton
                   size={JOJOButton.Size.L}
                   state={
@@ -555,21 +565,19 @@ function LoginPageContent() {
                   isLoading={initiateOtp.isPending || checkUserExists.isPending}
                   className="w-full flex border-none body-sm-medium"
                 >
-                  {t("next")}
+                  {t("get_otp")}
                 </JOJOCustomButton>
               </div>
 
-              <div className="flex items-center pt-10">
-                <div className="flex-1" />
-
-                <span className="body-xs-medium text-theme_5">
+              <div className="flex items-center pt-8">
+                <div className="flex-1 h-px bg-theme_1/10" />
+                <span className="body-xs-medium text-theme_5 px-3">
                   {t("or_login_with")}
                 </span>
-
-                <div className="flex-1 h-px" />
+                <div className="flex-1 h-px bg-theme_1/10" />
               </div>
 
-              <div className="flex justify-center gap-3">
+              <div className="flex justify-center gap-3 pt-4">
                 <GoogleLoginButton
                   onSuccess={() => router.push(ROUTES.HOME)}
                   onError={(loginError) => {
@@ -626,10 +634,8 @@ function LoginPageContent() {
                   <SocialBtn src={LOGOS.APPLE_LOGO} altKey="img_apple" />
                 </AppleLoginButton>
               </div>
-            </JOJOCardContent>
 
-            {!isAvailable && (
-              <JOJOCardFooter>
+              {!isAvailable && (
                 <p className="m-0 body-xs-regular text-center text-[var(--theme_7)] mt-8">
                   {t("not_existing_user")}
                   <span
@@ -642,10 +648,10 @@ function LoginPageContent() {
                     {t("create_account")}
                   </span>
                 </p>
-              </JOJOCardFooter>
-            )}
-          </form>
-        </JOJOCustomCard>
+              )}
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

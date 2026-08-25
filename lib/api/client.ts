@@ -97,7 +97,7 @@ async function request<T>(
       const base = (options?.baseUrl || config.apiBaseUrl).replace(/\/$/, "");
       const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
       
-      // For static export (Tizen TV), we cannot use Next.js /api routes.
+      // For static export (webOS TV), we cannot use Next.js /api routes.
       // We must hit the backend API directly from the client.
       url = `${base}${path}${query}`;
     }

@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { init, FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useRemoteManager } from './RemoteManager';
+import { useRemotePointer } from './PointerManager';
 
 // Initialize spatial navigation once (only on client side)
 if (typeof window !== 'undefined') {
@@ -13,8 +14,10 @@ if (typeof window !== 'undefined') {
 }
 
 export const SpatialNavigationProvider = ({ children }: { children: React.ReactNode }) => {
-  // Initialize remote key listeners (including Tizen keys)
+  // Initialize remote key listeners (including webOS keys)
   useRemoteManager();
+  // Bridge the Magic Remote pointer/cursor into spatial navigation focus
+  useRemotePointer();
 
   const { ref, focusKey } = useFocusable({
     focusable: true,

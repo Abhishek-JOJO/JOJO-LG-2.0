@@ -35,6 +35,9 @@ import { Pencil, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+
+const WEBOS_BACK_KEYCODE = 461;
 
 interface EditProfileModalProps {
     profile: Profile;
@@ -70,6 +73,31 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
             typeof window !== "undefined" &&
             window.sessionStorage.getItem(AVATAR_FLOW_STORAGE_KEYS.fromAvatar) === "1"
     );
+
+    // Scope D-pad navigation to this modal and focus it on open, mirroring AssetDetailModal
+    const { ref: modalRef, focusKey: modalFocusKey } = useFocusable({
+        focusKey: "EDIT_PROFILE_MODAL",
+        isFocusBoundary: true,
+    });
+
+    useEffect(() => {
+        const t = setTimeout(() => setFocus("EDIT_PROFILE_MODAL"), 100);
+        return () => clearTimeout(t);
+    }, []);
+
+    // This modal is an in-place overlay (no route/history entry behind it), so the
+    // global RemoteManager back-key handler would call history.back() and navigate
+    // away instead of closing it. Intercept the webOS back key here directly.
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.keyCode === WEBOS_BACK_KEYCODE || e.key === "Escape") && !isSubmitting) {
+                e.preventDefault();
+                onClose();
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [isSubmitting, onClose]);
 
     useEffect(() => {
         const hasAge = AGE_RANGES.includes(profile?.age as AgeRange);
@@ -142,24 +170,14 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
     const currentAvatarUrl = selectedAvatar?.url ?? (profile.avatar?.startsWith("http") ? profile.avatar : null);
 
     return (
+        <FocusContext.Provider value={modalFocusKey}>
         <div
+            ref={modalRef as any}
             className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 bg-black/60 backdrop-blur-sm"
             onClick={handleBackdropClick}
         >
             <JOJOCustomCard className="w-full max-w-sm sm:max-w-md overflow-hidden relative">
-                <JOJOCustomButton
-                    size={JOJOButton.Size.S}
-                    state={JOJOButton.State.ACTIVE}
-                    hoverColor="theme_10"
-                    type="button"
-                    onClick={onClose}
-                    disabled={isSubmitting}
-                    className="absolute top-4 right-4 z-10 text-theme_5 hover:text-theme_1 transition-colors"
-                    bgColor="none"
-                    aria-label="Close"
-                >
-                    <X className="w-5 h-5" />
-                </JOJOCustomButton>
+                <FocusableCloseButton onClose={onClose} disabled={isSubmitting} />
                 <form
                     onSubmit={handleSubmit as any}
                     noValidate
@@ -171,15 +189,10 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
 
                     <JOJOCardContent className="w-full space-y-2" gap="5px">
                         <div className="flex flex-col items-center gap-3 py-2">
-                            <div
-                                onClick={handleAvatarNavigation}
-                                className={cn(
-                                    "group relative h-32 w-32 overflow-hidden rounded-full bg-theme_10_80 transition sm:h-36 sm:w-36",
-                                    "border border-theme_1/10 hover:border-theme_13_samecolour",
-                                    "focus-visible:outline-none cursor-pointer",
-                                    isSubmitting && "cursor-not-allowed opacity-60"
-                                )}
-                                aria-label={t("avatar_label")}
+                            <FocusableAvatarEdit
+                                onSelect={handleAvatarNavigation}
+                                disabled={isSubmitting}
+                                ariaLabel={t("avatar_label")}
                             >
                                 {currentAvatarUrl ? (
                                     <>
@@ -209,7 +222,7 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
                                         </span>
                                     </div>
                                 )}
-                            </div>
+                            </FocusableAvatarEdit>
                         </div>
 
                         {/* Name input */}
@@ -217,17 +230,13 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
                             <label className="mb-2 block text-[15px] font-bold text-theme_1">
                                 {t("full_name_label")}
                             </label>
-                            <JOJOCustomInput
-                                state={JOJOInput.State.DEFAULT}
-                                placeholder={t("full_name_placeholder")}
-                                autoComplete="name"
+                            <FocusableNameInput
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
                                 onBlur={() => touchName()}
-                                className="w-full body-sm-regular bg-theme_10"
+                                placeholder={t("full_name_placeholder")}
                                 error={!!(nameTouched && nameError)}
                                 disabled={isSubmitting}
-                                maxLength={25}
                             />
                             <div className="mt-1 flex justify-between items-center">
                                 <div>
@@ -250,6 +259,7 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
                                 {AGE_RANGES.map((range) => (
                                     <Chip
                                         key={range}
+                                        focusKey={`edit-age-${range}`}
                                         label={range}
                                         active={age === range}
                                         onClick={() => !isSubmitting && setAge(range as AgeRange)}
@@ -268,6 +278,7 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
                                 {GENDERS.map((g) => (
                                     <Chip
                                         key={g}
+                                        focusKey={`edit-gender-${g}`}
                                         label={t(GENDER_LABEL_KEY[g as Gender])}
                                         active={gender === g}
                                         onClick={() => !isSubmitting && setGender(g as Gender)}
@@ -279,24 +290,147 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
                     </JOJOCardContent>
 
                     <JOJOCardFooter className="pt-8">
-                        <JOJOCustomButton
-                            size={JOJOButton.Size.L}
-                            state={
-                                canSubmit && !isSubmitting
-                                    ? JOJOButton.State.ACTIVE
-                                    : JOJOButton.State.DISABLED
-                            }
-                            hoverColor={themeColors.theme_13_samecolour}
-                            type="submit"
+                        <FocusableSaveButton
                             disabled={!canSubmit || isSubmitting || updateProfile.isPending}
                             isLoading={isSubmitting || updateProfile.isPending}
-                            className="mx-auto w-1/4 rounded-[100px] border-none body-sm-medium hover:opacity-90"
-                        >
-                            {t("save")}
-                        </JOJOCustomButton>
+                            active={canSubmit && !isSubmitting}
+                            label={t("save")}
+                        />
                     </JOJOCardFooter>
                 </form>
             </JOJOCustomCard>
         </div>
+        </FocusContext.Provider>
+    );
+}
+
+function FocusableCloseButton({ onClose, disabled }: { onClose: () => void; disabled: boolean }) {
+    const { ref, focused } = useFocusable({
+        focusKey: "edit-profile-close",
+        onEnterPress: onClose,
+    });
+    return (
+        <JOJOCustomButton
+            ref={ref as any}
+            size={JOJOButton.Size.S}
+            state={JOJOButton.State.ACTIVE}
+            hoverColor="theme_10"
+            type="button"
+            onClick={onClose}
+            disabled={disabled}
+            className={cn(
+                "absolute top-4 right-4 z-10 text-theme_5 hover:text-theme_1 transition-colors",
+                focused ? "ring-2 ring-white rounded-full" : ""
+            )}
+            bgColor="none"
+            aria-label="Close"
+        >
+            <X className="w-5 h-5" />
+        </JOJOCustomButton>
+    );
+}
+
+function FocusableAvatarEdit({
+    onSelect,
+    disabled,
+    ariaLabel,
+    children,
+}: {
+    onSelect: () => void;
+    disabled: boolean;
+    ariaLabel: string;
+    children: React.ReactNode;
+}) {
+    const { ref, focused } = useFocusable({
+        focusKey: "edit-profile-avatar",
+        onEnterPress: onSelect,
+    });
+    return (
+        <div
+            ref={ref as any}
+            onClick={onSelect}
+            className={cn(
+                "group relative h-32 w-32 overflow-hidden rounded-full bg-theme_10_80 transition sm:h-36 sm:w-36",
+                "border border-theme_1/10 hover:border-theme_13_samecolour",
+                "focus-visible:outline-none cursor-pointer",
+                disabled && "cursor-not-allowed opacity-60",
+                focused ? "ring-2 ring-white border-theme_13_samecolour scale-105" : ""
+            )}
+            aria-label={ariaLabel}
+        >
+            {children}
+        </div>
+    );
+}
+
+function FocusableNameInput({
+    value,
+    onChange,
+    onBlur,
+    placeholder,
+    error,
+    disabled,
+}: {
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onBlur: () => void;
+    placeholder: string;
+    error: boolean;
+    disabled: boolean;
+}) {
+    const { ref, focused } = useFocusable({
+        focusKey: "edit-profile-name",
+        onEnterPress: () => (ref.current as HTMLInputElement | null)?.focus(),
+    });
+    return (
+        <>
+            <JOJOCustomInput
+                ref={ref as any}
+                state={JOJOInput.State.DEFAULT}
+                placeholder={placeholder}
+                autoComplete="name"
+                value={value}
+                onChange={onChange}
+                onBlur={onBlur}
+                className={cn("w-full body-sm-regular bg-theme_10", focused ? "ring-2 ring-white" : "")}
+                error={error}
+                disabled={disabled}
+                maxLength={25}
+            />
+        </>
+    );
+}
+
+function FocusableSaveButton({
+    disabled,
+    isLoading,
+    active,
+    label,
+}: {
+    disabled: boolean;
+    isLoading: boolean;
+    active: boolean;
+    label: string;
+}) {
+    const { ref, focused } = useFocusable({
+        focusKey: "edit-profile-save",
+        onEnterPress: () => (ref.current as HTMLButtonElement | null)?.click(),
+    });
+    return (
+        <JOJOCustomButton
+            ref={ref as any}
+            size={JOJOButton.Size.L}
+            state={active ? JOJOButton.State.ACTIVE : JOJOButton.State.DISABLED}
+            hoverColor={themeColors.theme_13_samecolour}
+            type="submit"
+            disabled={disabled}
+            isLoading={isLoading}
+            className={cn(
+                "mx-auto w-1/4 rounded-[100px] border-none body-sm-medium hover:opacity-90",
+                focused ? "ring-2 ring-white scale-105" : ""
+            )}
+        >
+            {label}
+        </JOJOCustomButton>
     );
 }

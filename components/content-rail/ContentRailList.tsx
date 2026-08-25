@@ -7,7 +7,7 @@ import { appConfig } from "@/lib/config/app.config";
 import { minSwipeDistance, THUMB_CONFIG } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import React, { memo, useEffect, useState, useCallback } from "react";
+import React, { memo, useEffect, useState, useCallback, useId } from "react";
 import { FocusContext, useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { HeroCarouselCard } from "./cards/HeroCarouselCard";
 import { LandscapeCard } from "./cards/LandscapeCard";
@@ -30,6 +30,92 @@ interface ContentRailListProps {
   isLoadingMore?: boolean;
 }
 
+interface SpotlightCommonProps {
+  item: ContentRailItem;
+  index: number;
+  itemsLength?: number;
+  config: RailCardDesignConfig;
+  onClick: (item: ContentRailItem) => void;
+}
+
+/**
+ * Renders one slot of a spotlight rail. Slot 0 is a sticky landscape frame
+ * (CSS `sticky left-0`, pinned while the rest of the row scrolls behind it)
+ * that's the *only* D-pad-focusable element in the rail; every other slot
+ * is a small, non-focusable (mouse-clickable only) portrait card.
+ *
+ * The row doesn't scroll to browse — instead, each slot always shows
+ * `items[(leadIndex + slotIdx) % items.length]` (see the caller), so
+ * pressing Left/Right on the lead card *shifts what every slot displays*:
+ * item 2 moves into the landscape slot, item 3 moves into what was item 2's
+ * portrait slot, and so on — a true Hotstar-style shifting carousel, not a
+ * fixed-position preview swap.
+ */
+function renderSpotlightRailItem(
+  slotIdx: number,
+  effectiveItem: ContentRailItem,
+  keyId: string,
+  commonProps: SpotlightCommonProps,
+  config: RailCardDesignConfig,
+  leadFocusKey: string,
+  railActive: boolean,
+  onCycle: (direction: "left" | "right") => void
+) {
+  if (slotIdx === 0) {
+    const landscapeConfig: RailCardDesignConfig = {
+      ...config,
+      variant: RailCardVariant.LANDSCAPE,
+      width: RailCardWidth.W_462,
+      height: RailCardHeight.H_270,
+      aspectRatio: RailCardAspectRatio.WIDESCREEN_16_9,
+      hover: {
+        ...config.hover,
+        enabled: true,
+        type: "card",
+      },
+      // @ts-ignore
+      isMixedSeries: true,
+    };
+    return (
+      <LandscapeCard
+        key={keyId}
+        {...commonProps}
+        item={effectiveItem}
+        config={landscapeConfig}
+        className="sticky left-0 z-[150]"
+        focusKey={leadFocusKey}
+        forceFocusRing={railActive}
+        railActive={railActive}
+        onArrowLeftRight={onCycle}
+      />
+    );
+  }
+
+  const portraitConfig: RailCardDesignConfig = {
+    ...config,
+    variant: RailCardVariant.PORTRAIT,
+    width: RailCardWidth.W_180,
+    height: RailCardHeight.H_270,
+    aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,
+    hover: {
+      ...config.hover,
+      enabled: false,
+      type: "simple",
+    },
+    // @ts-ignore
+    isMixedSeries: true,
+  };
+  return (
+    <PortraitCard
+      key={keyId}
+      {...commonProps}
+      item={effectiveItem}
+      config={portraitConfig}
+      focusable={false}
+    />
+  );
+}
+
 
 
 
@@ -44,12 +130,39 @@ export function ContentRailList({
   isLoadingMore = false,
 }: ContentRailListProps) {
   const [virtualIndex, setVirtualIndex] = useState(0);
-  // Spotlight preview for SERIES_MIXED rails — index of the item currently
-  // mirrored into the fixed landscape frame (card 0). Defaults to 0 (the
-  // frame's own content) and resets whenever the rail's lead item changes.
+  // Spotlight rails: index of whichever item currently occupies the lead
+  // (landscape) slot. Every other slot displays items shifted forward from
+  // this one — see `renderSpotlightRailItem`. Resets whenever the rail's
+  // own lead item changes (new data, filter switch).
   const [spotlightIndex, setSpotlightIndex] = useState(0);
-  const handleSpotlightFocus = useCallback((idx: number) => setSpotlightIndex(idx), []);
   const activeIndex = items?.length ? ((virtualIndex % items.length) + items.length) % items.length : 0;
+
+  // Unique per-rail-instance id so the lead card's focus key never collides
+  // with another rail's on the same page.
+  const railInstanceId = useId();
+  const isSpotlightRail = config.variant === RailCardVariant.SERIES_MIXED || config.variant === RailCardVariant.PORTRAIT;
+  // Only the lead (landscape) slot is ever focusable in a spotlight rail, so
+  // this key is stable regardless of which item currently occupies it.
+  const leadFocusKey = `spotlight-lead-${railInstanceId}`;
+
+  const handleCycle = useCallback((direction: "left" | "right") => {
+    if (!items?.length) return;
+    setSpotlightIndex((prev) => {
+      const next = direction === "right" ? prev + 1 : prev - 1;
+      return ((next % items.length) + items.length) % items.length;
+    });
+  }, [items]);
+
+  // Focus boundary around the row: guarantees the lead card is what actually
+  // receives spatial-nav focus whenever this rail is (re-)entered — via
+  // `preferredChildFocusKey` — rather than leaving it to whichever card
+  // nearest-neighbor resolution happens to pick.
+  const { ref: railBoundaryRef, focusKey: railBoundaryFocusKey, hasFocusedChild: railActive } = useFocusable({
+    focusable: false,
+    trackChildren: true,
+    saveLastFocusedChild: false,
+    preferredChildFocusKey: leadFocusKey,
+  });
   const { isDragging } = useDragScroll(listRef);
   const isAnyCardHovered = usePlayerStore((s) => s.isAnyCardHovered);
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
@@ -287,128 +400,125 @@ export function ContentRailList({
     );
   }
 
+  const cardElements = items?.map((originalItem, index) => {
+    // Spotlight rails don't scroll to browse — each slot always displays
+    // whichever item currently sits `index` steps past the lead, wrapping
+    // around the end of the list. Left/Right on the lead card advances
+    // `spotlightIndex`, which shifts every slot's content at once.
+    const effectiveItem = isSpotlightRail
+      ? items[(spotlightIndex + index) % items.length]
+      : originalItem;
+
+    const commonProps = {
+      item: effectiveItem,
+      index,
+      itemsLength: items?.length,
+      config,
+      onClick: handleItemClick,
+    };
+
+    switch (config.variant) {
+      case RailCardVariant.LANDSCAPE:
+      case RailCardVariant.GENRE:
+        return <LandscapeCard key={originalItem?.id} {...commonProps} />;
+
+      case RailCardVariant.CONTINUE_WATCHING:
+        return <ContinueWatchingCard key={originalItem?.id} {...commonProps} />;
+
+      // Hotstar-style spotlight rail: slot 0 is a sticky landscape frame that
+      // stays pinned while the rest of the row scrolls behind it. It's the
+      // only D-pad-focusable slot — Left/Right shifts which item every slot
+      // displays instead of moving focus onto the small cards.
+      case RailCardVariant.SERIES_MIXED:
+      case RailCardVariant.PORTRAIT:
+      default:
+        return renderSpotlightRailItem(
+          index,
+          effectiveItem,
+          originalItem?.id,
+          commonProps,
+          config,
+          leadFocusKey,
+          railActive,
+          handleCycle
+        );
+
+      case RailCardVariant.TOP_TEN:
+      case RailCardVariant.ARTIST:
+      case RailCardVariant.UPCOMING:
+        return <PortraitCard key={originalItem.id} {...commonProps} />;
+    }
+  });
+
+  let skeletonElement: React.ReactNode = null;
+  if (isLoadingMore && !isExpanded) {
+    let skeletonMobileWidth = "135px";
+    let skeletonMobileHeight = "203px";
+
+    if (config.variant === RailCardVariant.SERIES_MIXED) {
+      skeletonMobileWidth = "105px";
+      skeletonMobileHeight = "158px";
+    } else if (
+      config.width >= RailCardWidth.W_580 ||
+      config.variant === RailCardVariant.LANDSCAPE ||
+      config.variant === RailCardVariant.CONTINUE_WATCHING
+    ) {
+      skeletonMobileWidth = "280px";
+      skeletonMobileHeight = "158px";
+    } else if (config.variant === RailCardVariant.GENRE) {
+      skeletonMobileWidth = "160px";
+      skeletonMobileHeight = "90px";
+    } else if (config.width === RailCardWidth.W_270) {
+      skeletonMobileWidth = "145px";
+      skeletonMobileHeight = "193px";
+    }
+
+    skeletonElement = (
+      <div
+        className="shrink-0 rounded-lg skeleton bg-white/5 flex items-center justify-center text-white/20 select-none animate-pulse w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)]"
+        style={{
+          "--desktop-width": `${config.width}px`,
+          "--desktop-height": `${config.height}px`,
+          "--mobile-width": skeletonMobileWidth,
+          "--mobile-height": skeletonMobileHeight,
+          borderRadius: config.borderRadius,
+        } as React.CSSProperties}
+      >
+        <div className="w-6 h-6 border-2 border-t-transparent border-white/40 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div
       ref={listRef}
-      className={`flex flex-nowrap overflow-x-auto overflow-y-hidden scrollbar-hide px-4 sm:px-6 lg:px-8 pb-6 pt-2 mt-0 ${isDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"}`}
+      className={`flex flex-nowrap overflow-x-auto overflow-y-hidden scrollbar-hide pb-6 pt-2 mt-0 ${isSpotlightRail ? "pl-0 pr-4 sm:pr-6 lg:pr-8" : "px-4 sm:px-6 lg:px-8"} ${isDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"}`}
       style={{ gap: `${config?.gap}px` }}
     >
-      {items?.map((item, index) => {
-        const commonProps = {
-          item,
-          index,
-          itemsLength: items?.length,
-          config,
-          onClick: handleItemClick,
-        };
-
-        switch (config.variant) {
-          case RailCardVariant.LANDSCAPE:
-          case RailCardVariant.GENRE:
-            return <LandscapeCard key={item?.id} {...commonProps} />;
-
-          case RailCardVariant.CONTINUE_WATCHING:
-            return <ContinueWatchingCard key={item?.id} {...commonProps} />;
-
-          case RailCardVariant.SERIES_MIXED:
-            if (index === 0) {
-              const landscapeConfig: RailCardDesignConfig = {
-                ...config,
-                variant: RailCardVariant.LANDSCAPE,
-                width: RailCardWidth.W_462,
-                height: RailCardHeight.H_270,
-                aspectRatio: RailCardAspectRatio.WIDESCREEN_16_9,
-                hover: {
-                  ...config.hover,
-                  enabled: true,
-                  type: "card",
-                },
-                // @ts-ignore
-                isMixedSeries: true,
-              };
-              return (
-                <LandscapeCard
-                  key={item.id}
-                  {...commonProps}
-                  config={landscapeConfig}
-                  previewItem={items[spotlightIndex] ?? item}
-                  onFocusChange={handleSpotlightFocus}
-                  className="sticky left-0 z-[150]"
-                />
-              );
-            } else {
-              const portraitConfig: RailCardDesignConfig = {
-                ...config,
-                variant: RailCardVariant.PORTRAIT,
-                width: RailCardWidth.W_180,
-                height: RailCardHeight.H_270,
-                aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,
-                hover: {
-                  ...config.hover,
-                  enabled: false,
-                  type: "simple",
-                },
-                // @ts-ignore
-                isMixedSeries: true,
-              };
-              return (
-                <PortraitCard
-                  key={item.id}
-                  {...commonProps}
-                  config={portraitConfig}
-                  onFocusChange={handleSpotlightFocus}
-                />
-              );
-            }
-
-          case RailCardVariant.TOP_TEN:
-          case RailCardVariant.ARTIST:
-          case RailCardVariant.UPCOMING:
-          case RailCardVariant.PORTRAIT:
-          default:
-            return <PortraitCard key={item.id} {...commonProps} />;
-        }
-      })}
-
-      {isLoadingMore && !isExpanded && (
-        (() => {
-          let skeletonMobileWidth = "135px";
-          let skeletonMobileHeight = "203px";
-
-          if (config.variant === RailCardVariant.SERIES_MIXED) {
-            skeletonMobileWidth = "105px";
-            skeletonMobileHeight = "158px";
-          } else if (
-            config.width >= RailCardWidth.W_580 ||
-            config.variant === RailCardVariant.LANDSCAPE ||
-            config.variant === RailCardVariant.CONTINUE_WATCHING
-          ) {
-            skeletonMobileWidth = "280px";
-            skeletonMobileHeight = "158px";
-          } else if (config.variant === RailCardVariant.GENRE) {
-            skeletonMobileWidth = "160px";
-            skeletonMobileHeight = "90px";
-          } else if (config.width === RailCardWidth.W_270) {
-            skeletonMobileWidth = "145px";
-            skeletonMobileHeight = "193px";
-          }
-
-          return (
+      {isSpotlightRail ? (
+        <FocusContext.Provider value={railBoundaryFocusKey}>
+          <div ref={railBoundaryRef as any} className="contents">
+            {/*
+              Sticky card 0 only covers its own box, starting at the scroll
+              container's padding edge — so container padding can't be used
+              here (it scrolls away as content, leaving the sticky card's
+              left edge exposed once scrolled). This spacer is a normal
+              (non-sticky) flex item instead: it scrolls off with the rest
+              of the row, and once gone, the sticky card is flush with the
+              true viewport edge and covers it completely.
+            */}
             <div
-              className="shrink-0 rounded-lg skeleton bg-white/5 flex items-center justify-center text-white/20 select-none animate-pulse w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)]"
-              style={{
-                "--desktop-width": `${config.width}px`,
-                "--desktop-height": `${config.height}px`,
-                "--mobile-width": skeletonMobileWidth,
-                "--mobile-height": skeletonMobileHeight,
-                borderRadius: config.borderRadius,
-              } as React.CSSProperties}
-            >
-              <div className="w-6 h-6 border-2 border-t-transparent border-white/40 rounded-full animate-spin" />
-            </div>
-          );
-        })()
+              className="w-4 sm:w-6 lg:w-8 shrink-0"
+              style={{ marginRight: `-${config?.gap ?? 0}px` }}
+              aria-hidden="true"
+            />
+            {cardElements}
+          </div>
+        </FocusContext.Provider>
+      ) : (
+        cardElements
       )}
+      {skeletonElement}
     </div>
   );
 }

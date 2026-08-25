@@ -15,6 +15,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useFocusable, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 import {
   selectSelectedAvatar,
   selectSetSelectedAvatar,
@@ -61,8 +62,14 @@ export default function AvtarClient() {
     router.replace(getReturnRoute());
   };
 
+  const { ref: containerRef, focusKey: containerFocusKey } = useFocusable({
+    trackChildren: true,
+    focusKey: "avatar-page-container",
+  });
+
   return (
-    <div className="relative min-h-screen overflow-hidden -mt-15 lg:-mt-25">
+    <FocusContext.Provider value={containerFocusKey}>
+    <div ref={containerRef as any} className="relative min-h-screen overflow-hidden -mt-15 lg:-mt-25">
       <PageBackground />
 
       <main
@@ -74,18 +81,9 @@ export default function AvtarClient() {
       >
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <div
-            onClick={handleBack}
-            className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-              "text-theme_1 transition",
-              "hover:bg-theme_13_samecolour",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme_13_samecolour"
-            )}
-            aria-label={t("back")}
-          >
+          <FocusableIconButton onClick={handleBack} ariaLabel={t("back")} focusKey="avatar-back-btn">
             <ArrowLeft className="h-5 w-5" />
-          </div>
+          </FocusableIconButton>
 
           <h1 className="text-xl font-semibold text-theme_1 sm:text-2xl">
             {t("avatar_title")}
@@ -108,16 +106,7 @@ export default function AvtarClient() {
                 {t("avatar_error")}
               </p>
 
-              <div
-                onClick={() => avatarsQuery.refetch()}
-                className={cn(
-                  "body-sm-medium rounded-full px-6 py-2.5",
-                  "bg-theme_13_samecolour text-theme_1 transition hover:opacity-90",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme_13_samecolour"
-                )}
-              >
-                {t("avatar_retry")}
-              </div>
+              <FocusableRetryButton onClick={() => avatarsQuery.refetch()} label={t("avatar_retry")} />
             </div>
           )}
 
@@ -157,18 +146,12 @@ export default function AvtarClient() {
                     );
 
                   return (
-                    <div
+                    <FocusableAvatarGridItem
                       key={avatarKey}
-                      onClick={() => handleAvatarSelect(avatar)}
-                      className={cn(
-                        "relative aspect-square w-full rounded-full",
-                        "p-1 transition duration-200",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme_13_samecolour",
-                        isSelected
-                          ? "scale-105 ring-2 ring-theme_13_samecolour"
-                          : "hover:scale-105"
-                      )}
-                      aria-label={t("avatar_label")}
+                      focusKey={`avatar-grid-${avatarKey}`}
+                      onSelect={() => handleAvatarSelect(avatar)}
+                      isSelected={isSelected}
+                      ariaLabel={t("avatar_label")}
                     >
                       <JOJOCommonImage
                         src={avatar.url}
@@ -191,13 +174,102 @@ export default function AvtarClient() {
                           <Check className="h-3.5 w-3.5" strokeWidth={3} />
                         </span>
                       )}
-                    </div>
+                    </FocusableAvatarGridItem>
                   );
                 })}
               </div>
             )}
         </section>
       </main>
+    </div>
+    </FocusContext.Provider>
+  );
+}
+
+function FocusableIconButton({
+  onClick,
+  ariaLabel,
+  focusKey,
+  children,
+}: {
+  onClick: () => void;
+  ariaLabel: string;
+  focusKey: string;
+  children: React.ReactNode;
+}) {
+  const { ref, focused } = useFocusable({ focusKey, onEnterPress: onClick });
+  return (
+    <div
+      ref={ref as any}
+      onClick={onClick}
+      className={cn(
+        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+        "text-theme_1 transition cursor-pointer",
+        "hover:bg-theme_13_samecolour",
+        "focus-visible:outline-none",
+        focused ? "ring-2 ring-white bg-theme_13_samecolour scale-105" : ""
+      )}
+      aria-label={ariaLabel}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FocusableRetryButton({ onClick, label }: { onClick: () => void; label: string }) {
+  const { ref, focused } = useFocusable({ focusKey: "avatar-retry-btn", onEnterPress: onClick });
+  return (
+    <div
+      ref={ref as any}
+      onClick={onClick}
+      className={cn(
+        "body-sm-medium rounded-full px-6 py-2.5 cursor-pointer",
+        "bg-theme_13_samecolour text-theme_1 transition hover:opacity-90",
+        "focus-visible:outline-none",
+        focused ? "ring-2 ring-white scale-105" : ""
+      )}
+    >
+      {label}
+    </div>
+  );
+}
+
+function FocusableAvatarGridItem({
+  focusKey,
+  onSelect,
+  isSelected,
+  ariaLabel,
+  children,
+}: {
+  focusKey: string;
+  onSelect: () => void;
+  isSelected: boolean;
+  ariaLabel: string;
+  children: React.ReactNode;
+}) {
+  const { ref, focused } = useFocusable({
+    focusKey,
+    onEnterPress: onSelect,
+    onFocus: () => {
+      (ref.current as HTMLElement | null)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    },
+  });
+  return (
+    <div
+      ref={ref as any}
+      onClick={onSelect}
+      className={cn(
+        "relative aspect-square w-full rounded-full cursor-pointer",
+        "p-1 transition duration-200",
+        "focus-visible:outline-none",
+        isSelected
+          ? "scale-105 ring-2 ring-theme_13_samecolour"
+          : "hover:scale-105",
+        focused ? "ring-2 ring-white scale-105" : ""
+      )}
+      aria-label={ariaLabel}
+    >
+      {children}
     </div>
   );
 }

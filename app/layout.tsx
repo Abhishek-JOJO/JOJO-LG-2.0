@@ -87,8 +87,8 @@ export default function RootLayout({
   return (
     <html lang={defaultLocale} suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
-        {/* Samsung Tizen Web APIs script — injected natively by Tizen TV OS / Simulator */}
-        <script src="$WEBAPIS/webapis/webapis.js" />
+        {/* LG webOS TV Web APIs script — self-hosted webOSTV.js from the webOS TV SDK */}
+        <script src="/webOSTV.js" />
         {/* Preload critical authentication page background assets */}
         <link rel="preload" href="/images/AUTH_BACKGROUND_IMG.webp" as="image" />
         <link rel="preload" href="/lottie/auth_background_data.json" as="fetch" crossOrigin="anonymous" />

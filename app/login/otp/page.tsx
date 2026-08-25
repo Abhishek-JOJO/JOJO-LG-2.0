@@ -2,8 +2,8 @@
 
 import { PageBackground } from "@/components/common/PageBackground";
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
-import { JOJOCardContent, JOJOCardDescription, JOJOCardFooter, JOJOCardHeader, JOJOCardTitle, JOJOCustomCard } from "@/components/ui/JOJOCard";
 import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
+import { LoginModeToggle, LoginMode } from "../components/LoginModeToggle";
 import { JOJOCustomInput } from "@/components/ui/JOJOInput";
 import { ErrorKey, LoginIdentifierType, OtpDeliveryMethod } from "@/enums/ui.enum";
 import { appConfig } from "@/lib/config/app.config";
@@ -410,6 +410,12 @@ function OtpPageContent() {
 
   const isDisabled = countdown > 0 || resendOtp.isPending || otpSecurity.isLocked;
 
+  const handleModeChange = (nextMode: LoginMode) => {
+    if (nextMode === "phone") {
+      router.push(`${ROUTES.LOGIN}?mode=phone`);
+    }
+  };
+
   // Display value for UI
   const displayIdentifier = isEmail
     ? email
@@ -433,20 +439,38 @@ function OtpPageContent() {
   });
 
   return (
-    <div className="relative min-h-screen overflow-hidden -mt-15 lg:-mt-25">
+    <div className="relative min-h-screen overflow-hidden">
       <PageBackground />
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8">
-        <JOJOCustomCard className="w-full max-w-sm sm:max-w-md bg-theme_12_60" style={{ backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(6px)", }}>
-          <form onSubmit={handleOtpSubmit as any} noValidate>
-            <JOJOCardHeader>
-              <JOJOCardTitle>{isRegister ? t("verify_registration") : t("title_login")}</JOJOCardTitle>
-              <JOJOCardDescription className="mt-10 text-start text-theme_5 w-full body-md-regular overflow-hidden">
-                <span className="mr-1">{isEmail ? t("sent_to_email") : t("sent_to")}</span>
-                <span className={`body-md-regular break-all max-w-full inline-block ${!isEmail ? 'ml-2' : ''}`}>{` ${displayIdentifier}`}</span>
-              </JOJOCardDescription>
-            </JOJOCardHeader>
+      <div className="relative z-10 flex min-h-screen flex-col px-6 py-8 sm:px-10">
+        {/* Top bar: logo (left) + mode toggle (centered) */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+          <JOJOCommonImage
+            src={LOGOS.JOJO_LOGO}
+            altKey="img_jojo_logo"
+            width={110}
+            height={40}
+            preset={JOJOImagePreset.Logo}
+            wrapperClassName="h-9 w-[110px] justify-self-start"
+          />
+          <div className="justify-self-center">
+            <LoginModeToggle mode="remote" onChange={handleModeChange} />
+          </div>
+          <div />
+        </div>
 
-            <JOJOCardContent className="gap-0" style={{ gap: "10px" }}>
+        <div className="flex flex-1 items-center justify-center px-4">
+        <form onSubmit={handleOtpSubmit as any} noValidate className="w-full max-w-sm sm:max-w-md">
+            <div className="flex flex-col items-center text-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-semibold text-theme_1">
+                {isRegister ? t("verify_registration") : t("title_login")}
+              </h1>
+              <p className="body-md-regular text-theme_5">
+                <span className="mr-1">{isEmail ? t("sent_to_email") : t("sent_to")}</span>
+                <span className="body-md-regular break-all text-theme_1">{` ${displayIdentifier}`}</span>
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-0 pt-8" style={{ gap: "10px" }}>
               {/* OTP boxes */}
               <div className="grid gap-3 w-full pt-3" style={{ gridTemplateColumns: `repeat(${appConfig.OTP_LENGTH}, 1fr)` }}>
                 {Array.from({ length: appConfig.OTP_LENGTH }).map((_, i) => (
@@ -579,26 +603,24 @@ function OtpPageContent() {
                   </div>
                 } */}
               </div>
-            </JOJOCardContent>
+            </div>
 
-            <JOJOCardFooter>
-              <div ref={submitRef as any} className={`w-[80%] mx-auto mt-10 rounded-[100px] transition-all ${submitFocused ? "ring-4 ring-white shadow-xl scale-105" : ""}`}>
-                <JOJOCustomButton
-                  ref={submitButtonRef}
-                  size={JOJOButton.Size.L}
-                  state={canSubmitOtp && !otpSecurity.isLocked && !otpExpiration.isExpired ? JOJOButton.State.ACTIVE : JOJOButton.State.DISABLED}
-                  type="submit"
-                  hoverColor={themeColors.theme_13_samecolour}
-                  disabled={!canSubmitOtp || verifyOtp.isPending || otpSecurity.isLocked || otpExpiration.isExpired}
-                  isLoading={verifyOtp.isPending}
-                  className="rounded-[100px] hover:opacity-90 body-sm-medium mx-auto flex border-none w-full"
-                >
-                  {isRegister ? t("submit_register") : t("submit_login")}
-                </JOJOCustomButton>
-              </div>
-            </JOJOCardFooter>
+            <div ref={submitRef as any} className={`w-[80%] mx-auto mt-10 rounded-[100px] transition-all ${submitFocused ? "ring-4 ring-white shadow-xl scale-105" : ""}`}>
+              <JOJOCustomButton
+                ref={submitButtonRef}
+                size={JOJOButton.Size.L}
+                state={canSubmitOtp && !otpSecurity.isLocked && !otpExpiration.isExpired ? JOJOButton.State.ACTIVE : JOJOButton.State.DISABLED}
+                type="submit"
+                hoverColor={themeColors.theme_13_samecolour}
+                disabled={!canSubmitOtp || verifyOtp.isPending || otpSecurity.isLocked || otpExpiration.isExpired}
+                isLoading={verifyOtp.isPending}
+                className="rounded-[100px] hover:opacity-90 body-sm-medium mx-auto flex border-none w-full"
+              >
+                {isRegister ? t("submit_register") : t("submit_login")}
+              </JOJOCustomButton>
+            </div>
           </form>
-        </JOJOCustomCard>
+        </div>
       </div>
     </div>
   );
