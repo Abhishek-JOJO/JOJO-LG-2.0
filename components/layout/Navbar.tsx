@@ -182,16 +182,15 @@ export function Navbar() {
 
   return (
     <header
-      className={`z-[100] overflow-visible transition-all duration-300 ${isBrowsingMode ? "fixed top-0 left-0 right-0" : "sticky top-0"
-        }`}
-      style={isScrolled && !isBrowsingMode ? { WebkitBackdropFilter: "blur(4px)", backdropFilter: "blur(4px)" } : undefined}
+      className="z-[999] overflow-visible transition-all duration-300 sticky top-0 left-0 right-0 w-full bg-[#0c0805]/95 backdrop-blur-xl border-b border-white/10 shadow-2xl"
+      style={{ WebkitBackdropFilter: "blur(12px)", backdropFilter: "blur(12px)" }}
     >
       <div
-        className="pointer-events-none absolute inset-x-0 -top-10 h-35.5 z-0 top-fade-gradient"
+        className="pointer-events-none absolute inset-x-0 top-0 h-full z-0 top-fade-gradient"
       />
 
       {isBrowsingMode ? (
-        <div className="relative py-5 sm:py-6 lg:py-8 px-6 sm:px-12 lg:px-16 w-full flex items-center justify-between z-50">
+        <div className="relative py-4 sm:py-5 lg:py-6 px-6 sm:px-12 lg:px-16 w-full flex items-center justify-between z-50">
           {/* 1. Left JOJO Logo */}
           <div className="flex items-center shrink-0">
             <Link

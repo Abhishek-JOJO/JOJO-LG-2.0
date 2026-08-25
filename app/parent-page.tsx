@@ -103,7 +103,7 @@ export default function ParentPage() {
     // will instantly render it. If not, it will natively show its own Skeleton.
 
     return (
-        <main className="min-h-screen" style={{ background: "var(--theme_12)" }}>
+        <div className="min-h-screen" style={{ background: "var(--theme_12)" }}>
             <ContentRailsView />
             {successData && (
                 successData.matchedType === "TVOD" || successData.paymentType === "TVOD" ? (
@@ -118,6 +118,6 @@ export default function ParentPage() {
                     />
                 )
             )}
-        </main>
+        </div>
     );
 }

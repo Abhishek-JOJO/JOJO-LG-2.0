@@ -39,8 +39,6 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
     mainClassName = "min-h-screen flex flex-col";
   } else if (isStandalonePage) {
     mainClassName = "h-screen h-[100dvh] w-full flex flex-col overflow-hidden";
-  } else if (isKidsPage || isHotAndNewPage || isLegalPage) {
-    mainClassName = "min-h-screen flex flex-col mt-25 max-lg:pb-20";
   }
 
   return (

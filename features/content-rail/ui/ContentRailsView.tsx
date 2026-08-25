@@ -303,7 +303,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   const isFirstHero = mappedRails.length > 0 ? mappedRails[0].type === ContentRailType.HERO_CAROUSEL : false;
 
   return (
-    <div className={`overflow-x-hidden ${isFirstHero ? "pt-0" : "pt-8"}`}>
+    <div className={`overflow-x-hidden ${isFirstHero ? "pt-0" : "pt-4 sm:pt-6"}`}>
       {mappedRails.map((rail,index) => {
         return (
           <ContentRailSection

@@ -82,7 +82,7 @@ function renderSpotlightRailItem(
         {...commonProps}
         item={effectiveItem}
         config={landscapeConfig}
-        className="sticky left-0 z-[150]"
+        className="sticky left-0 z-20"
         focusKey={leadFocusKey}
         forceFocusRing={railActive}
         railActive={railActive}
@@ -294,7 +294,7 @@ export function ContentRailList({
           id="hero-carousel-container"
           ref={focusKeyRef}
           data-focuskey={focusKey}
-          className={`relative overflow-hidden w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] lg:w-[calc(100%-4rem)] mx-auto select-none h-[75vh] mt-[100px] lg:mt-[120px] max-sm:h-[65dvh] max-sm:mt-[85px] rounded-[32px] border-[1.5px] shadow-[0_20px_50px_rgba(0,0,0,0.95)] transition-all duration-300 ${focused ? "ring-[4px] ring-white z-[99] border-white scale-[1.01]" : "border-white/10"}`}
+          className={`relative overflow-hidden w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] lg:w-[calc(100%-4rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] shadow-[0_20px_50px_rgba(0,0,0,0.95)] transition-all duration-300 ${focused ? "ring-[4px] ring-white z-[99] border-white scale-[1.01]" : "border-white/10"}`}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
