@@ -252,23 +252,15 @@ export function ContentRailList({
         return false;
       }
       if (direction === 'down') {
-        if (focusKeyRef.current) {
-          const heroSection = (focusKeyRef.current as HTMLElement).closest('section');
-          if (heroSection && heroSection.parentElement) {
-            const allSections = Array.from(heroSection.parentElement.querySelectorAll('section'));
-            const heroIndex = allSections.indexOf(heroSection);
-            
-            if (heroIndex !== -1 && heroIndex + 1 < allSections.length) {
-              const nextSection = allSections[heroIndex + 1];
-              const firstCard = nextSection.querySelector('[data-focuskey]');
-              if (firstCard) {
-                const targetFocusKey = firstCard.getAttribute('data-focuskey');
-                if (targetFocusKey) {
-                  setFocus(targetFocusKey);
-                  return false;
-                }
-              }
-            }
+        // Always focus the 1st card in the content section directly below hero carousel, regardless of active hero slider index
+        const firstCardBelowHero = document.querySelector(
+          'section:not(:first-child) [data-focuskey]:not([data-focuskey="hero-carousel"])'
+        );
+        if (firstCardBelowHero) {
+          const targetFocusKey = firstCardBelowHero.getAttribute('data-focuskey');
+          if (targetFocusKey) {
+            setFocus(targetFocusKey);
+            return false;
           }
         }
       }
@@ -490,35 +482,34 @@ export function ContentRailList({
   }
 
   return (
-    <div
-      ref={listRef}
-      className={`flex flex-nowrap overflow-x-auto overflow-y-hidden scrollbar-hide pb-6 pt-2 mt-0 ${isSpotlightRail ? "pl-0 pr-4 sm:pr-6 lg:pr-8" : "px-4 sm:px-6 lg:px-8"} ${isDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"}`}
-      style={{ gap: `${config?.gap}px` }}
-    >
-      {isSpotlightRail ? (
-        <FocusContext.Provider value={railBoundaryFocusKey}>
-          <div ref={railBoundaryRef as any} className="contents">
-            {/*
-              Sticky card 0 only covers its own box, starting at the scroll
-              container's padding edge — so container padding can't be used
-              here (it scrolls away as content, leaving the sticky card's
-              left edge exposed once scrolled). This spacer is a normal
-              (non-sticky) flex item instead: it scrolls off with the rest
-              of the row, and once gone, the sticky card is flush with the
-              true viewport edge and covers it completely.
-            */}
-            <div
-              className="w-4 sm:w-6 lg:w-8 shrink-0"
-              style={{ marginRight: `-${config?.gap ?? 0}px` }}
-              aria-hidden="true"
-            />
-            {cardElements}
-          </div>
-        </FocusContext.Provider>
-      ) : (
-        cardElements
-      )}
-      {skeletonElement}
-    </div>
+    <FocusContext.Provider value={railBoundaryFocusKey}>
+      <div
+        ref={(node) => {
+          if (railBoundaryRef) {
+            if (typeof (railBoundaryRef as any) === "function") (railBoundaryRef as any)(node);
+            else (railBoundaryRef as any).current = node;
+          }
+          if (isHeroVariant && focusKeyRef) {
+            if (typeof (focusKeyRef as any) === "function") (focusKeyRef as any)(node);
+            else (focusKeyRef as any).current = node;
+          }
+          if (listRef) {
+            (listRef as any).current = node;
+          }
+        }}
+        className={`flex flex-nowrap overflow-x-auto overflow-y-hidden scrollbar-hide pb-6 pt-2 mt-0 ${isSpotlightRail ? "pl-0 pr-4 sm:pr-6 lg:pr-8" : "px-4 sm:px-6 lg:px-8"} ${isDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"}`}
+        style={{ gap: `${config?.gap}px` }}
+      >
+        {isSpotlightRail && (
+          <div
+            className="w-4 sm:w-6 lg:w-8 shrink-0"
+            style={{ marginRight: `-${config?.gap ?? 0}px` }}
+            aria-hidden="true"
+          />
+        )}
+        {cardElements}
+        {skeletonElement}
+      </div>
+    </FocusContext.Provider>
   );
 }
