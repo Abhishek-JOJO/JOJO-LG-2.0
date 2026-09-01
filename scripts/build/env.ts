@@ -19,7 +19,7 @@ export function loadEnvFile(filePath: string): void {
     if (eqIndex === -1) continue;
     const key = trimmed.slice(0, eqIndex).trim();
     const val = trimmed.slice(eqIndex + 1).trim();
-    if (key && !(key in process.env)) {
+    if (key) {
       process.env[key] = val;
     }
   }

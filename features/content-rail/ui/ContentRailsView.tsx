@@ -94,12 +94,13 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     statusRef.current = { hasNextPage, isFetchingNextPage, fetchNextPage };
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Restore focus when returning to home page or switching subnavs
+  // Restore focus when returning to home page, switching subnavs, or when data loading completes after login
   useEffect(() => {
+    if (isLoading) return;
     const isModalOpen = useAssetDetailStore.getState().isOpen;
     if (isModalOpen) return;
     restorePageFocus();
-  }, [pathname, subnavId]);
+  }, [pathname, subnavId, isLoading, data]);
 
   // Scroll-to-bottom pagination — listener is removed when there are no more pages
   useEffect(() => {

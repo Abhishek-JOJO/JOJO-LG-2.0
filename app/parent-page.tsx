@@ -33,8 +33,11 @@ const SUPPRESS_HOME_ROUTES = [
     ROUTES.APP_INSTALL
 ];
 
+import { normalizePathname } from "@/lib/utils/pathname";
+
 export default function ParentPage() {
-    const pathname = usePathname();
+    const rawPathname = usePathname();
+    const pathname = normalizePathname(rawPathname);
     const [hasScrolled, setHasScrolled] = useState(false);
     const [successData, setSuccessData] = useState<any>(null);
 

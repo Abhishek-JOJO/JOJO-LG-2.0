@@ -63,11 +63,11 @@ function IconBtn({ onClick, label, children, active = false, disabled = false, i
       aria-label={label}
       disabled={disabled}
       className={`
-        flex items-center justify-center p-1.5 rounded transition-all duration-150
-        hover:bg-theme_1/10 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme_1/40
+        flex items-center justify-center p-1.5 rounded transition-all duration-150 outline-none
+        hover:bg-theme_1/10 active:scale-95
         ${active ? 'opacity-100' : 'opacity-90 hover:opacity-100'}
         ${disabled ? 'pointer-events-none opacity-40' : ''}
-        ${focused ? 'ring-2 ring-theme_1/40 bg-theme_1/10 scale-[1.15] shadow-lg z-10' : ''}
+        ${focused ? 'ring-[3px] ring-white bg-white/20 scale-[1.25] shadow-2xl z-30 opacity-100' : ''}
       `}
     >
       {children}
@@ -110,7 +110,7 @@ function SettingsMenuRow({ label, value, focusKey, isVisible = true, onClick }: 
     <button
       ref={ref}
       onClick={onClick}
-      className={`w-full flex items-center justify-between gap-4 px-4 py-3.5 text-left transition-colors ${focused ? 'bg-theme_1/20 outline-none' : 'hover:bg-theme_1/10'}`}
+      className={`w-full flex items-center justify-between gap-4 px-4 py-3.5 text-left transition-colors outline-none ${focused ? 'bg-neutral-800 ring-2 ring-inset ring-white font-bold' : 'hover:bg-theme_1/10'}`}
     >
       <span className="text-sm text-theme_1 font-medium">{label}</span>
       <span className="flex items-center gap-2 min-w-0 text-theme_1/60">
@@ -140,10 +140,10 @@ function SettingsOptionRow({ label, isActive, focusKey, isVisible = true, onClic
     <button
       ref={ref}
       onClick={onClick}
-      className={`w-full text-left px-4 py-3 text-sm transition-colors ${isActive
+      className={`w-full text-left px-4 py-3 text-sm transition-colors outline-none ${isActive
         ? 'text-theme_13_samecolour bg-theme_1/10 font-semibold'
         : 'text-theme_1 hover:bg-theme_1/10'
-        } ${focused ? 'bg-theme_1/20 outline-none' : ''}`}
+        } ${focused ? 'bg-neutral-800 ring-2 ring-inset ring-white font-bold' : ''}`}
     >
       {label}
     </button>

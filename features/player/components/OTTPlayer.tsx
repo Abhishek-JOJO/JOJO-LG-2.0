@@ -237,32 +237,24 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   // fullscreen. Falls back silently if the browser refuses (e.g. in an iframe).
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || !document.fullscreenEnabled) return;
+    if (!el || typeof document === 'undefined' || !document.fullscreenEnabled) return;
 
-    // Already fullscreen (e.g. navigating between episodes while FS is active)
     if (document.fullscreenElement) return;
 
     let entered = false;
     const tryEnter = () => {
       if (entered) return;
       entered = true;
-      el.requestFullscreen().catch(() => {/* browser refused — ignore */ });
+      el.requestFullscreen?.().catch(() => {/* browser refused — ignore */ });
     };
 
-    // Attempt immediately (works on some browsers / PWA contexts)
-    el.requestFullscreen().catch(() => {
-      // Not allowed without gesture — wait for first interaction
-      el.addEventListener('pointerdown', tryEnter, { once: true });
-    });
+    el.addEventListener('pointerdown', tryEnter, { once: true });
+    el.addEventListener('keydown', tryEnter, { once: true });
 
     return () => {
       el.removeEventListener('pointerdown', tryEnter);
-      // Exit fullscreen when the player unmounts (e.g. user navigates away)
-      if (document.fullscreenElement === el) {
-        document.exitFullscreen().catch(() => {/* ignore */ });
-      }
+      el.removeEventListener('keydown', tryEnter);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
@@ -1096,6 +1088,33 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     setFocus('ott-player-main');
   }, []);
 
+  // Handle webOS Back key (461) and Escape key for player overlay dismissal / exit
+  useEffect(() => {
+    const handlePlayerBackKey = (e: KeyboardEvent) => {
+      if (e.keyCode === 461 || e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (showEpisodesPanel) {
+          setShowEpisodesPanel(false);
+          setFocus('ott-player-main');
+          return;
+        }
+
+        if (controlsVisible) {
+          setControlsVisible(false);
+          setFocus('ott-player-main');
+          return;
+        }
+
+        handleBack();
+      }
+    };
+
+    window.addEventListener("keydown", handlePlayerBackKey);
+    return () => window.removeEventListener("keydown", handlePlayerBackKey);
+  }, [controlsVisible, showEpisodesPanel, handleBack]);
+
   const handleVolumeChange = useCallback((v: number) => {
     storeSetVolume(v);
     engineRef.current?.setVolume(v);
@@ -1416,14 +1435,8 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         return true;
       }
 
-      if (direction === 'up' || direction === 'down') {
-        if (controlsVisible) {
-          setFocus('play-pause-btn');
-        } else {
-          showControls();
-          focusToControlsRef.current = true;
-        }
-      }
+      showControls();
+      setFocus('play-pause-btn');
       return true;
     }
   });

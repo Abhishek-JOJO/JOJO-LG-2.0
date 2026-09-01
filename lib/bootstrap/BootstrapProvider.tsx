@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
 import { fetchConfig, setAppConfig } from "@lib/config/app.config";
+import { env } from "@lib/config/env";
 import { fetchGeoData } from "@lib/geo/geo.service";
 import { getCachedGeo, setCachedGeo } from "@lib/geo/geo.cache";
 import { logger } from "@lib/logger/logger";
@@ -144,9 +145,17 @@ export function BootstrapProvider({ children }: BootstrapProviderProps) {
         if (cancelled) return;
 
         const message = err instanceof Error ? err.message : "Unknown error";
-        logger.error("[Bootstrap] Failed", { error: message });
-        setError(message);
-        setState("error");
+        logger.error("[Bootstrap] Failed, applying fallback bootstrap...", { error: message });
+
+        setAppConfig({
+          apiBaseUrl: env.fallbackApiBaseUrl || "https://api.superott.in",
+          socketUrl: "wss://socket.superott.in",
+          envType: env.fallbackEnvType || "stage",
+          analyticUrl: "",
+        });
+
+        setIsAppReady(true);
+        setState("ready");
       }
     }
 

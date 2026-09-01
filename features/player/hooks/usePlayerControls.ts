@@ -317,7 +317,49 @@ export function usePlayerControls({
         target.closest('[role="tab"]')
       ) return;
 
+      // Handle webOS specific numeric keyCodes first
+      if (e.keyCode === 415) { // PLAY
+        e.preventDefault();
+        togglePlay();
+        onActivityRef.current();
+        return;
+      }
+      if (e.keyCode === 19) { // PAUSE
+        e.preventDefault();
+        togglePlay();
+        onActivityRef.current();
+        return;
+      }
+      if (e.keyCode === 413) { // STOP
+        e.preventDefault();
+        engine?.pause();
+        onActivityRef.current();
+        return;
+      }
+      if (e.keyCode === 417) { // FF
+        e.preventDefault();
+        if (!isAdPlayingRef.current) {
+          seekForward();
+          onActionFeedbackRef.current?.('seek_forward');
+        }
+        onActivityRef.current();
+        return;
+      }
+      if (e.keyCode === 412) { // RW
+        e.preventDefault();
+        if (!isAdPlayingRef.current) {
+          seekBackward();
+          onActionFeedbackRef.current?.('seek_backward');
+        }
+        onActivityRef.current();
+        return;
+      }
+
       switch (e.key) {
+        case 'Escape':
+          // Esc key on desktop
+          onActivityRef.current();
+          break;
         case ' ':
         case 'k':
         case 'K':
@@ -327,7 +369,6 @@ export function usePlayerControls({
           togglePlay();
           onActivityRef.current();
           break;
-        case 'ArrowRight':
         case 'l':
         case 'L':
           e.preventDefault();
@@ -337,7 +378,6 @@ export function usePlayerControls({
           }
           onActivityRef.current();
           break;
-        case 'ArrowLeft':
         case 'j':
         case 'J':
           e.preventDefault();
@@ -347,97 +387,12 @@ export function usePlayerControls({
           }
           onActivityRef.current();
           break;
-        case 'f':
-        case 'F':
-          e.preventDefault();
-          void toggleFullscreen();
-          break;
-        case 'm':
-        case 'M':
-          e.preventDefault();
-          toggleMute();
-          break;
-        case 'i':
-        case 'I':
-          e.preventDefault();
-          void togglePip();
-          break;
-        case 'c':
-        case 'C':
-          e.preventDefault();
-          {
-            const tracks = subtitleTracksRef.current;
-            const activeId = activeSubtitleTrackIdRef.current;
-            const changeFn = onSubtitleChangeRef.current;
-            if (tracks && activeId !== undefined && changeFn) {
-              if (activeId === -1) {
-                const first = tracks.find(t => t.id !== -1);
-                if (first) {
-                  changeFn(first.id);
-                }
-              } else {
-                changeFn(-1);
-              }
-            }
-          }
-          onActivityRef.current();
-          break;
-        case ',':
-        case '<':
-          e.preventDefault();
-          {
-            const curSpeed = speedRef.current;
-            const changeSpeedFn = onSpeedChangeRef.current;
-            if (curSpeed !== undefined && changeSpeedFn) {
-              const idx = PLAYBACK_SPEEDS.indexOf(curSpeed);
-              if (idx > 0) {
-                changeSpeedFn(PLAYBACK_SPEEDS[idx - 1]);
-              }
-            }
-          }
-          onActivityRef.current();
-          break;
-        case '.':
-        case '>':
-          e.preventDefault();
-          {
-            const curSpeed = speedRef.current;
-            const changeSpeedFn = onSpeedChangeRef.current;
-            if (curSpeed !== undefined && changeSpeedFn) {
-              const idx = PLAYBACK_SPEEDS.indexOf(curSpeed);
-              if (idx !== -1 && idx < PLAYBACK_SPEEDS.length - 1) {
-                changeSpeedFn(PLAYBACK_SPEEDS[idx + 1]);
-              }
-            }
-          }
-          onActivityRef.current();
-          break;
-        case 'n':
-        case 'N':
-          e.preventDefault();
-          if (onNextEpisodeRef.current) {
-            onNextEpisodeRef.current();
-          }
-          onActivityRef.current();
-          break;
+        case 'ArrowRight':
+        case 'ArrowLeft':
         case 'ArrowUp':
-          e.preventDefault();
-          {
-            const v = Math.min(volume + 0.1, 1);
-            setVolume(v);
-            engine?.setVolume(v);
-            onActionFeedbackRef.current?.('volume_up');
-          }
-          onActivityRef.current();
-          break;
         case 'ArrowDown':
-          e.preventDefault();
-          {
-            const v = Math.max(volume - 0.1, 0);
-            setVolume(v);
-            engine?.setVolume(v);
-            onActionFeedbackRef.current?.('volume_down');
-          }
+          // Allow Norigin Spatial Navigation to handle TV remote D-Pad navigation.
+          // Trigger onActivity so the controls overlay remains visible during D-Pad usage.
           onActivityRef.current();
           break;
         case '0':
@@ -464,8 +419,49 @@ export function usePlayerControls({
       }
     };
 
+    // Global custom media event handlers dispatched by RemoteManager
+    const handleTvPlay = () => {
+      togglePlay();
+      onActivityRef.current();
+    };
+    const handleTvPause = () => {
+      togglePlay();
+      onActivityRef.current();
+    };
+    const handleTvStop = () => {
+      engine?.pause();
+      onActivityRef.current();
+    };
+    const handleTvFf = () => {
+      if (!isAdPlayingRef.current) {
+        seekForward();
+        onActionFeedbackRef.current?.('seek_forward');
+      }
+      onActivityRef.current();
+    };
+    const handleTvRw = () => {
+      if (!isAdPlayingRef.current) {
+        seekBackward();
+        onActionFeedbackRef.current?.('seek_backward');
+      }
+      onActivityRef.current();
+    };
+
     document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener('tv-media-play', handleTvPlay);
+    document.addEventListener('tv-media-pause', handleTvPause);
+    document.addEventListener('tv-media-stop', handleTvStop);
+    document.addEventListener('tv-media-ff', handleTvFf);
+    document.addEventListener('tv-media-rw', handleTvRw);
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('tv-media-play', handleTvPlay);
+      document.removeEventListener('tv-media-pause', handleTvPause);
+      document.removeEventListener('tv-media-stop', handleTvStop);
+      document.removeEventListener('tv-media-ff', handleTvFf);
+      document.removeEventListener('tv-media-rw', handleTvRw);
+    };
   }, [isEnabled, togglePlay, seekForward, seekBackward, toggleFullscreen, toggleMute, togglePip, setVolume, engine, volume]);
 
   // ── Mobile double-tap seek ────────────────────────────────────────────────────

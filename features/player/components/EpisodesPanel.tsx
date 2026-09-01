@@ -15,12 +15,111 @@ import React, { memo, useCallback, useEffect, useRef, useState, useMemo } from '
 import type { AssetSeason, AssetEpisode } from '@features/asset/model/types';
 import { useEpisodes } from '@/features/content/hooks/useEpisodes';
 import type { Episode, Season } from '@/features/content/model/types';
+import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 
 interface EpisodesPanelProps {
   seasons: AssetSeason[];
   currentEpisodeId?: number | null;
   onEpisodeSelect: (episode: AssetEpisode, season: AssetSeason) => void;
   onClose: () => void;
+}
+
+interface FocusableEpisodeCardProps {
+  episode: Episode;
+  activeSeason: any;
+  isActive: boolean;
+  posterUrl: string;
+  duration: string;
+  desc: string;
+  onClick: () => void;
+}
+
+function FocusableEpisodeCard({
+  episode,
+  activeSeason,
+  isActive,
+  posterUrl,
+  duration,
+  desc,
+  onClick,
+}: FocusableEpisodeCardProps) {
+  const { ref, focused } = useFocusable({
+    onEnterPress: onClick,
+  });
+
+  return (
+    <button
+      ref={ref}
+      onClick={onClick}
+      className={`w-full flex gap-3.5 px-5 py-4 text-left transition-all duration-200 group border-b border-theme_1/[0.03] outline-none ${
+        focused
+          ? 'bg-neutral-800 border-l-4 border-white pl-4 ring-2 ring-inset ring-white scale-[1.01] shadow-2xl z-10'
+          : isActive
+          ? 'bg-theme_1/[0.06] border-l-4 border-[#ff6b00] pl-4'
+          : 'hover:bg-theme_1/[0.03] border-l-4 border-transparent pl-4 hover:pl-[18px]'
+      }`}
+    >
+      <div
+        className="shrink-0 rounded-lg overflow-hidden bg-theme_1/[0.04] border border-theme_1/10 relative group-hover:border-theme_1/20 transition-all duration-300"
+        style={{ width: 112, height: 63 }}
+      >
+        {posterUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={posterUrl}
+            alt={episode.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-theme_1/20">
+              <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
+            </svg>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="w-8 h-8 rounded-full bg-theme_1/10 backdrop-blur-sm border border-theme_1/20 flex items-center justify-center transform scale-90 group-hover:scale-100 transition-transform duration-200">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-theme_1 ml-0.5 animate-pulse">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 min-w-0 flex flex-col justify-center">
+        <p className="text-[10px] font-bold text-[#ff6b00]/90 uppercase tracking-wider mb-1">
+          S{activeSeason.seasonNumber} · EP{episode.episodeNumber}
+        </p>
+        <p
+          className={`text-sm font-semibold leading-snug truncate mb-1 transition-colors ${
+            focused ? 'text-white' : isActive ? 'text-[#ff6b00]' : 'text-theme_1/90 group-hover:text-theme_1'
+          }`}
+        >
+          {episode.title}
+        </p>
+        {duration && (
+          <div className="flex items-center gap-1 text-[11px] text-theme_1/45 mb-1.5">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-70">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span>{duration}</span>
+          </div>
+        )}
+        {desc && (
+          <p className="text-[11px] text-theme_1/40 leading-relaxed line-clamp-2">
+            {desc}
+          </p>
+        )}
+      </div>
+
+      {isActive && (
+        <div className="shrink-0 self-center bg-[#ff6b00]/10 border border-[#ff6b00]/25 rounded px-2 py-0.5 text-[9px] text-[#ff6b00] font-extrabold uppercase tracking-widest shadow-sm select-none">
+          Playing
+        </div>
+      )}
+    </button>
+  );
 }
 
 const PANEL_CLOSE_MS = 260;
@@ -284,9 +383,14 @@ export const EpisodesPanel = memo(function EpisodesPanel({
             const desc = stripHtml(episode.description);
 
             return (
-              <button
+              <FocusableEpisodeCard
                 key={String(epId)}
-                ref={isActive ? activeEpisodeRef : undefined}
+                episode={episode}
+                activeSeason={activeSeason}
+                isActive={isActive}
+                posterUrl={posterUrl}
+                duration={duration}
+                desc={desc}
                 onClick={() => {
                   let originalEpisode = activeSeason.episodes.find(
                     (ep) => String(ep.asset_id) === String(episode.assetId)
@@ -323,71 +427,7 @@ export const EpisodesPanel = memo(function EpisodesPanel({
                   }
                   onEpisodeSelect(originalEpisode, activeSeason);
                 }}
-                className={`w-full flex gap-3.5 px-5 py-4 text-left transition-all duration-200 group border-b border-theme_1/[0.03] ${isActive
-                    ? 'bg-theme_1/[0.06] border-l-4 border-[#ff6b00] pl-4'
-                    : 'hover:bg-theme_1/[0.03] border-l-4 border-transparent pl-4 hover:pl-[18px]'
-                  }`}
-              >
-                <div
-                  className="shrink-0 rounded-lg overflow-hidden bg-theme_1/[0.04] border border-theme_1/10 relative group-hover:border-theme_1/20 transition-all duration-300"
-                  style={{ width: 112, height: 63 }}
-                >
-                  {posterUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={posterUrl}
-                      alt={episode.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-theme_1/20">
-                        <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
-                      </svg>
-                    </div>
-                  )}
-                  {/* Premium play icon overlay on hover */}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <div className="w-8 h-8 rounded-full bg-theme_1/10 backdrop-blur-sm border border-theme_1/20 flex items-center justify-center transform scale-90 group-hover:scale-100 transition-transform duration-200">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-theme_1 ml-0.5 animate-pulse">
-                        <polygon points="5 3 19 12 5 21 5 3" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                  <p className="text-[10px] font-bold text-[#ff6b00]/90 uppercase tracking-wider mb-1">
-                    S{activeSeason.season_number} · EP{episode.episodeNumber}
-                  </p>
-                  <p
-                    className={`text-sm font-semibold leading-snug truncate mb-1 transition-colors ${isActive ? 'text-[#ff6b00]' : 'text-theme_1/90 group-hover:text-theme_1'
-                      }`}
-                  >
-                    {episode.title}
-                  </p>
-                  {duration && (
-                    <div className="flex items-center gap-1 text-[11px] text-theme_1/45 mb-1.5">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-70">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                      </svg>
-                      <span>{duration}</span>
-                    </div>
-                  )}
-                  {desc && (
-                    <p className="text-[11px] text-theme_1/40 leading-relaxed line-clamp-2">
-                      {desc}
-                    </p>
-                  )}
-                </div>
-
-                {isActive && (
-                  <div className="shrink-0 self-center bg-[#ff6b00]/10 border border-[#ff6b00]/25 rounded px-2 py-0.5 text-[9px] text-[#ff6b00] font-extrabold uppercase tracking-widest shadow-sm select-none">
-                    Playing
-                  </div>
-                )}
-              </button>
+              />
             );
           })}
 

@@ -250,9 +250,6 @@ export default async function MoviesAssetDetailPage({ params }: Props) {
 
 export function generateStaticParams() {
   return [
-    { 
-      slugAndId: ["placeholder"],
-      "/movies/[...slugAndId]": ["placeholder"]
-    }
+    { slugAndId: ["placeholder"] }
   ];
 }

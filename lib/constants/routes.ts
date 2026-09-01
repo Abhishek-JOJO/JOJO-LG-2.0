@@ -43,8 +43,9 @@ export const ROUTES = {
   FACEBOOK_CALLBACK: '/auth/facebook/callback',
 
 
-  // Demo (remove before production)
+  // Demo & Debugger
   PLAYER_DEMO: '/watch/demo',
+  CRYPTO_DEBUG: '/crypto-debug',
 
   // Protected routes
   WATCHING: '/watching',
@@ -81,6 +82,7 @@ export const PUBLIC_ROUTES = [
   ROUTES.GOOGLE_CALLBACK,
   ROUTES.FACEBOOK_CALLBACK,
   ROUTES.PLAYER_DEMO,
+  ROUTES.CRYPTO_DEBUG,
 ] as const;
 
 /**
@@ -168,6 +170,8 @@ export function isGuestAllowedRoute(pathname: string): boolean {
     ROUTES.HOT_AND_NEW,
     ROUTES.PAYMENT,
     ROUTES.SEARCH,
+    ROUTES.CRYPTO_DEBUG,
+    ROUTES.WATCH_BASE,
     "/live",
     "/kidz"
   ];
@@ -182,8 +186,9 @@ export function isGuestAllowedRoute(pathname: string): boolean {
     ROUTES.BROWSE,
     ROUTES.GENRE,
     ROUTES.HOT_AND_NEW,
+    ROUTES.WATCH_BASE,
     '/live',
     '/kidz'
   ];
-  return prefixes.some(prefix => pathname.startsWith(`${prefix}/`));
+  return prefixes.some(prefix => pathname.startsWith(`${prefix}/`) || pathname === prefix);
 }

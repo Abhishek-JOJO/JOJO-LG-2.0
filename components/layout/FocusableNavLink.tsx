@@ -79,21 +79,43 @@ export const FocusableNavLink = React.memo(({
   }, [router, targetUrl]);
 
   return (
-    <div
-      ref={ref}
-      className={`relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full transition-all duration-200 z-10 flex items-center justify-center shrink-0 ${
-        focused
-          ? "bg-white text-black font-bold scale-105 shadow-[0_0_18px_rgba(255,255,255,0.7)] ring-2 ring-white"
-          : isItemActive
-          ? "bg-white text-black font-bold shadow-md"
-          : "text-white/80 hover:text-white font-semibold hover:bg-white/10"
-      }`}
+    <motion.div
+      ref={ref as any}
       onClick={handleClick}
+      animate={{ scale: focused ? 1.06 : 1 }}
+      transition={{ type: "spring", stiffness: 450, damping: 30 }}
+      className="relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none"
     >
-      <span className="text-base sm:text-lg whitespace-nowrap tracking-wide">
+      {/* Netflix-style smooth sliding focus pill */}
+      {focused && (
+        <motion.div
+          layoutId="navbarFocusPill"
+          className="absolute inset-0 bg-white rounded-full shadow-[0_0_22px_rgba(255,255,255,0.75)] border-2 border-white z-0"
+          transition={{ type: "spring", stiffness: 450, damping: 32 }}
+        />
+      )}
+
+      {/* Active state indicator pill when not focused */}
+      {!focused && isItemActive && (
+        <motion.div
+          layoutId="navbarActivePill"
+          className="absolute inset-0 bg-white/20 backdrop-blur-md rounded-full border border-white/20 z-0"
+          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        />
+      )}
+
+      <span
+        className={`relative z-10 text-base sm:text-lg font-bold tracking-wide transition-colors duration-200 whitespace-nowrap ${
+          focused
+            ? "text-black font-extrabold"
+            : isItemActive
+            ? "text-white"
+            : "text-white/75 hover:text-white"
+        }`}
+      >
         {item?.title}
       </span>
-    </div>
+    </motion.div>
   );
 });
 

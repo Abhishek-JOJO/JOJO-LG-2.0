@@ -8,7 +8,7 @@
  * file while the player fetches everything client-side.
  */
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useCallback, useState } from "react";
 import { useVideoDetails } from "@features/player/hooks/useVideoDetails";
 import { OTTPlayer } from "@features/player/components/OTTPlayer";
@@ -21,9 +21,11 @@ import { logger } from "@/lib/logger/logger";
 import { useWatchPageGating } from "@/features/asset/hooks/useWatchPageGating";
 
 function WatchContent() {
-  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const id = searchParams?.get("v") || "";
+  const rawId = searchParams.get("v");
+  const fallbackId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("v") : null;
+  const id = rawId || fallbackId || "";
 
   // 1. Execute watch page security gating (SVOD, TVOD, Overseas, Guests)
   const {
@@ -107,25 +109,25 @@ function WatchContent() {
     }
   }, []);
 
-  // Show error toaster and redirect to home
+  // Show error toaster and redirect based on server authorization status
   useEffect(() => {
     if (isError && error) {
+      const status = (error as any)?.status;
       const errMsg = error instanceof Error ? error.message : "Failed to load playback details";
       showToast(errMsg, "error");
 
       const timer = setTimeout(() => {
-        router.push(ROUTES.HOME);
+        if (status === 403 || errMsg.toLowerCase().includes("subscription")) {
+          router.push(ROUTES.SUBSCRIPTION);
+        } else {
+          router.push(ROUTES.HOME);
+        }
       }, 1500);
       return () => clearTimeout(timer);
     }
   }, [isError, error, showToast, router]);
 
-  const [redirectingToAsset, setRedirectingToAsset] = useState(() => {
-    if (typeof window !== "undefined") {
-      return !!sessionStorage.getItem("redirect_back_to_asset");
-    }
-    return false;
-  });
+  const [redirectingToAsset, setRedirectingToAsset] = useState(false);
 
   const handleGoAdsFree = useCallback(() => {
     let assetUrl = null;
@@ -171,16 +173,6 @@ function WatchContent() {
   // ═══════════════════════════════════════════════════════════════════════════
 
 
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const redirectUrl = sessionStorage.getItem("redirect_back_to_asset");
-      if (redirectUrl) {
-        sessionStorage.removeItem("redirect_back_to_asset");
-        router.replace(redirectUrl);
-      }
-    }
-  }, [router]);
 
   if (redirectingToAsset) {
     return (

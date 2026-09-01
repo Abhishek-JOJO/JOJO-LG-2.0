@@ -49,13 +49,7 @@ export default function AssetDetailPageClient({ initialAsset }: { initialAsset?:
   });
 
   useEffect(() => {
-    // Attempt to focus the page root when it mounts so spatial navigation isn't lost
-    const timer = setTimeout(() => {
-      setFocus(`PAGE_ASSET_DETAIL_${assetId}`);
-    }, 100);
-
     return () => {
-      clearTimeout(timer);
       restorePageFocus();
     };
   }, [assetId]);

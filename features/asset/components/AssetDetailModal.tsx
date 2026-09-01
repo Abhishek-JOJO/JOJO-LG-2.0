@@ -39,10 +39,12 @@ export function AssetDetailModal() {
   // 1. Lock Body Scroll when modal is open
   useBodyScrollLock(isOpen);
 
-  // 2. Escape Key Listener
+  // 2. Escape / webOS Back Key Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
+      if ((e.key === "Escape" || e.keyCode === 461) && isOpen) {
+        e.preventDefault();
+        e.stopPropagation();
         closeAssetDetail();
       }
     };

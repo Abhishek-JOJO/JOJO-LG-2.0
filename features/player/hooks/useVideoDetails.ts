@@ -14,17 +14,18 @@ import { logger } from '@lib/logger/logger';
 import { appConfig } from '@/lib/config/app.config';
 
 export function useVideoDetails(contentId: string, isAppReady: boolean = true, enabled: boolean = true) {
-  const sessionId = useAuthStore((state) => state.token);
+  const token = useAuthStore((state) => state.token);
+  const effectiveSessionId = token || (typeof window !== "undefined" ? localStorage.getItem("AUTH_TOKEN") : null);
 
   return useQuery({
-    queryKey: ['video-details', contentId, sessionId],
+    queryKey: ['video-details', contentId, effectiveSessionId],
     queryFn: async () => {
       logger.info('[useVideoDetails] Fetching', { contentId });
-      const video = await fetchVideoDetails(contentId, sessionId ?? undefined);
+      const video = await fetchVideoDetails(contentId, effectiveSessionId ?? undefined);
       logger.info('[useVideoDetails] Fetched', { title: video.title });
       return video;
     },
-    enabled: !!sessionId && !!contentId && isAppReady && enabled,
+    enabled: !!contentId && isAppReady && enabled,
     staleTime: 0,                   // Always consider stale: ensures fresh signed stream URL & progress on mount
     gcTime: 0,                      // Instantly garbage collect on unmount: prevents using expired CDN links on next play
     refetchOnWindowFocus: false,    // Do NOT refetch when clicking or switching tabs

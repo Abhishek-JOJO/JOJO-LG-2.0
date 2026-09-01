@@ -50,7 +50,7 @@ interface JOJOModalProps {
   style?: React.CSSProperties;
 }
 
-import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 
 function FocusableCloseButton({ onClick }: { onClick: () => void }) {
   const { ref, focused } = useFocusable({
@@ -80,79 +80,111 @@ export function JOJOModal({
   showCloseButton = false,
   style,
 }: JOJOModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <Portal>
+      <JOJOModalContent
+        onClose={onClose}
+        className={className}
+        backdropClassName={backdropClassName}
+        showCloseButton={showCloseButton}
+        style={style}
+      >
+        {children}
+      </JOJOModalContent>
+    </Portal>
+  );
+}
+
+function JOJOModalContent({
+  onClose,
+  children,
+  className,
+  backdropClassName,
+  showCloseButton,
+  style,
+}: Omit<JOJOModalProps, "isOpen">) {
+  const { ref: modalFocusRef, focusKey: modalFocusKey } = useFocusable({
+    focusKey: 'JOJO_MODAL_CONTAINER',
+    isFocusBoundary: true,
+    autoRestoreFocus: true,
+  });
 
   useEffect(() => {
-    if (!isOpen) return;
+    const timer = setTimeout(() => {
+      setFocus('JOJO_MODAL_CONTAINER');
+    }, 50);
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" || e.keyCode === 461) {
+        e.preventDefault();
+        e.stopPropagation();
         onClose();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
 
   useEffect(() => {
-    if (!isOpen) return;
-
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     return () => {
       document.body.style.overflow = originalOverflow;
     };
-  }, [isOpen]);
+  }, []);
 
   return (
-    <Portal>
-      <AnimatePresence>
-        {isOpen && (
-          <div
-            className="fixed inset-0 z-[100000] flex items-center justify-center p-4"
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            {/* Backdrop Overlay */}
-            <motion.div
-              key="modal-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              className={cn("absolute inset-0 bg-black/60 backdrop-blur-md", backdropClassName)}
-            />
+    <div
+      className="fixed inset-0 z-[100000] flex items-center justify-center p-4"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      {/* Backdrop Overlay */}
+      <motion.div
+        key="modal-backdrop"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className={cn("absolute inset-0 bg-black/60 backdrop-blur-md", backdropClassName)}
+      />
 
-            {/* Modal Dialog Content Card */}
-            <motion.div
-              key="modal-card"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              role="dialog"
-              aria-modal="true"
-              style={style}
-              className={cn(
-                "relative z-10 w-full max-w-[520px] bg-theme_10 border-[2px] border-theme_8 rounded-xl shadow-2xl p-8 sm:p-10 flex flex-col items-center text-center gap-6",
-                className
-              )}
-            >
-              {showCloseButton && (
-                <FocusableCloseButton onClick={onClose} />
-              )}
+      {/* Modal Dialog Content Card with Focus Isolation */}
+      <FocusContext.Provider value={modalFocusKey}>
+        <motion.div
+          ref={modalFocusRef}
+          key="modal-card"
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          role="dialog"
+          aria-modal="true"
+          style={style}
+          className={cn(
+            "relative z-10 w-full max-w-[520px] bg-theme_10 border-[2px] border-theme_8 rounded-xl shadow-2xl p-8 sm:p-10 flex flex-col items-center text-center gap-6 outline-none",
+            className
+          )}
+        >
+          {showCloseButton && (
+            <FocusableCloseButton onClick={onClose} />
+          )}
 
-              {children}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </Portal>
+          {children}
+        </motion.div>
+      </FocusContext.Provider>
+    </div>
   );
 }

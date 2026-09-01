@@ -239,8 +239,8 @@ const CountryWithEMailInput = forwardRef<
     return (
         <div
             className={cn(
-                "flex items-center h-13 rounded-full bg-theme_10 border relative overflow-visible",
-                error ? "border-theme_14_samecolour" : "border-none",
+                "flex items-center h-14 rounded-full bg-[#181310] border border-white/15 relative overflow-visible px-2 shadow-inner",
+                error ? "border-red-500" : "border-white/15",
                 wrapperClassName
             )}
         >
@@ -256,22 +256,10 @@ const CountryWithEMailInput = forwardRef<
                         aria-expanded={dropdownOpen}
                         onClick={handleDropdownOpen}
                         hoverColor="none"
-                        className="h-full border-none bg-transparent body-sm-medium text-theme_13_samecolour font-bold px-3.5 flex items-center gap-1 cursor-pointer"
+                        className="h-full border-none bg-transparent text-base font-bold text-[#ea580c] px-4 flex items-center gap-1.5 cursor-pointer border-r border-white/10 rounded-none"
                     >
-                        {/* Optional flag */}
-                        {/* <JOJOFlagEmoji
-                            countryCode={
-                                selectedCountry
-                                    ? selectedCountry.country_code
-                                    : defaultCountryCode
-                            }
-                            size={20}
-                            shape="square"
-                            className="mr-1"
-                        /> */}
-
                         <ChevronDown
-                            size={24}
+                            size={20}
                             className="transition-transform duration-200"
                             style={{
                                 transform: dropdownOpen
@@ -294,7 +282,7 @@ const CountryWithEMailInput = forwardRef<
                 aria-invalid={error}
                 data-normalized-phone={normalizedPhone?.international ?? ""}
                 className={cn(
-                    `flex-1 h-full border-none outline-none bg-theme_10 px-4.5 min-w-0 body-sm-regular placeholder:text-theme_7 text-theme_1 ${shouldShowCountrySelector ? "pl-0" : ""
+                    `flex-1 h-full border-none outline-none bg-transparent px-5 min-w-0 text-lg font-medium placeholder:text-white/40 text-white ${shouldShowCountrySelector ? "pl-3" : ""
                     }`,
                     className
                 )}

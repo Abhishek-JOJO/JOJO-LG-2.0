@@ -238,10 +238,9 @@ export default async function StandaloneAssetDetailPage({ params }: Props) {
 
 export function generateStaticParams() {
   return [
-    { 
-      contentType: "placeholder", 
-      slugAndId: ["placeholder"],
-      "/[contentType]/[...slugAndId]": ["placeholder"]
-    }
+    { contentType: "movies", slugAndId: ["placeholder"] },
+    { contentType: "shows", slugAndId: ["placeholder"] },
+    { contentType: "nataks", slugAndId: ["placeholder"] },
+    { contentType: "kids", slugAndId: ["placeholder"] }
   ];
 }

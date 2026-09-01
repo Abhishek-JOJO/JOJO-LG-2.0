@@ -37,7 +37,7 @@ export function QrPairingPanel() {
     const qrUrl = deepLinkManager.generatePairingQrUrl(nextCode, window.location.origin);
     if (!qrUrl) return;
 
-    QRCode.toDataURL(qrUrl, { width: 340, margin: 1, color: { dark: "#1a1006", light: "#ffffff" } })
+    QRCode.toDataURL(qrUrl, { width: 380, margin: 1, color: { dark: "#f97316", light: "#ffffff" } })
       .then((dataUrl) => {
         if (generationRef.current === myGeneration) setQrDataUrl(dataUrl);
       })
@@ -96,57 +96,68 @@ export function QrPairingPanel() {
   }, [code, expired, router, setAuth]);
 
   return (
-    <div className="flex flex-col items-center gap-10 px-4 py-8 sm:flex-row sm:items-start sm:justify-center sm:gap-16">
-      <div className="flex flex-col items-center gap-4 sm:items-start">
-        <p className="max-w-[280px] text-center text-base text-theme_1/90 sm:text-left">
-          {t("scan_qr_instruction")}
-        </p>
-        <div className="relative flex h-[220px] w-[220px] items-center justify-center rounded-2xl bg-white p-3 sm:h-[280px] sm:w-[280px]">
+    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center w-full max-w-7xl mx-auto px-4 py-2">
+      {/* Left Column: Instructions + QR Code (Right-aligned to OR line) */}
+      <div className="flex flex-col items-start gap-6 shrink-0 justify-self-end sm:pr-8 md:pr-14 lg:pr-20">
+        <h2 className="max-w-[400px] text-left text-3xl sm:text-[34px] font-bold text-white leading-[1.25] tracking-tight">
+          Scan the QR Code using your phone or tablet’s camera
+        </h2>
+        <div className="relative flex h-[280px] w-[280px] sm:h-[300px] sm:w-[300px] items-center justify-center rounded-[32px] bg-white p-5 shadow-2xl border border-white/20">
           {qrDataUrl && !expired ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={qrDataUrl} alt="" className="h-full w-full" />
+            <img src={qrDataUrl} alt="Pairing QR Code" className="h-full w-full object-contain rounded-2xl" />
           ) : expired ? (
-            <FocusableRefreshButton onClick={generateCode} label={t("qr_get_new_code")} />
+            <FocusableRefreshButton onClick={generateCode} label={t("qr_get_new_code") || "Get New Code"} />
           ) : (
-            <span className="text-sm text-theme_12/60">{t("qr_generating_code")}</span>
+            <span className="text-base font-medium text-neutral-400">{t("qr_generating_code") || "Generating code..."}</span>
           )}
         </div>
       </div>
 
-      <div className="relative hidden self-stretch sm:block">
-        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-theme_1/15" />
-        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-theme_10 px-3 py-1.5 text-sm text-theme_5">
-          {t("qr_or")}
+      {/* Center Divider: Fixed at exact 50% screen center */}
+      <div className="relative hidden self-stretch sm:flex sm:items-center sm:justify-center px-4 justify-self-center">
+        <div className="h-[380px] w-px bg-white/20" />
+        <span className="absolute text-[#aaaaaa] font-medium text-2xl tracking-widest uppercase bg-[#140a04] px-4">
+          OR
         </span>
       </div>
-      <div className="flex items-center gap-3 sm:hidden">
-        <div className="h-px w-16 bg-theme_1/15" />
-        <span className="text-sm text-theme_5">{t("qr_or")}</span>
-        <div className="h-px w-16 bg-theme_1/15" />
+
+      <div className="flex items-center gap-4 sm:hidden my-4 justify-self-center">
+        <div className="h-px w-24 bg-white/20" />
+        <span className="text-base font-medium text-[#aaaaaa] tracking-widest uppercase">OR</span>
+        <div className="h-px w-24 bg-white/20" />
       </div>
 
-      <div className="flex flex-col gap-6">
-        <ol className="flex flex-col gap-5 text-base text-theme_1 sm:text-lg">
-          <li>1. {t("qr_step_open_app")}</li>
-          <li className="flex items-center gap-2">
-            2. {t("qr_step_go_to")}
-            <CircleUser className="h-5 w-5 text-theme_13_samecolour" />
-            <span className="font-bold text-theme_13_samecolour">{t("qr_step_profile")}</span>
+      {/* Right Column: Step Instructions + TV Pairing Code Badge (Left-aligned to OR line) */}
+      <div className="flex flex-col gap-8 shrink-0 items-start justify-self-start sm:pl-8 md:pl-14 lg:pl-20">
+        <ol className="flex flex-col gap-6 text-2xl sm:text-[28px] font-bold text-white leading-snug max-w-[460px]">
+          <li className="flex flex-wrap items-center gap-x-2">
+            <span>1. Open the JOJO app on your mobile phone</span>
           </li>
-          <li className="flex items-center gap-2">
-            3. {t("qr_step_click_on")}
-            <Tv className="h-5 w-5" />
-            <span className="font-bold">{t("qr_step_tv_login")}</span>
+          <li className="flex items-center gap-2 flex-wrap">
+            <span>2. Go to</span>
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f97316]/20 text-[#f97316] font-bold text-2xl">
+              <CircleUser className="h-6 w-6 fill-current" />
+              <span>Profile</span>
+            </span>
           </li>
-          <li>4. {t("qr_step_enter_code")}</li>
+          <li className="flex items-center gap-2 flex-wrap">
+            <span>3. Click on</span>
+            <span className="inline-flex items-center gap-2 font-bold text-white text-2xl">
+              <Tv className="h-6 w-6 text-white" />
+              <span>TV Login</span>
+            </span>
+          </li>
+          <li className="flex flex-wrap items-center gap-x-2">
+            <span>4. Enter this unique code to continue</span>
+          </li>
         </ol>
 
-        <div className="flex items-center gap-2 rounded-full bg-theme_10 px-6 py-4">
-          {(code ?? "……").split("").map((char, idx) => (
-            <span key={idx} className="text-2xl font-bold tracking-widest text-theme_1 sm:text-3xl">
-              {char}
-            </span>
-          ))}
+        {/* Pairing Code Pill Badge */}
+        <div className="inline-flex items-center justify-center rounded-full bg-[#18110b] border border-white/15 px-12 py-4 shadow-2xl min-w-[280px] mt-2">
+          <span className="text-4xl sm:text-5xl font-black tracking-[0.45em] text-white font-mono">
+            {code ?? "……"}
+          </span>
         </div>
       </div>
     </div>

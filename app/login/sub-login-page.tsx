@@ -24,11 +24,11 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "re
 import CountryWithEMailInput from "./components/CountryWithEmailInput";
 import SocialBtn from "./components/social-buttons";
 import { getErrorMessage, validate } from "./validate";
-import { handleLoginKeyDown, isPossiblePhoneInput, normalizePhoneNumber } from "@/lib/utils";
+import { cn, handleLoginKeyDown, isPossiblePhoneInput, normalizePhoneNumber } from "@/lib/utils";
 import { useOtpStore } from "./otp/store";
 import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { analyticsService } from "@/shared/analytics";
-import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, setFocus, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 import { LoginModeToggle, LoginMode } from "./components/LoginModeToggle";
 import { QrPairingPanel } from "./components/QrPairingPanel";
 
@@ -68,6 +68,11 @@ function LoginPageContent() {
   const [touched, setTouched] = useState(false);
 
   // ── Focus setup ──────────────────────────────────────────────────────────
+  const { ref: pageRef, focusKey: pageFocusKey } = useFocusable({
+    focusKey: 'LOGIN_PAGE_ROOT',
+    trackChildren: true,
+    autoRestoreFocus: true,
+  });
   const { ref: inputRef, focused: inputFocused } = useFocusable({
     focusKey: 'login-input',
     onEnterPress: () => {
@@ -89,11 +94,17 @@ function LoginPageContent() {
   });
 
   useEffect(() => {
-    // Focus the input when the remote-entry form is showing
-    if (mode !== "remote") return;
-    setTimeout(() => {
-      setFocus('login-input');
-    }, 300);
+    // Focus login input field by default when entering 'remote' mode
+    const timer = setTimeout(() => {
+      if (mode === "remote") {
+        setFocus('login-input');
+        const el = document.getElementById("login-input-field");
+        if (el) el.focus();
+      } else {
+        setFocus('login-mode-phone');
+      }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [mode]);
 
   const lastTrackedErrorRef = useRef<ErrorKey | null>(null);
@@ -444,25 +455,15 @@ function LoginPageContent() {
 
     // Email flow
     try {
-      const result = await initiateOtp.mutateAsync({
-        phone: trimmed,
-        phoneCode: "",
-      });
-
-      // SPECIAL USER BYPASS FLOW
+      const result = await checkUserExists.mutateAsync({ phone: trimmed, phoneCode: "" });
       if (result?.isSpecialUser) {
         logger.info("[Login] Special user (email) detected, initiating direct passwordless login");
-        await verifySpecialUser.mutateAsync({
-          phone: trimmed,
-          phoneCode: "",
-          isRegister: !result.isExists,
-        });
         showToast(t("login_success") || "Special User Login Successful!", "success");
         router.push(ROUTES.WATCHING || "/watching");
         return;
       }
 
-      const isRegister = !result?.isExists;
+      const isRegister = !result?.exists;
 
       setAuthContext({
         email: trimmed,
@@ -476,39 +477,39 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <PageBackground />
-
-      <div className="relative z-10 flex min-h-screen flex-col px-6 py-8 sm:px-10">
-        {/* Top bar: logo (left) + mode toggle (centered) */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+    <FocusContext.Provider value={pageFocusKey}>
+      <div ref={pageRef as any} className="relative min-h-screen w-full bg-[radial-gradient(circle_at_25%_25%,_#3d1a08_0%,_#140a04_50%,_#050201_100%)] overflow-hidden text-white flex flex-col justify-between p-6 sm:p-10 select-none">
+        {/* Absolute Top-Left Logo */}
+        <div className="absolute top-10 left-12 z-30">
           <JOJOCommonImage
             src={LOGOS.JOJO_LOGO}
             altKey="img_jojo_logo"
-            width={110}
-            height={40}
+            width={140}
+            height={50}
             preset={JOJOImagePreset.Logo}
-            wrapperClassName="h-9 w-[110px] justify-self-start"
+            wrapperClassName="h-11 w-[140px]"
           />
-          <div className="justify-self-center">
-            <LoginModeToggle mode={mode} onChange={setMode} />
-          </div>
-          <div />
         </div>
 
-        <div className="flex flex-1 items-center justify-center">
+        {/* Centered Top Mode Switcher */}
+        <div className="w-full flex justify-center pt-8 pb-2 z-30">
+          <LoginModeToggle mode={mode} onChange={setMode} />
+        </div>
+
+        {/* Main Centered Content */}
+        <div className="flex-1 flex items-center justify-center py-4 z-20 w-full">
           {mode === "phone" ? (
             <QrPairingPanel />
           ) : (
-            <form id="login-form" onSubmit={handleSubmit} noValidate className="w-full max-w-sm sm:max-w-md">
-              <div className="flex flex-col">
-                <div ref={inputRef as any} className={`rounded-[24px] transition-all ${inputFocused ? "ring-4 ring-white shadow-xl scale-[1.02] z-10" : ""}`}>
+            <form id="login-form" onSubmit={handleSubmit} noValidate className="w-full max-w-[480px] mx-auto flex flex-col items-center gap-6">
+              <div className="w-full flex flex-col items-center">
+                <div ref={inputRef as any} className={`w-full rounded-full transition-all duration-200 ${inputFocused ? "ring-4 ring-white shadow-2xl scale-[1.02] z-10" : ""}`}>
                   <CountryWithEMailInput
                     id="login-input-field"
                     type="text"
                     inputMode="text"
                     autoComplete="username"
-                    placeholder={t("placeholder")}
+                    placeholder={t("placeholder") || "Enter phone or email"}
                     value={value}
                     onChange={handleChange}
                     onKeyDown={handleLoginKeyDown}
@@ -532,7 +533,7 @@ function LoginPageContent() {
                 {error && touched && (
                   <div
                     role="alert"
-                    className="m-0 text-xs text-theme_14_samecolour pl-4 flex items-center gap-2 mt-2"
+                    className="m-0 text-xs text-red-400 pl-4 flex items-center gap-2 mt-2 self-start"
                   >
                     <JOJOCommonImage
                       src={LOGOS.ERROR_ICON}
@@ -546,113 +547,36 @@ function LoginPageContent() {
                   </div>
                 )}
 
-                <div className="p-2 pt-3 caption-sm-regular text-theme_5 text-center">
-                  {t("disclaimer")}
-                </div>
+                <p className="text-sm font-normal text-white/40 text-center leading-relaxed max-w-[440px] mt-4 mb-2">
+                  {t("disclaimer") || "By proceeding with the login process, we might send a one-time verification code to the phone number linked to your account."}
+                </p>
               </div>
 
-              <div ref={submitRef as any} className={`w-1/2 sm:w-2/5 mx-auto mt-8 rounded-[100px] transition-all ${submitFocused ? "ring-4 ring-white shadow-xl scale-105" : ""}`}>
-                <JOJOCustomButton
-                  size={JOJOButton.Size.L}
-                  state={
-                    canSubmit
-                      ? JOJOButton.State.ACTIVE
-                      : JOJOButton.State.DISABLED
-                  }
-                  hoverColor={themeColors.theme_13_samecolour}
+              <div ref={submitRef as any} className={`w-full rounded-full transition-all duration-200 ${submitFocused ? "ring-4 ring-white shadow-2xl scale-[1.02] z-10" : ""}`}>
+                <button
                   type="submit"
                   disabled={!canSubmit || initiateOtp.isPending || checkUserExists.isPending}
-                  isLoading={initiateOtp.isPending || checkUserExists.isPending}
-                  className="w-full flex border-none body-sm-medium"
+                  className={cn(
+                    "w-full h-14 rounded-full font-bold text-lg transition-all duration-200 flex items-center justify-center shadow-xl cursor-pointer outline-none",
+                    canSubmit
+                      ? "bg-[#ea580c] text-white hover:bg-[#f97316]"
+                      : "bg-[#241e1a] text-white/30 cursor-not-allowed border border-white/5"
+                  )}
                 >
-                  {t("get_otp")}
-                </JOJOCustomButton>
+                  {initiateOtp.isPending || checkUserExists.isPending
+                    ? t("loading") || "Loading..."
+                    : t("get_otp") || "Get OTP"}
+                </button>
               </div>
-
-              <div className="flex items-center pt-8">
-                <div className="flex-1 h-px bg-theme_1/10" />
-                <span className="body-xs-medium text-theme_5 px-3">
-                  {t("or_login_with")}
-                </span>
-                <div className="flex-1 h-px bg-theme_1/10" />
-              </div>
-
-              <div className="flex justify-center gap-3 pt-4">
-                <GoogleLoginButton
-                  onSuccess={() => router.push(ROUTES.HOME)}
-                  onError={(loginError) => {
-                    logger.error("[Login] Google error", { error: loginError });
-                    try {
-                      analyticsService.trackLoginFailed({
-                        method: "google",
-                        error_message: String(loginError?.message || loginError),
-                        source_link: typeof window !== "undefined" ? window.location.href : "",
-                      });
-                    } catch (e) {}
-                  }}
-                  hideChildrenWhenLoading
-                  className="w-10.5 h-10.5 px-0 rounded-full bg-theme_10_50 flex items-center justify-center cursor-pointer transition-colors hover:bg-theme_9"
-                >
-                  <SocialBtn src={LOGOS.GOOGLE_LOGO} altKey="img_google" />
-                </GoogleLoginButton>
-
-                <FacebookLoginButton
-                  onSuccess={() => router.push(ROUTES.HOME)}
-                  onError={(loginError) => {
-                    logger.error("[Login] Facebook error", { error: loginError });
-                    try {
-                      analyticsService.trackLoginFailed({
-                        method: "facebook",
-                        error_message: String(loginError?.message || loginError),
-                        source_link: typeof window !== "undefined" ? window.location.href : "",
-                      });
-                    } catch (e) {}
-                  }}
-                  hideChildrenWhenLoading
-                  className="w-10.5 h-10.5 rounded-full bg-theme_10_50 flex items-center justify-center cursor-pointer transition-colors hover:bg-theme_9"
-                >
-                  <SocialBtn
-                    src={LOGOS.FACEBOOK_LOGO}
-                    altKey="img_facebook"
-                  />
-                </FacebookLoginButton>
-
-                <AppleLoginButton
-                  onError={(loginError) => {
-                    logger.error("[Login] Apple error", { error: loginError });
-                    try {
-                      analyticsService.trackLoginFailed({
-                        method: "apple",
-                        error_message: String(loginError?.message || loginError),
-                        source_link: typeof window !== "undefined" ? window.location.href : "",
-                      });
-                    } catch (e) {}
-                  }}
-                  hideChildrenWhenLoading
-                  className="w-10.5 h-10.5 rounded-full bg-theme_10_50 flex items-center justify-center cursor-pointer transition-colors hover:bg-theme_9"
-                >
-                  <SocialBtn src={LOGOS.APPLE_LOGO} altKey="img_apple" />
-                </AppleLoginButton>
-              </div>
-
-              {!isAvailable && (
-                <p className="m-0 body-xs-regular text-center text-[var(--theme_7)] mt-8">
-                  {t("not_existing_user")}
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    className="text-[var(--theme_13_samecolour)] cursor-pointer hover:underline ml-1"
-                    onClick={() => router.push(ROUTES.REGISTER)}
-                    onKeyDown={(e) => e.key === "Enter" && router.push(ROUTES.REGISTER)}
-                  >
-                    {t("create_account")}
-                  </span>
-                </p>
-              )}
             </form>
           )}
         </div>
+
+        {/* Bottom right app version badge matching screenshot */}
+        <span className="fixed bottom-3 right-6 text-[11px] font-mono text-white/30 pointer-events-none select-none z-50">
+          v2.2.32
+        </span>
       </div>
-    </div>
+    </FocusContext.Provider>
   );
 }

@@ -78,7 +78,7 @@ export function ProgressBar({
     <div className="w-full flex items-center gap-3">
       <div 
         ref={focusRef}
-        className={`relative flex-1 group/seek transition-all duration-150 ${focused ? 'ring-2 ring-theme_1/40 bg-white/10 rounded-full scale-[1.01]' : ''}`} 
+        className={`relative flex-1 group/seek transition-all duration-150 ${focused ? 'ring-[3px] ring-white bg-white/30 rounded-full scale-[1.02] shadow-2xl z-20' : ''}`} 
         style={{ height: 20 }}
       >
         {isThumbnailEnabled &&

@@ -119,11 +119,6 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
   const t = useTranslations("profile-dropdown");
 
-  const { ref: dropdownBoundaryRef, focusKey: dropdownBoundaryKey } = useFocusable({
-    focusKey: 'profile-dropdown-boundary',
-    isFocusBoundary: true,
-  });
-
   // Open: mount first, then trigger CSS transition on next tick
   const openDropdown = () => {
     if (triggerRef.current) {
@@ -134,7 +129,6 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       });
     }
     setIsMounted(true);
-    // Small delay so the element is in the DOM before we apply the visible class
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setIsVisible(true);
@@ -151,7 +145,6 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     }
     setIsVisible(false);
     setIsDropdownOpen(false);
-    // Match the CSS transition duration (200ms)
     setTimeout(() => setIsMounted(false), 200);
   };
 
@@ -203,66 +196,16 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
   }, [isDropdownOpen]);
 
   const dropdownContent = isMounted ? (
-    <FocusContext.Provider value={dropdownBoundaryKey}>
-      <div
-        ref={(node) => {
-          (dropdownRef as any).current = node;
-          if (typeof (dropdownBoundaryRef as any) === 'function') {
-            (dropdownBoundaryRef as any)(node);
-          } else if (dropdownBoundaryRef) {
-            (dropdownBoundaryRef as any).current = node;
-          }
-        }}
-        style={{
-          position: "fixed",
-          top: dropdownPos.top,
-          right: dropdownPos.right,
-          zIndex: 9999,
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          // Open: scale(1) opacity(1) — Close: scale(0.95) opacity(0)
-          opacity: isVisible ? 1 : 0,
-          transform: isVisible ? "scale(1) translateY(0px)" : "scale(0.95) translateY(-8px)",
-          transformOrigin: "top right",
-          transition: "opacity 200ms ease, transform 200ms ease",
-          pointerEvents: isVisible ? "auto" : "none",
-        }}
-        className="w-60 bg-theme_10_80 border-none rounded-[15px] shadow-2xl py-3 px-3.5 flex flex-col gap-1 mt-2"
-      >
-        <div className="absolute right-[18px] -top-1.5 w-3 h-3 rotate-45 z-[1]" />
-
-        {allProfiles?.map((profile) => (
-          <FocusableProfileItem
-            key={profile?.profile_id}
-            profile={profile}
-            isSelected={profile?.profile_id === selectedProfile?.profile_id}
-            onSwitch={handleProfileSwitch}
-          />
-        ))}
-
-        {allProfiles?.length > 0 && <div className="h-px bg-theme_7 my-1" />}
-
-        <ProfileMenuLink href={ROUTES.MANAGE_PROFILE}>
-          {t("manage_profiles")}
-        </ProfileMenuLink>
-
-        <ProfileMenuLink href={ROUTES.WATCHLIST}>
-          {t("watch_list")}
-        </ProfileMenuLink>
-
-        <ProfileMenuLink href={ROUTES.ACCOUNT_SETTINGS}>
-          {t("account_settings")}
-        </ProfileMenuLink>
-
-        <ProfileMenuLink href="https://help.jojoapp.in/" target="_blank">
-          {t("help_and_support")}
-        </ProfileMenuLink>
-
-        <div className="h-px bg-theme_7 my-1" />
-
-        <FocusableDropdownLogout onLogout={handleDropdownLogout} t={t} />
-      </div>
-    </FocusContext.Provider>
+    <ProfileDropdownMenu
+      dropdownRef={dropdownRef}
+      dropdownPos={dropdownPos}
+      isVisible={isVisible}
+      allProfiles={allProfiles}
+      selectedProfile={selectedProfile}
+      handleProfileSwitch={handleProfileSwitch}
+      handleDropdownLogout={handleDropdownLogout}
+      t={t}
+    />
   ) : null;
 
   const { ref: focusableRef, focused } = useFocusable({
@@ -325,6 +268,84 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
         <LogoutModal isOpen={isLogoutModalOpen} onClose={() => setIsLogoutModalOpen(false)} />
       </div>
     </>
+  );
+}
+
+function ProfileDropdownMenu({
+  dropdownRef,
+  dropdownPos,
+  isVisible,
+  allProfiles,
+  selectedProfile,
+  handleProfileSwitch,
+  handleDropdownLogout,
+  t,
+}: any) {
+  const { ref: dropdownBoundaryRef, focusKey: dropdownBoundaryKey } = useFocusable({
+    focusKey: 'profile-dropdown-boundary',
+    isFocusBoundary: true,
+  });
+
+  return (
+    <FocusContext.Provider value={dropdownBoundaryKey}>
+      <div
+        ref={(node) => {
+          (dropdownRef as any).current = node;
+          if (typeof (dropdownBoundaryRef as any) === 'function') {
+            (dropdownBoundaryRef as any)(node);
+          } else if (dropdownBoundaryRef) {
+            (dropdownBoundaryRef as any).current = node;
+          }
+        }}
+        style={{
+          position: "fixed",
+          top: dropdownPos.top,
+          right: dropdownPos.right,
+          zIndex: 9999,
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          opacity: isVisible ? 1 : 0,
+          transform: isVisible ? "scale(1) translateY(0px)" : "scale(0.95) translateY(-8px)",
+          transformOrigin: "top right",
+          transition: "opacity 200ms ease, transform 200ms ease",
+          pointerEvents: isVisible ? "auto" : "none",
+        }}
+        className="w-60 bg-theme_10_80 border-none rounded-[15px] shadow-2xl py-3 px-3.5 flex flex-col gap-1 mt-2"
+      >
+        <div className="absolute right-[18px] -top-1.5 w-3 h-3 rotate-45 z-[1]" />
+
+        {allProfiles?.map((profile: any) => (
+          <FocusableProfileItem
+            key={profile?.profile_id}
+            profile={profile}
+            isSelected={profile?.profile_id === selectedProfile?.profile_id}
+            onSwitch={handleProfileSwitch}
+          />
+        ))}
+
+        {allProfiles?.length > 0 && <div className="h-px bg-theme_7 my-1" />}
+
+        <ProfileMenuLink href={ROUTES.MANAGE_PROFILE}>
+          {t("manage_profiles")}
+        </ProfileMenuLink>
+
+        <ProfileMenuLink href={ROUTES.WATCHLIST}>
+          {t("watch_list")}
+        </ProfileMenuLink>
+
+        <ProfileMenuLink href={ROUTES.ACCOUNT_SETTINGS}>
+          {t("account_settings")}
+        </ProfileMenuLink>
+
+        <ProfileMenuLink href="https://help.jojoapp.in/" target="_blank">
+          {t("help_and_support")}
+        </ProfileMenuLink>
+
+        <div className="h-px bg-theme_7 my-1" />
+
+        <FocusableDropdownLogout onLogout={handleDropdownLogout} t={t} />
+      </div>
+    </FocusContext.Provider>
   );
 }
 

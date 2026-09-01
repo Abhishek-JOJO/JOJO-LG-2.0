@@ -992,19 +992,17 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     }
   });
 
-  const hasSetInitialFocusRef = useRef<string | null>(null);
-
+  // 1. Initial Focus Trigger: Set focus to primary Watch Now button as soon as skeleton finishes loading
   useEffect(() => {
-    if (asset && !isAuthLoading && !isDataLoading && hasSetInitialFocusRef.current !== assetId) {
-      hasSetInitialFocusRef.current = assetId;
+    if (!showSkeleton && asset && !isAuthLoading && !isDataLoading) {
       const timer = setTimeout(() => {
         setFocus(`asset-watch-now-${assetId}`);
-      }, 200);
+      }, 100);
       return () => clearTimeout(timer);
     }
-  }, [asset, isAuthLoading, isDataLoading, assetId]);
+  }, [assetId, showSkeleton, isAuthLoading, isDataLoading, asset]);
 
-  // Focus Auto-Recovery Guard for AssetDetailView
+  // 2. Focus Auto-Recovery Guard: Continuously ensure focus is maintained on AssetDetailView
   useEffect(() => {
     if (showSkeleton || !asset) return;
 
@@ -1012,26 +1010,35 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     const checkInterval = setInterval(() => {
       attempts++;
 
-      const container = document.getElementById("asset-detail-container");
-      if (!container) return;
+      const isAnyActionFocused =
+        watchNowFocused ||
+        watchlistFocused ||
+        shareFocused ||
+        likeFocused ||
+        muteFocused;
 
-      const currentFocused = container.querySelector(
-        '[data-focuskey].ring-\\[4px\\], ' +
-        '[data-focuskey].ring-white, ' +
-        '[data-focuskey].border-white, ' +
-        '[data-focuskey].ring-2'
-      );
+      if (!isAnyActionFocused) {
+        const container = document.getElementById("asset-detail-container");
+        if (container) {
+          const activeFocusedInDom = container.querySelector(
+            '[data-focuskey].ring-4, ' +
+            '[data-focuskey].scale-110, ' +
+            '[data-focuskey].scale-105, ' +
+            '[data-focuskey].border-white'
+          );
 
-      if (!currentFocused) {
-        const watchNowKey = `asset-watch-now-${assetId}`;
-        const watchNowEl = container.querySelector(`[data-focuskey="${watchNowKey}"]`);
-        if (watchNowEl) {
-          setFocus(watchNowKey);
-        } else {
-          const firstFocusable = container.querySelector('[data-focuskey]');
-          if (firstFocusable) {
-            const key = firstFocusable.getAttribute("data-focuskey");
-            if (key) setFocus(key);
+          if (!activeFocusedInDom) {
+            const watchNowKey = `asset-watch-now-${assetId}`;
+            const watchNowEl = container.querySelector(`[data-focuskey="${watchNowKey}"]`);
+            if (watchNowEl) {
+              setFocus(watchNowKey);
+            } else {
+              const firstFocusable = container.querySelector('[data-focuskey]');
+              if (firstFocusable) {
+                const key = firstFocusable.getAttribute("data-focuskey");
+                if (key) setFocus(key);
+              }
+            }
           }
         }
       }
@@ -1039,10 +1046,21 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       if (attempts >= 12) {
         clearInterval(checkInterval);
       }
-    }, 120);
+    }, 150);
 
     return () => clearInterval(checkInterval);
-  }, [assetId, showSkeleton, activeTab, selectedSeasonIndex, displayedEpisodes?.length, asset]);
+  }, [
+    assetId,
+    showSkeleton,
+    asset,
+    watchNowFocused,
+    watchlistFocused,
+    shareFocused,
+    likeFocused,
+    muteFocused,
+    videoStarted,
+    videoReady
+  ]);
 
   if (showSkeleton) {
     return (
@@ -1198,7 +1216,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       <div
         className={
           isStandalone
-            ? "relative w-full h-[350px] sm:h-[500px] md:h-[600px] lg:h-[70vh] overflow-hidden group"
+            ? "relative w-full h-[400px] sm:h-[550px] md:h-[650px] lg:h-[75vh] overflow-hidden group"
             : "relative w-full h-[280px] sm:h-[450px] overflow-hidden group"
         }
       >
@@ -1211,7 +1229,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             playsInline
             onTimeUpdate={handleTimeUpdate}
             onEnded={handleVideoEnded}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${videoReady ? "opacity-100" : "opacity-0"
+            className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-1000 ${videoReady ? "opacity-100" : "opacity-0"
               }`}
             onCanPlay={() => setVideoReady(true)}
             onError={() => setVideoError(true)}
@@ -1225,7 +1243,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
               src={bgPosterUrl}
               alt={asset.title}
               fill
-              className="object-cover transition-opacity duration-1000"
+              className="object-cover object-top transition-opacity duration-1000"
               wrapperClassName="w-full h-full"
             />
           ) : (
@@ -1399,14 +1417,14 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             </div>
           )}
 
-          <div className="flex items-center gap-5 sm:gap-6">
+          <div className="flex items-center gap-3 sm:gap-4">
             {isAuthLoading ? (
               <>
-                <div className="h-6 w-6 bg-neutral-800 rounded-full animate-pulse" />
-                <div className="h-6 w-6 bg-neutral-800 rounded-full animate-pulse" />
-                <div className="h-6 w-6 bg-neutral-800 rounded-full animate-pulse" />
+                <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
+                <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
+                <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
                 {activePreview?.videoUrl && videoStarted && videoReady && !videoError && (
-                  <div className="h-6 w-6 bg-neutral-800 rounded-full animate-pulse" />
+                  <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
                 )}
               </>
             ) : (
@@ -1432,14 +1450,14 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   description: asset.description,
                 } : undefined);
               }}
-              className={`flex items-center justify-center hover:scale-115 active:scale-90 transition-all text-theme_1/80 hover:text-theme_1 cursor-pointer ${watchlistFocused ? "scale-115 text-theme_1 ring-2 ring-white/50 rounded-full" : ""}`}
+              className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all cursor-pointer shrink-0 ${watchlistFocused ? "bg-white text-black border-white scale-110 shadow-lg ring-4 ring-white/40 z-50" : "bg-white/10 text-white/80 border-white/15 hover:bg-white/20 hover:text-white"}`}
               title={t("add_to_watchlist")}
             >
-              {inWatchlist ? <Check size={22} className="text-theme_13_samecolour" /> : <Plus size={22} />}
+              {inWatchlist ? <Check size={20} className="text-theme_13_samecolour" /> : <Plus size={20} />}
             </button>
 
             {/* Share */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 ref={shareRef as any}
                 onClick={() => {
@@ -1464,10 +1482,10 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                     });
                   }
                 }}
-                className={`flex items-center justify-center hover:scale-115 active:scale-90 transition-all text-theme_1/80 hover:text-theme_1 cursor-pointer ${shareFocused ? "scale-115 text-theme_1 ring-2 ring-white/50 rounded-full" : ""}`}
+                className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all cursor-pointer ${shareFocused ? "bg-white text-black border-white scale-110 shadow-lg ring-4 ring-white/40 z-50" : "bg-white/10 text-white/80 border-white/15 hover:bg-white/20 hover:text-white"}`}
                 title={t("share")}
               >
-                <Share2 size={22} />
+                <Share2 size={20} />
               </button>
               {shareSuccess && (
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-neutral-900 border border-neutral-800 text-[10px] text-theme_13_samecolour font-bold whitespace-nowrap rounded shadow-lg animate-fadeIn">
@@ -1492,10 +1510,10 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   content_type: asset?.assetType === 'SHOW' ? 'show' : 'movie',
                 });
               }}
-              className={`flex items-center justify-center hover:scale-115 active:scale-90 transition-all text-theme_1/80 hover:text-theme_1 cursor-pointer ${likeFocused ? "scale-115 text-theme_1 ring-2 ring-white/50 rounded-full" : ""}`}
+              className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all cursor-pointer shrink-0 ${likeFocused ? "bg-white text-black border-white scale-110 shadow-lg ring-4 ring-white/40 z-50" : "bg-white/10 text-white/80 border-white/15 hover:bg-white/20 hover:text-white"}`}
               title={t("like")}
             >
-              <ThumbsUp size={22} fill={isLiked ? "currentColor" : "none"} />
+              <ThumbsUp size={20} fill={isLiked ? "currentColor" : "none"} />
             </button>
 
             {/* Mute/Unmute */}
@@ -1511,10 +1529,10 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                     source: 'content_detail_card',
                   });
                 }}
-                className={`flex items-center justify-center hover:scale-115 active:scale-90 transition-all text-theme_1/80 hover:text-theme_1 cursor-pointer ${muteFocused ? "scale-115 text-theme_1 ring-2 ring-white/50 rounded-full" : ""}`}
+                className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all cursor-pointer shrink-0 ${muteFocused ? "bg-white text-black border-white scale-110 shadow-lg ring-4 ring-white/40 z-50" : "bg-white/10 text-white/80 border-white/15 hover:bg-white/20 hover:text-white"}`}
                 title={isMuted ? t("unmute") : t("mute")}
               >
-                {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
               </button>
             )}
               </>

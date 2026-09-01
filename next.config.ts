@@ -57,7 +57,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  trailingSlash: false, // Remove trailing slashes from URLs
+  trailingSlash: true, // Output clean folder index.html files for static export
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production'
       ? { exclude: ['error', 'warn'] }

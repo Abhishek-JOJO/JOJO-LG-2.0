@@ -24,6 +24,9 @@ export const WEBOS_KEYS = {
 export const useRemoteManager = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // If a component (e.g. modal or video player) already handled & prevented the key, do not override
+      if (e.defaultPrevented) return;
+
       // Map webOS specific keys to actions
       switch (e.keyCode) {
         case WEBOS_KEYS.BACK:
@@ -41,6 +44,15 @@ export const useRemoteManager = () => {
           break;
         case WEBOS_KEYS.PAUSE:
           document.dispatchEvent(new CustomEvent('tv-media-pause'));
+          break;
+        case WEBOS_KEYS.STOP:
+          document.dispatchEvent(new CustomEvent('tv-media-stop'));
+          break;
+        case WEBOS_KEYS.FF:
+          document.dispatchEvent(new CustomEvent('tv-media-ff'));
+          break;
+        case WEBOS_KEYS.RW:
+          document.dispatchEvent(new CustomEvent('tv-media-rw'));
           break;
         default:
           break;

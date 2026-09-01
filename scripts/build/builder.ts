@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import { fixWebOSPaths } from './fix-webos-paths';
 
 /**
  * Run Next.js build with environment variables
@@ -21,7 +22,7 @@ export function runBuild(
   const envFile = envFileMap[env] || '.env.development';
 
   try {
-    execSync(`npm run next:build`, {
+    execSync(`npx dotenv -e ${envFile} -- npx next build`, {
       stdio: 'inherit',
       env: {
         ...process.env,
@@ -36,6 +37,9 @@ export function runBuild(
         VITE_CONSOLE_ENABLED: String(consoleAllowed),
       },
     });
+
+    // Automatically fix absolute asset paths for LG webOS TV
+    fixWebOSPaths();
   } catch {
     process.exit(1);
   }

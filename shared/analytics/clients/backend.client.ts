@@ -44,7 +44,7 @@ class BackendClient {
 
     logger.info(`[Backend Analytics] Sending event ${eventName}`, { targetUrl: actualTargetUrl, payload });
 
-    fetch(bffAnalyticsEndpoint, {
+    fetch(actualTargetUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
