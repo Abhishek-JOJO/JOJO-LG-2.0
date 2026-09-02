@@ -20,8 +20,92 @@ function getAllFiles(dirPath: string, arrayOfFiles: string[] = []): string[] {
   return arrayOfFiles;
 }
 
+/**
+ * Transpile ECMAScript 2022 static { ... } blocks to static property assignments
+ * Chrome 87 (webOS 22) does not support static initialization blocks
+ */
+function transpileStaticBlocks(jsContent: string): string {
+  let index = jsContent.indexOf('static');
+  while (index !== -1) {
+    const slice = jsContent.slice(index);
+    const match = slice.match(/^static\s*\{/);
+    if (match) {
+      const startBraceIndex = index + match[0].length - 1;
+      let depth = 1;
+      let i = startBraceIndex + 1;
+      while (i < jsContent.length && depth > 0) {
+        if (jsContent[i] === '{') depth++;
+        else if (jsContent[i] === '}') depth--;
+        i++;
+      }
+      if (depth === 0) {
+        const blockContent = jsContent.slice(startBraceIndex + 1, i - 1).trim();
+        const assignMatch = blockContent.match(/^this\.([a-zA-Z0-9_$]+)\s*=\s*([\s\S]+)$/);
+        let replacement = jsContent.slice(index, i);
+        if (assignMatch) {
+          const propName = assignMatch[1];
+          let propValue = assignMatch[2].trim();
+          if (propValue.endsWith(';')) propValue = propValue.slice(0, -1);
+          replacement = `static ${propName} = ${propValue};`;
+        }
+        jsContent = jsContent.slice(0, index) + replacement + jsContent.slice(i);
+        index += replacement.length;
+      } else {
+        index += 6;
+      }
+    } else {
+      index += 6;
+    }
+    index = jsContent.indexOf('static', index);
+  }
+  return jsContent;
+}
+
+function sanitizeTildeFilenames(outDir: string) {
+  const allFiles = getAllFiles(outDir);
+  const tildeMap = new Map<string, string>(); // oldBasename -> newBasename
+
+  // Step 1: Rename files containing ~ to use _
+  for (const filePath of allFiles) {
+    const base = path.basename(filePath);
+    if (base.includes('~')) {
+      const newBase = base.replaceAll('~', '_');
+      const newPath = path.join(path.dirname(filePath), newBase);
+      fs.renameSync(filePath, newPath);
+      tildeMap.set(base, newBase);
+    }
+  }
+
+  if (tildeMap.size === 0) return;
+  console.log(`[webOS Fix] Renamed ${tildeMap.size} files containing '~' to '_' for webOS file:// protocol compatibility.`);
+
+  // Step 2: Replace references to old tilde filenames across all HTML, JS, CSS, and JSON files
+  const updatedFiles = getAllFiles(outDir);
+  for (const filePath of updatedFiles) {
+    if (
+      filePath.endsWith('.html') ||
+      filePath.endsWith('.js') ||
+      filePath.endsWith('.css') ||
+      filePath.endsWith('.json')
+    ) {
+      let content = fs.readFileSync(filePath, 'utf8');
+      let modified = false;
+      for (const [oldName, newName] of tildeMap.entries()) {
+        if (content.includes(oldName)) {
+          content = content.replaceAll(oldName, newName);
+          modified = true;
+        }
+      }
+      if (modified) {
+        fs.writeFileSync(filePath, content, 'utf8');
+      }
+    }
+  }
+}
+
 export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
   console.log('[webOS Fix] Fixing absolute paths, CSS color-mix webOS polyfills & React hydration scripts...');
+  sanitizeTildeFilenames(outDir);
   const allFiles = getAllFiles(outDir);
 
   let htmlCount = 0;
@@ -37,17 +121,10 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
       let content = fs.readFileSync(filePath, 'utf8');
 
       // 1. Standard HTML attributes
-      content = content.replaceAll('"/_next/', `"${relPrefix}_next/`);
-      content = content.replaceAll("'/_next/", `'${relPrefix}_next/`);
       content = content.replaceAll('href="/_next/', `href="${relPrefix}_next/`);
       content = content.replaceAll('src="/_next/', `src="${relPrefix}_next/`);
 
-      // 2. Escaped JSON strings in Next.js Flight/RSC hydration payloads
-      content = content.replaceAll('\\"/_next/', `\\"${relPrefix}_next/`);
-      content = content.replaceAll('\\\\"/_next/', `\\\\"${relPrefix}_next/`);
-      content = content.replaceAll('[\\"/_next/', `[\\"${relPrefix}_next/`);
-
-      // 3. Static public asset routes
+      // 2. Static public asset routes
       content = content.replaceAll('"/logos/', `"${relPrefix}logos/`);
       content = content.replaceAll('\\"/logos/', `\\"${relPrefix}logos/`);
       content = content.replaceAll('"/images/', `"${relPrefix}images/`);
@@ -55,7 +132,24 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
       content = content.replaceAll('"/lottie/', `"${relPrefix}lottie/`);
       content = content.replaceAll('\\"/lottie/', `\\"${relPrefix}lottie/`);
       content = content.replaceAll('"/webOSTV.js"', `"${relPrefix}webOSTV.js"`);
-      content = content.replaceAll('"/favicon.ico"', `"${relPrefix}favicon.ico"`);
+      content = content.replaceAll('\\"/webOSTV.js\\"', `\\"${relPrefix}webOSTV.js\\"`);
+      // 3. Strip crossorigin attributes for webOS file:// protocol CORS compatibility without breaking JSON syntax
+      content = content.replaceAll('crossorigin=""', '');
+      content = content.replaceAll('crossorigin="anonymous"', '');
+      content = content.replaceAll('crossorigin="use-credentials"', '');
+      content = content.replaceAll('crossOrigin=""', '');
+      content = content.replaceAll('crossOrigin="anonymous"', '');
+      content = content.replaceAll(',\\"crossOrigin\\":\\"\\"', '');
+      content = content.replaceAll(',\\"crossOrigin\\":\\"anonymous\\"', '');
+      content = content.replaceAll(',\\"crossOrigin\\":\\"$undefined\\"', '');
+      content = content.replaceAll(',\\"crossorigin\\":\\"\\"', '');
+      content = content.replaceAll(',\\"crossorigin\\":\\"anonymous\\"', '');
+      content = content.replaceAll('{\\"crossOrigin\\":\\"\\",', '{');
+      content = content.replaceAll('{\\"crossOrigin\\":\\"anonymous\\",', '{');
+      content = content.replaceAll('{\\"crossOrigin\\":\\"$undefined\\",', '{');
+      content = content.replaceAll('\\"crossOrigin\\":\\"\\"', '');
+      content = content.replaceAll('\\"crossOrigin\\":\\"anonymous\\"', '');
+      content = content.replaceAll('\\"crossOrigin\\":\\"$undefined\\"', '');
 
       fs.writeFileSync(filePath, content, 'utf8');
       htmlCount++;
@@ -63,25 +157,59 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
       let content = fs.readFileSync(filePath, 'utf8');
       let modified = false;
 
-      // Fix Turbopack document.currentScript.src assetPrefix invariant check
-      if (content.includes('document.currentScript')) {
+      // Fix webOS 22 Chromium 87 syntax error: transpile ECMAScript 2022 static { ... } blocks
+      if (content.includes('static')) {
+        const prevContent = content;
+        content = transpileStaticBlocks(content);
+        if (content !== prevContent) {
+          modified = true;
+        }
+      }
+
+      // Fix Next.js getAssetPrefix() to always return relative prefix '.' instead of throwing InvariantError on file:// URLs
+      if (content.includes('InvariantError') || content.includes('E784') || content.includes('document.currentScript')) {
+        const prevContent = content;
         content = content.replace(
-          /if\s*\(!r\.startsWith\([a-zA-Z0-9_$]+\)\)\s*throw\s*Error\([`']Invariant:[^`']+[`']\);/g,
-          ''
+          /let\{pathname:[a-zA-Z0-9_$]+\}=new URL\([^)]+\)[\s\S]*?return [a-zA-Z0-9_$]+\.slice\(0,[a-zA-Z0-9_$]+\)/g,
+          'return "."'
         );
-        content = content.replace(
-          /!r\.startsWith\(t\)/g,
-          '!r.includes("_next/")'
+        if (content !== prevContent) {
+          modified = true;
+        }
+      }
+
+      // Fix Turbopack base chunk loading prefix to dynamically resolve absolute file:// URL from document base URI
+      const dynamicT = 'let t=(typeof document!=="undefined"&&(document.baseURI||location.href))?new URL("./_next/",document.baseURI||location.href).href:"./_next/"';
+      if (content.includes('let t="/_next/"')) {
+        content = content.replaceAll('let t="/_next/"', dynamicT);
+        modified = true;
+      }
+      if (content.includes('let t = "/_next/"')) {
+        content = content.replaceAll('let t = "/_next/"', dynamicT);
+        modified = true;
+      }
+      if (content.includes('let t="./_next/"')) {
+        content = content.replaceAll('let t="./_next/"', dynamicT);
+        modified = true;
+      }
+
+      // Transpile Chromium 87 incompatible optional chaining ?. and ?? in Turbopack loader
+      if (content.includes('document?.currentScript')) {
+        content = content.replaceAll(
+          'document?.currentScript?.getAttribute?.("src")??""',
+          '("object"==typeof document&&document.currentScript?document.currentScript.getAttribute("src"):"")'
         );
         modified = true;
       }
 
-      if (content.includes('/_next/')) {
-        content = content.replaceAll('"/_next/', '"./_next/');
-        content = content.replaceAll("'/_next/", "'./_next/");
-        content = content.replaceAll('\\"/_next/', '\\"./_next/');
-        content = content.replaceAll('"/_next/"', '"./_next/"');
-        modified = true;
+      // Fix Turbopack chunk key resolution on file:// protocol URLs (matching D(q(n)).resolve() key with M() loader key)
+      if (content.includes('r.startsWith(t)?r.slice(t.length):r')) {
+        const oldCode = `let n=function(e){if("string"==typeof e)return e;let r=decodeURIComponent(e.src.replace(/[?#].*$/,""));return r.startsWith(t)?r.slice(t.length):r}(e);if(D("string"==typeof e?q(e):e.src).resolve()`;
+        const newCode = `let n=function(e){if("string"==typeof e)return e;let r=decodeURIComponent(e.src.replace(/[?#].*$/,""));let i=r.indexOf("_next/");return i!==-1?r.slice(i+6):r.startsWith(t)?r.slice(t.length):r}(e);if(D(q(n)).resolve()`;
+        if (content.includes(oldCode)) {
+          content = content.replace(oldCode, newCode);
+          modified = true;
+        }
       }
 
       if (content.includes('__webpack_require__.p')) {
@@ -93,6 +221,18 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
 
       if (content.includes('"/" + e + ".js"')) {
         content = content.replaceAll('"/" + e + ".js"', '"./" + e + ".js"');
+        modified = true;
+      }
+
+      // Strip crossOrigin properties from dynamic script element creations in JS files
+      if (content.includes('crossOrigin') || content.includes('crossorigin')) {
+        content = content.replaceAll('.crossOrigin="anonymous"', '');
+        content = content.replaceAll('.crossOrigin=""', '');
+        content = content.replaceAll('.crossOrigin=e', '');
+        content = content.replaceAll('.crossOrigin=t', '');
+        content = content.replaceAll('.crossOrigin=r', '');
+        content = content.replaceAll('crossorigin=""', '');
+        content = content.replaceAll('crossorigin="anonymous"', '');
         modified = true;
       }
 

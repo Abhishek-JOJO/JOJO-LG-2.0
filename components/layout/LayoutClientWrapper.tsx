@@ -19,18 +19,23 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   const isMobileDevice = searchParams?.get("device") === "mobile";
   const isMobileLegalPage = isLegalPage && isMobileDevice;
 
-  const isStandalonePage =
-    pathname === ROUTES.DOWNLOAD_APP ||
-    pathname === ROUTES.APP_INSTALL ||
-    pathname === "/appInstall" ||
-    pathname === "/app-install" ||
-    pathname === ROUTES.WATCH_BASE ||
-    pathname.startsWith(ROUTES.WATCH_BASE + "/") ||
-    pathname === ROUTES.LOGIN ||
-    pathname === ROUTES.LOGIN_OTP;
+  const normalizedPath = pathname ? (pathname.replace(/\/$/, "") || "/") : "/";
 
-  const isKidsPage = pathname === ROUTES.KIDS;
-  const isHotAndNewPage = pathname === ROUTES.HOT_AND_NEW;
+  const isAuthPage =
+    normalizedPath.startsWith(ROUTES.LOGIN) ||
+    normalizedPath.startsWith(ROUTES.REGISTER);
+
+  const isStandalonePage =
+    isAuthPage ||
+    normalizedPath === ROUTES.DOWNLOAD_APP ||
+    normalizedPath === ROUTES.APP_INSTALL ||
+    normalizedPath === "/appInstall" ||
+    normalizedPath === "/app-install" ||
+    normalizedPath === ROUTES.WATCH_BASE ||
+    normalizedPath.startsWith(ROUTES.WATCH_BASE + "/");
+
+  const isKidsPage = normalizedPath === ROUTES.KIDS;
+  const isHotAndNewPage = normalizedPath === ROUTES.HOT_AND_NEW;
 
   const hideHeaderFooter = isStandalonePage || isMobileLegalPage;
 

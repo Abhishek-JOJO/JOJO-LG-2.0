@@ -282,66 +282,65 @@ export function ContentRailList({
     if (!items?.length) return null;
 
     return (
+      <div
+        id="hero-carousel-container"
+        ref={focusKeyRef}
+        data-focuskey={focusKey}
+        className={`relative overflow-hidden w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] lg:w-[calc(100%-4rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] shadow-[0_20px_50px_rgba(0,0,0,0.95)] transition-all duration-300 ${focused ? "ring-[4px] ring-white z-[99] border-white scale-[1.01]" : "border-white/10"}`}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         <div
-          id="hero-carousel-container"
-          ref={focusKeyRef}
-          data-focuskey={focusKey}
-          className={`relative overflow-hidden w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] lg:w-[calc(100%-4rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] shadow-[0_20px_50px_rgba(0,0,0,0.95)] transition-all duration-300 ${focused ? "ring-[4px] ring-white z-[99] border-white scale-[1.01]" : "border-white/10"}`}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
+          className="flex h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]"
+          style={{ transform: `translateX(calc(-${(items?.length > 1 ? activeIndex + 1 : activeIndex) * 100}%))` }}
         >
-          <div
-            className="flex h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]"
-            style={{ transform: `translateX(calc(-${(items?.length > 1 ? activeIndex + 1 : activeIndex) * 100}%))` }}
-          >
-            {extendedItems.map((item, index) => {
-              const isActive = items?.length > 1 ? index === activeIndex + 1 : index === activeIndex;
-              const targetAssetId = item.assetId || item.id;
-              const batchPricing = mapBatchAssetAccess(batchAccessData, targetAssetId);
+          {extendedItems.map((item, index) => {
+            const isActive = items?.length > 1 ? index === activeIndex + 1 : index === activeIndex;
+            const targetAssetId = item.assetId || item.id;
+            const batchPricing = mapBatchAssetAccess(batchAccessData, targetAssetId);
 
-              return (
+            return (
+              <div
+                key={`${item.id}-${index}`}
+                className="w-full shrink-0 h-full relative"
+              >
                 <div
-                  key={`${item.id}-${index}`}
-                  className="w-full shrink-0 h-full relative"
+                  className={`relative w-full h-full transition-all duration-700 ease-out ${isActive ? "" : "pointer-events-none"}`}
                 >
-                  <div
-                    className={`relative w-full h-full transition-all duration-700 ease-out ${isActive ? "" : "pointer-events-none"}`}
-                  >
-                    <HeroCarouselCard
-                      item={item}
-                      index={index}
-                      isActive={isActive}
-                      config={config}
-                      onClick={() => onItemClick?.(item)}
-                      onHoverChange={setIsAutoplayPaused}
-                      onVideoPlayChange={setIsVideoPlaying}
-                      batchPricing={batchPricing}
-                    />
-                  </div>
+                  <HeroCarouselCard
+                    item={item}
+                    index={index}
+                    isActive={isActive}
+                    config={config}
+                    onClick={() => onItemClick?.(item)}
+                    onHoverChange={setIsAutoplayPaused}
+                    onVideoPlayChange={setIsVideoPlaying}
+                    batchPricing={batchPricing}
+                  />
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Pagination Dots */}
-          {items?.length > 1 && (
-            <div className="absolute bottom-6 right-6 sm:bottom-10 sm:right-12 lg:bottom-12 lg:right-16 flex gap-2 z-[100]">
-              {items.map((_, dotIndex) => (
-                <div
-                  key={dotIndex}
-                  onClick={() => {
-                    setVirtualIndex(dotIndex);
-                    setIsAutoplayPaused(true);
-                  }}
-                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                    dotIndex === activeIndex ? "w-6 bg-theme_1" : "w-2 bg-theme_1/50 hover:bg-theme_1/80"
-                  }`}
-                />
-              ))}
-            </div>
-          )}
+              </div>
+            );
+          })}
         </div>
+
+        {/* Pagination Dots */}
+        {items?.length > 1 && (
+          <div className="absolute bottom-6 right-6 sm:bottom-10 sm:right-12 lg:bottom-12 lg:right-16 flex gap-2 z-[100]">
+            {items.map((_, dotIndex) => (
+              <div
+                key={dotIndex}
+                onClick={() => {
+                  setVirtualIndex(dotIndex);
+                  setIsAutoplayPaused(true);
+                }}
+                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${dotIndex === activeIndex ? "w-6 bg-theme_1" : "w-2 bg-theme_1/50 hover:bg-theme_1/80"
+                  }`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     );
   }
 

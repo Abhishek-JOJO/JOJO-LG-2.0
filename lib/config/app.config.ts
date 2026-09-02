@@ -291,7 +291,7 @@ export const appConfig = {
         enableAnalytics: true,
         enableCaptcha: false,     // Enable/disable reCAPTCHA verification globally
         showNavbar: true,
-        showFooter: true,
+        showFooter: false,
         showDarkLightToggle: true,
         showLanguageDropdown: true,
         isShowLanguageDropdown: false,
