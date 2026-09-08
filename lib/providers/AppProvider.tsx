@@ -31,6 +31,7 @@ import { useContinueWatchingStore } from "@store/useContinueWatchingStore";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { useDeepLinkHandler, deepLinkManager } from "@/lib/deeplink/useDeepLinkHandler";
+import { tvNavigate } from "@/src/navigation/tvNavigate";
 
 interface AppProviderProps {
   children: ReactNode;
@@ -406,42 +407,34 @@ export function AppProvider({ children }: AppProviderProps) {
         ? ROUTES.HOME
         : getProfileSelectionRoute(isMobile);
       logger.info('[AppProvider] ➡️  Authenticated user on auth-only route, redirecting', { normalizedPath, destination });
-      router.replace(destination);
+      tvNavigate(destination, router, { replace: true });
       return;
     }
 
     const isPublic = isPublicRoute(normalizedPath);
 
-    // EARLY GUARD: Guest on allowed routes / redirect guest if on protected route
-    if (isGuest) {
-      if (isGuestAllowedRoute(normalizedPath)) {
-        logger.info('[AppProvider] ✅ Guest on allowed route, bypassing profile checks', { normalizedPath });
-        return;
-      } else if (!isPublic) {
-        logger.info('[AppProvider] ➡️  Guest user on protected route, redirecting to login immediately');
-        router.replace(UNAUTHENTICATED_ENTRY_ROUTE);
-        return;
-      }
-    }
-
-    // NO SESSION
-    if (!sessionId) {
+    // TV Auth Guard: Unauthenticated users or guests cannot browse content routes on TV.
+    // They must authenticate via the Login screen.
+    if (!sessionId || isGuest) {
       // Check if this is a deep link initialization
       const hasDeepLink = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("data");
       if (hasDeepLink) {
-        logger.info('[AppProvider] Deep link detected, postponing authentication redirect for guest login');
+        logger.info('[AppProvider] Deep link detected, postponing authentication redirect');
         return;
       }
 
       if (!isPublic) {
-        logger.info('[AppProvider] ➡️  No session, redirecting to login', {
+        logger.info('[AppProvider] 📺 TV user not authenticated, redirecting to login', {
           from: normalizedPath,
+          isGuest,
+          hasSession: !!sessionId,
         });
-        router.push(UNAUTHENTICATED_ENTRY_ROUTE);
+        tvNavigate(UNAUTHENTICATED_ENTRY_ROUTE, router, { replace: true });
+        return;
       } else {
-        logger.info('[AppProvider] ✅ Public route, allowing access');
+        logger.info('[AppProvider] ✅ Public route, allowing access', { normalizedPath });
+        return;
       }
-      return;
     }
 
     // HAS SESSION - wait for profiles query (including background refetches).
@@ -491,10 +484,10 @@ export function AppProvider({ children }: AppProviderProps) {
       } else if (!isPublic) {
         if (isGuest) {
           logger.info('[AppProvider] ➡️  Guest user on protected route, redirecting to login');
-          router.replace(UNAUTHENTICATED_ENTRY_ROUTE);
+          tvNavigate(UNAUTHENTICATED_ENTRY_ROUTE, router, { replace: true });
         } else {
           logger.info('[AppProvider] ➡️  No profiles, redirecting to create-account');
-          router.replace(ROUTES.REGISTER_CREATE_ACCOUNT);
+          tvNavigate(ROUTES.REGISTER_CREATE_ACCOUNT, router, { replace: true });
         }
       } else {
         logger.info('[AppProvider] ✅ Public route, skipping redirect (no profiles)');
@@ -505,7 +498,7 @@ export function AppProvider({ children }: AppProviderProps) {
     // HAS PROFILES — logged-in users who already have profile(s) cannot access /register/create-account directly
     if (normalizedPath === ROUTES.REGISTER_CREATE_ACCOUNT) {
       logger.info('[AppProvider] ➡️  User already has profile(s), redirecting away from create-account to HOME', { normalizedPath });
-      router.replace(ROUTES.HOME);
+      tvNavigate(ROUTES.HOME, router, { replace: true });
       return;
     }
 
@@ -520,7 +513,7 @@ export function AppProvider({ children }: AppProviderProps) {
       const profileRoute = getProfileSelectionRoute(isMobile);
       if (normalizedPath !== profileRoute) {
         logger.info('[AppProvider] ➡️  No selected profile, redirecting to profile selection route', { profileRoute });
-        router.push(profileRoute);
+        tvNavigate(profileRoute, router, { replace: true });
       } else {
         logger.info('[AppProvider] ✅ Already on profile selection route (no selection)');
       }
@@ -561,7 +554,7 @@ export function AppProvider({ children }: AppProviderProps) {
           destination,
           isMobile,
         });
-        router.push(destination);
+        tvNavigate(destination, router);
       } else {
         logger.info('[AppProvider] ✅ Already on post-auth route', { pathname });
       }

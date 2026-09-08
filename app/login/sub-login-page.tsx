@@ -32,6 +32,8 @@ import { useFocusable, setFocus, FocusContext } from "@noriginmedia/norigin-spat
 import { LoginModeToggle, LoginMode } from "./components/LoginModeToggle";
 import { QrPairingPanel } from "./components/QrPairingPanel";
 
+import { tvNavigate } from "@/src/navigation/tvNavigate";
+
 export default function LoginPage() {
   return (
     <Suspense>
@@ -79,6 +81,17 @@ function LoginPageContent() {
       // Trigger native keyboard or handle submit if valid
       const el = document.getElementById("login-input-field");
       if (el) el.focus();
+    },
+    onArrowPress: (direction) => {
+      if (direction === 'down') {
+        setFocus('login-submit');
+        return false;
+      }
+      if (direction === 'up') {
+        setFocus('login-mode-remote');
+        return false;
+      }
+      return true;
     }
   });
 
@@ -88,8 +101,21 @@ function LoginPageContent() {
       // Manually trigger form submit
       const form = document.getElementById("login-form") as HTMLFormElement;
       if (form && canSubmit && !initiateOtp.isPending && !checkUserExists.isPending) {
-        form.requestSubmit();
+        if (typeof form.requestSubmit === "function") {
+          form.requestSubmit();
+        } else {
+          form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+        }
       }
+    },
+    onArrowPress: (direction) => {
+      if (direction === 'up') {
+        setFocus('login-input');
+        const el = document.getElementById("login-input-field");
+        if (el) el.focus();
+        return false;
+      }
+      return true;
     }
   });
 
@@ -283,6 +309,39 @@ function LoginPageContent() {
     setSelectedCountryCode(country.country_code);
   };
 
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      (e.target as HTMLElement)?.blur();
+      setFocus("login-submit");
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      (e.target as HTMLElement)?.blur();
+      setFocus("login-mode-remote");
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      (e.target as HTMLElement)?.blur();
+      if (canSubmit && !initiateOtp.isPending && !checkUserExists.isPending) {
+        const form = document.getElementById("login-form") as HTMLFormElement;
+        if (form) {
+          if (typeof form.requestSubmit === "function") {
+            form.requestSubmit();
+          } else {
+            form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+          }
+        }
+      } else {
+        setFocus("login-submit");
+      }
+      return;
+    }
+    handleLoginKeyDown(e);
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -344,7 +403,7 @@ function LoginPageContent() {
               isRegister: false,
             });
             showToast(t("login_success") || "Special User Login Successful!", "success");
-            router.push(ROUTES.WATCHING || "/watching");
+            tvNavigate(ROUTES.WATCHING || "/watching", router);
             return;
           }
 
@@ -361,7 +420,7 @@ function LoginPageContent() {
             isRegister: false,
           });
 
-          router.push(ROUTES.LOGIN_OTP);
+          tvNavigate(ROUTES.LOGIN_OTP, router);
         } catch (err) {
           setError(ErrorKey.INVALID_PHONE);
         }
@@ -390,7 +449,7 @@ function LoginPageContent() {
             isRegister: false,
           });
           showToast(t("login_success") || "Special User Login Successful!", "success");
-          router.push(ROUTES.WATCHING || "/watching");
+          tvNavigate(ROUTES.WATCHING || "/watching", router);
           return;
         }
 
@@ -406,12 +465,12 @@ function LoginPageContent() {
           isRegister: false,
         });
 
-        router.push(ROUTES.LOGIN_OTP);
+        tvNavigate(ROUTES.LOGIN_OTP, router);
       } catch (err) {
         setError(ErrorKey.INVALID_EMAIL);
       }
 
-      return;
+        return;
     }
 
     // INDIA USER FLOW: Send OTP directly
@@ -433,7 +492,7 @@ function LoginPageContent() {
             isRegister: !result.isExists,
           });
           showToast(t("login_success") || "Special User Login Successful!", "success");
-          router.push(ROUTES.WATCHING || "/watching");
+          tvNavigate(ROUTES.WATCHING || "/watching", router);
           return;
         }
 
@@ -445,7 +504,7 @@ function LoginPageContent() {
           isRegister,
         });
 
-        router.push(ROUTES.LOGIN_OTP);
+        tvNavigate(ROUTES.LOGIN_OTP, router);
       } catch {
         setError(ErrorKey.INVALID_PHONE);
       }
@@ -459,7 +518,7 @@ function LoginPageContent() {
       if (result?.isSpecialUser) {
         logger.info("[Login] Special user (email) detected, initiating direct passwordless login");
         showToast(t("login_success") || "Special User Login Successful!", "success");
-        router.push(ROUTES.WATCHING || "/watching");
+        tvNavigate(ROUTES.WATCHING || "/watching", router);
         return;
       }
 
@@ -470,7 +529,7 @@ function LoginPageContent() {
         isRegister,
       });
 
-      router.push(ROUTES.LOGIN_OTP);
+      tvNavigate(ROUTES.LOGIN_OTP, router);
     } catch {
       setError(ErrorKey.INVALID_EMAIL);
     }
@@ -512,7 +571,7 @@ function LoginPageContent() {
                     placeholder={t("placeholder") || "Enter phone or email"}
                     value={value}
                     onChange={handleChange}
-                    onKeyDown={handleLoginKeyDown}
+                    onKeyDown={handleInputKeyDown}
                     onBlur={handleBlur}
                     error={Boolean(error && touched)}
                     showCountryCode={isMobileInput}

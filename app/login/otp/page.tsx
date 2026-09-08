@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import { ChangeEvent, CSSProperties, KeyboardEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useOtpStore } from "./store";
 import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { tvNavigate } from "@/src/navigation/tvNavigate";
 
 export default function OtpPage() {
   return (
@@ -65,7 +66,7 @@ function OtpPageContent() {
     // Don't redirect if we just successfully verified OTP and are navigating away
     if (!identifier && !isVerifiedRef.current) {
       logger.warn("[OTP] Unauthorized access - no phone/email provided, redirecting to login");
-      router.replace(ROUTES.LOGIN);
+      tvNavigate(ROUTES.LOGIN, router, { replace: true });
     }
   }, [identifier, router]);
 
@@ -284,9 +285,9 @@ function OtpPageContent() {
           const param = phone
             ? `${LoginIdentifierType.PHONE}=${encodeURIComponent(phone)}`
             : `${LoginIdentifierType.EMAIL}=${encodeURIComponent(email)}`;
-          router.push(`${ROUTES.REGISTER_CREATE_ACCOUNT}?${param}`);
+          tvNavigate(`${ROUTES.REGISTER_CREATE_ACCOUNT}?${param}`, router);
         } else {
-          router.push(ROUTES.HOME);
+          tvNavigate(ROUTES.HOME, router);
         }
 
         // Clear sessionStorage and reset store AFTER navigation is initiated
@@ -412,7 +413,7 @@ function OtpPageContent() {
 
   const handleModeChange = (nextMode: LoginMode) => {
     if (nextMode === "phone") {
-      router.push(`${ROUTES.LOGIN}?mode=phone`);
+      tvNavigate(`${ROUTES.LOGIN}?mode=phone`, router);
     }
   };
 
@@ -428,6 +429,14 @@ function OtpPageContent() {
       if (canSubmitOtp && !verifyOtp.isPending && !otpSecurity.isLocked && !otpExpiration.isExpired) {
         submitButtonRef.current?.click();
       }
+    },
+    onArrowPress: (direction) => {
+      if (direction === 'up') {
+        setFocus('otp-input-0');
+        inputRefs.current[0]?.focus();
+        return false;
+      }
+      return true;
     }
   });
 
@@ -635,11 +644,21 @@ function FocusableOtpInput({ index, digit, activeIndex, hasError, handleChange, 
     onArrowPress: (direction) => {
       if (direction === 'left' && index > 0) {
         setFocus(`otp-input-${index - 1}`);
-        return true;
+        inputRefs.current[index - 1]?.focus();
+        return false;
       }
       if (direction === 'right' && index < appConfig.OTP_LENGTH - 1) {
         setFocus(`otp-input-${index + 1}`);
-        return true;
+        inputRefs.current[index + 1]?.focus();
+        return false;
+      }
+      if (direction === 'down') {
+        setFocus('otp-submit');
+        return false;
+      }
+      if (direction === 'up') {
+        setFocus('login-mode-remote');
+        return false;
       }
       return true;
     }
@@ -659,13 +678,45 @@ function FocusableOtpInput({ index, digit, activeIndex, hasError, handleChange, 
           // Auto move focus if moving index
           if (e.target.value && index < appConfig.OTP_LENGTH - 1) {
              setFocus(`otp-input-${index + 1}`);
+             inputRefs.current[index + 1]?.focus();
           }
         }}
         onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            (e.target as HTMLElement)?.blur();
+            setFocus('otp-submit');
+            return;
+          }
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            (e.target as HTMLElement)?.blur();
+            setFocus('login-mode-remote');
+            return;
+          }
+          if (e.key === "ArrowLeft" && index > 0) {
+            e.preventDefault();
+            setFocus(`otp-input-${index - 1}`);
+            inputRefs.current[index - 1]?.focus();
+            return;
+          }
+          if (e.key === "ArrowRight" && index < appConfig.OTP_LENGTH - 1) {
+            e.preventDefault();
+            setFocus(`otp-input-${index + 1}`);
+            inputRefs.current[index + 1]?.focus();
+            return;
+          }
+          if (e.key === "Enter") {
+            e.preventDefault();
+            (e.target as HTMLElement)?.blur();
+            setFocus('otp-submit');
+            return;
+          }
           handleKeyDown(e, index);
           // Manually handle spatial focus sync
           if (e.key === "Backspace" && !digit && index > 0) {
             setFocus(`otp-input-${index - 1}`);
+            inputRefs.current[index - 1]?.focus();
           }
         }}
         onPaste={handlePaste}

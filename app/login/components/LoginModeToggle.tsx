@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useFocusable, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 
@@ -57,6 +57,15 @@ function ToggleOption({
     focusKey,
     onEnterPress: onSelect,
     onFocus: onSelect,
+    onArrowPress: (direction) => {
+      if (direction === "down") {
+        setFocus("login-input");
+        const el = document.getElementById("login-input-field");
+        if (el) el.focus();
+        return false;
+      }
+      return true;
+    },
   });
 
   return (

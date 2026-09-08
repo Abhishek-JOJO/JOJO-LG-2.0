@@ -10,11 +10,8 @@ import { logger } from "@lib/logger/logger";
 import { BootstrapContext } from "./BootstrapContext";
 import { useTranslations } from "next-intl";
 import { useAuthStore } from "@store/useAuthStore";
-import { guestLogin } from "@/features/auth/api/guestLogin";
-import { isPublicRoute, isGuestAllowedRoute } from "@lib/constants/routes";
 import { localStorageManager } from "@lib/localStorage/localStorage.manager";
 import { StorageKey } from "@enums/storage.enum";
-import { normalizePathname } from "@/lib/utils/pathname";
 
 interface BootstrapProviderProps {
   children: ReactNode;
@@ -59,46 +56,21 @@ export function BootstrapProvider({ children }: BootstrapProviderProps) {
           publicIp: config.publicIp
         });
 
-        // STEP 1.5: Guest Session Initialization
-        const { token, setGuestAuth } = useAuthStore.getState();
+        // STEP 1.5: TV Session Validation
+        const { token, clearAuth } = useAuthStore.getState();
         const storedUser = localStorageManager.get<{ isGuest?: boolean }>(StorageKey.USER);
         const isExistingGuest = storedUser?.isGuest === true;
 
-        // Call guestLogin() when:
-        //   a) There is no token at all (fresh browser / cleared storage), OR
-        //   b) The stored token belongs to a guest user — guest tokens expire
-        //      server-side so we always refresh them on bootstrap to avoid
-        //      sending an expired guest token that results in a 403/404.
-        const needsGuestSession = !token || isExistingGuest;
-
-        if (needsGuestSession) {
-          const pathname = normalizePathname(window.location.pathname);
-          // Do not initialize guest session on auth routes (login, register, landing)
-          const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register') || pathname === '/landing';
-
-          // Only initialize guest session on non-auth routes that are allowed for guests.
-          const isGuestRoute = isGuestAllowedRoute(pathname);
-          const isPublic = isPublicRoute(pathname);
-
-          if (!isAuthRoute && (isGuestRoute || isPublic)) {
-            logger.info("[Bootstrap] No valid session found, initiating guest session...", { hadToken: !!token, isExistingGuest });
-            try {
-              const response = await guestLogin({ data: "data" });
-              const sessionId = response?.data?.session_id || response?.data?.data?.session_id;
-              if (sessionId) {
-                setGuestAuth(sessionId, sessionId);
-                logger.info("[Bootstrap] Guest session initialized");
-              } else {
-                logger.warn("[Bootstrap] Guest login returned no session ID");
-              }
-            } catch (guestErr) {
-              logger.error("[Bootstrap] Guest session failed", guestErr);
-            }
-          } else {
-            logger.info("[Bootstrap] Skipping guest session initialization (auth route or protected non-guest route)");
-          }
+        // On TV: We do NOT automatically create guest sessions.
+        // Unauthenticated TV users must log in via the Login page (QR code pairing / remote input).
+        // If a lingering/stale guest session is found in localStorage, purge it clean.
+        if (isExistingGuest) {
+          logger.info("[Bootstrap] Lingering guest session detected on TV, clearing auth store");
+          clearAuth();
+        } else if (!token) {
+          logger.info("[Bootstrap] No session found (TV requires user authentication, skipping auto-guest session)");
         } else {
-          logger.info("[Bootstrap] Existing authenticated session found, skipping guest login");
+          logger.info("[Bootstrap] Existing authenticated session found, proceeding");
         }
 
         // STEP 2: Geo with cache check

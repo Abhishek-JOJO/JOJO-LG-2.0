@@ -192,13 +192,33 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
     var qIdx=clean.search(/[?#]/);
     var qh="";
     if(qIdx!==-1){qh=clean.slice(qIdx);clean=clean.slice(0,qIdx);}
-    clean=clean.replace(/\/$/, "");
+    if(clean.endsWith("/"))clean=clean.slice(0,-1);
     if(!clean||clean==="")return appBase+"index.html"+qh;
     if(clean.endsWith(".html"))return appBase+clean+qh;
     return appBase+clean+"/index.html"+qh;
   }
 
   try{
+    if(typeof Location!=="undefined"&&Location.prototype){
+      var origProtoReplace=Location.prototype.replace;
+      if(origProtoReplace){
+        Location.prototype.replace=function(v){origProtoReplace.call(this,fixNavUrl(v));};
+      }
+      var origProtoAssign=Location.prototype.assign;
+      if(origProtoAssign){
+        Location.prototype.assign=function(v){origProtoAssign.call(this,fixNavUrl(v));};
+      }
+      var hDesc=Object.getOwnPropertyDescriptor(Location.prototype,"href");
+      if(hDesc&&hDesc.set){
+        var origH=hDesc.set;
+        Object.defineProperty(Location.prototype,"href",{
+          set:function(v){origH.call(this,fixNavUrl(v));},
+          get:hDesc.get,
+          configurable:true,
+          enumerable:true
+        });
+      }
+    }
     if(window.location){
       var origAssign=window.location.assign?window.location.assign.bind(window.location):null;
       if(origAssign){
@@ -210,6 +230,32 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
       }
     }
   }catch(e){}
+
+  // TV Auth Gate: If unauthenticated on root index.html, immediately jump to login/index.html
+  // Defer until DOMContentLoaded so WAM has committed the document frame before location.replace
+  if ("${relPrefix}" === "./" && (location.pathname.endsWith("/index.html") || location.pathname.endsWith("/"))) {
+    try {
+      var _tok = localStorage.getItem("ott_auth_token");
+      var _usr = localStorage.getItem("user");
+      var _auth = false;
+      if (_tok && _usr) {
+        var _u = JSON.parse(_usr);
+        if (_u && !_u.isGuest && (_u.id || _u.user_id || _u.email || _u.phone || _u.profiles)) {
+          _auth = true;
+        }
+      }
+      if (!_auth) {
+        var targetLogin = appBase + "login/index.html";
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", function() {
+            window.location.replace(targetLogin);
+          });
+        } else {
+          window.location.replace(targetLogin);
+        }
+      }
+    } catch(e) {}
+  }
 
   try{
     var sDesc=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,"src");
@@ -247,7 +293,9 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
 })();
 </script>`;
 
-      if (!content.includes('id="webos-early-boot"')) {
+      if (content.includes('id="webos-early-boot"')) {
+        content = content.replace(/<script id="webos-early-boot">[\s\S]*?<\/script>/, earlyInterceptorScript);
+      } else {
         content = content.replace('<head>', `<head>${earlyInterceptorScript}`);
       }
 

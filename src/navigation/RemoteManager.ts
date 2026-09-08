@@ -35,7 +35,7 @@ export const useRemoteManager = () => {
           // If we're on the root page, minimize the app (platform convention),
           // otherwise go back in history
           const currentPath = normalizePathname(window.location.pathname);
-          if (currentPath === '/' || currentPath === '/landing') {
+          if (currentPath === '/' || currentPath === '/landing' || currentPath === '/login') {
             exitWebOSApp();
           } else {
             window.history.back();

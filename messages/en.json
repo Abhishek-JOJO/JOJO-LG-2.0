@@ -48,6 +48,7 @@
     "not_existing_user": "Not an existing User?",
     "create_account": "Create Account",
     "search_country": "Search country...",
+    "loading": "Loading...",
     "loading_countries": "Loading countries...",
     "failed_countries": "Failed to load countries",
     "no_countries": "No countries found",
