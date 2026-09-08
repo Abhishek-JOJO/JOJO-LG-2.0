@@ -120,19 +120,28 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
     if (filePath.endsWith('.html')) {
       let content = fs.readFileSync(filePath, 'utf8');
 
-      // 1. Standard HTML attributes
+      // 1. Next.js App Router chunks & flight payloads (escaped & unescaped)
+      content = content.replaceAll('\\"/_next/', `\\"${relPrefix}_next/`);
+      content = content.replaceAll('"/_next/', `"${relPrefix}_next/`);
+      content = content.replaceAll('\'/_next/', `'${relPrefix}_next/`);
       content = content.replaceAll('href="/_next/', `href="${relPrefix}_next/`);
       content = content.replaceAll('src="/_next/', `src="${relPrefix}_next/`);
 
-      // 2. Static public asset routes
+      // 2. Static public asset routes (escaped & unescaped)
       content = content.replaceAll('"/logos/', `"${relPrefix}logos/`);
       content = content.replaceAll('\\"/logos/', `\\"${relPrefix}logos/`);
       content = content.replaceAll('"/images/', `"${relPrefix}images/`);
       content = content.replaceAll('\\"/images/', `\\"${relPrefix}images/`);
       content = content.replaceAll('"/lottie/', `"${relPrefix}lottie/`);
       content = content.replaceAll('\\"/lottie/', `\\"${relPrefix}lottie/`);
+      content = content.replaceAll('"/payment-icon/', `"${relPrefix}payment-icon/`);
+      content = content.replaceAll('\\"/payment-icon/', `\\"${relPrefix}payment-icon/`);
       content = content.replaceAll('"/webOSTV.js"', `"${relPrefix}webOSTV.js"`);
       content = content.replaceAll('\\"/webOSTV.js\\"', `\\"${relPrefix}webOSTV.js\\"`);
+      content = content.replaceAll('"/favicon.ico"', `"${relPrefix}favicon.ico"`);
+      content = content.replaceAll('\\"/favicon.ico\\"', `\\"${relPrefix}favicon.ico\\"`);
+      content = content.replaceAll('href="/favicon.ico"', `href="${relPrefix}favicon.ico"`);
+
       // 3. Strip crossorigin attributes for webOS file:// protocol CORS compatibility without breaking JSON syntax
       content = content.replaceAll('crossorigin=""', '');
       content = content.replaceAll('crossorigin="anonymous"', '');
@@ -150,6 +159,97 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
       content = content.replaceAll('\\"crossOrigin\\":\\"\\"', '');
       content = content.replaceAll('\\"crossOrigin\\":\\"anonymous\\"', '');
       content = content.replaceAll('\\"crossOrigin\\":\\"$undefined\\"', '');
+
+      // 4. Inject early runtime URL interceptor at the start of <head> to catch ANY dynamic root-relative URL
+      const earlyInterceptorScript = `<script id="webos-early-boot">
+(function(){
+  if(typeof window==="undefined")return;
+  var relRoot="${relPrefix}";
+  var appBase=(typeof document!=="undefined"&&(document.baseURI||location.href))?new URL(relRoot,document.baseURI||location.href).href:relRoot;
+  if(!appBase.endsWith("/"))appBase+="/";
+  window.__WEBOS_APP_BASE__=appBase;
+
+  function fixUrl(u){
+    if(typeof u!=="string")return u;
+    if(u.startsWith("file:///")){
+      if(u.startsWith(appBase)||u.startsWith("file:///media/")||u.startsWith("file:///usr/"))return u;
+      return appBase+u.slice(8);
+    }
+    if(u.startsWith("/_next/"))return appBase+u.slice(1);
+    if(u.startsWith("/logos/")||u.startsWith("/images/")||u.startsWith("/lottie/")||u.startsWith("/payment-icon/")||u.startsWith("/player-icons/")||u==="/favicon.ico")return appBase+u.slice(1);
+    if(u.startsWith("/")&&!u.startsWith("//")&&!u.startsWith("http://")&&!u.startsWith("https://"))return appBase+u.slice(1);
+    return u;
+  }
+
+  function fixNavUrl(u){
+    if(typeof u!=="string")return u;
+    var clean=u;
+    if(clean.startsWith("file:///")){
+      if(clean.startsWith(appBase)||clean.startsWith("file:///usr/")||clean.startsWith("file:///media/"))return clean;
+      clean=clean.slice(8);
+    }
+    if(clean.startsWith("/"))clean=clean.slice(1);
+    var qIdx=clean.search(/[?#]/);
+    var qh="";
+    if(qIdx!==-1){qh=clean.slice(qIdx);clean=clean.slice(0,qIdx);}
+    clean=clean.replace(/\/$/, "");
+    if(!clean||clean==="")return appBase+"index.html"+qh;
+    if(clean.endsWith(".html"))return appBase+clean+qh;
+    return appBase+clean+"/index.html"+qh;
+  }
+
+  try{
+    if(window.location){
+      var origAssign=window.location.assign?window.location.assign.bind(window.location):null;
+      if(origAssign){
+        window.location.assign=function(v){origAssign(fixNavUrl(v));};
+      }
+      var origReplace=window.location.replace?window.location.replace.bind(window.location):null;
+      if(origReplace){
+        window.location.replace=function(v){origReplace(fixNavUrl(v));};
+      }
+    }
+  }catch(e){}
+
+  try{
+    var sDesc=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,"src");
+    if(sDesc&&sDesc.set){
+      var origS=sDesc.set;
+      Object.defineProperty(HTMLScriptElement.prototype,"src",{set:function(v){origS.call(this,fixUrl(v))},get:sDesc.get,configurable:true,enumerable:true});
+    }
+    var lDesc=Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype,"href");
+    if(lDesc&&lDesc.set){
+      var origL=lDesc.set;
+      Object.defineProperty(HTMLLinkElement.prototype,"href",{set:function(v){origL.call(this,fixUrl(v))},get:lDesc.get,configurable:true,enumerable:true});
+    }
+    var iDesc=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");
+    if(iDesc&&iDesc.set){
+      var origI=iDesc.set;
+      Object.defineProperty(HTMLImageElement.prototype,"src",{set:function(v){origI.call(this,fixUrl(v))},get:iDesc.get,configurable:true,enumerable:true});
+    }
+    var origSetAttr=Element.prototype.setAttribute;
+    Element.prototype.setAttribute=function(n,v){
+      if((n==="src"||n==="href")&&typeof v==="string")v=fixUrl(v);
+      return origSetAttr.call(this,n,v);
+    };
+    if(typeof window.fetch==="function"){
+      var origF=window.fetch;
+      window.fetch=function(inp,ini){
+        if(typeof inp==="string")inp=fixUrl(inp);
+        else if(inp&&typeof inp.url==="string"){
+          var f=fixUrl(inp.url);
+          if(f!==inp.url){try{inp=new Request(f,inp)}catch(e){}}
+        }
+        return origF.call(this,inp,ini);
+      };
+    }
+  }catch(e){}
+})();
+</script>`;
+
+      if (!content.includes('id="webos-early-boot"')) {
+        content = content.replace('<head>', `<head>${earlyInterceptorScript}`);
+      }
 
       fs.writeFileSync(filePath, content, 'utf8');
       htmlCount++;
@@ -179,7 +279,7 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
       }
 
       // Fix Turbopack base chunk loading prefix to dynamically resolve absolute file:// URL from document base URI
-      const dynamicT = 'let t=(typeof document!=="undefined"&&(document.baseURI||location.href))?new URL("./_next/",document.baseURI||location.href).href:"./_next/"';
+      const dynamicT = 'let t=(typeof window!=="undefined"&&window.__WEBOS_APP_BASE__)?(window.__WEBOS_APP_BASE__+"_next/"):(typeof document!=="undefined"&&(document.baseURI||location.href))?new URL("./_next/",document.baseURI||location.href).href:"./_next/"';
       if (content.includes('let t="/_next/"')) {
         content = content.replaceAll('let t="/_next/"', dynamicT);
         modified = true;
@@ -205,11 +305,29 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
       // Fix Turbopack chunk key resolution on file:// protocol URLs (matching D(q(n)).resolve() key with M() loader key)
       if (content.includes('r.startsWith(t)?r.slice(t.length):r')) {
         const oldCode = `let n=function(e){if("string"==typeof e)return e;let r=decodeURIComponent(e.src.replace(/[?#].*$/,""));return r.startsWith(t)?r.slice(t.length):r}(e);if(D("string"==typeof e?q(e):e.src).resolve()`;
-        const newCode = `let n=function(e){if("string"==typeof e)return e;let r=decodeURIComponent(e.src.replace(/[?#].*$/,""));let i=r.indexOf("_next/");return i!==-1?r.slice(i+6):r.startsWith(t)?r.slice(t.length):r}(e);if(D(q(n)).resolve()`;
+        const newCode = `let n=function(e){if("string"==typeof e)return e;let r=decodeURIComponent(e.src.replace(/[?#].*$/,""));let i=r.indexOf("_next/");return i!==-1?r.slice(i+6):r.startsWith(t)?r.slice(t.length):r}(e);if(D(q(n)).resolve(),("object"==typeof e&&e&&e.src&&D(e.src).resolve())`;
         if (content.includes(oldCode)) {
           content = content.replace(oldCode, newCode);
           modified = true;
         }
+      }
+
+      // Ensure loadChunkCached normalizes absolute /_next/ chunk paths to local file:// URL
+      if (content.includes('loadChunkCached:(e,t)=>(function(e,t){let r=D(t);')) {
+        content = content.replace(
+          'loadChunkCached:(e,t)=>(function(e,t){let r=D(t);',
+          'loadChunkCached:(e,t)=>(function(e,t){let normT=(typeof t=="string"&&t.startsWith("/")&&typeof window!=="undefined"&&window.__WEBOS_APP_BASE__)?(window.__WEBOS_APP_BASE__+t.slice(1)):(typeof t=="string"&&t.startsWith("/")&&typeof document!=="undefined"&&(document.baseURI||location.href))?new URL("."+t,document.baseURI||location.href).href:t;let r=D(normT);t=normT;'
+        );
+        modified = true;
+      }
+
+      // Ensure R.L normalizes chunk paths passed to M
+      if (content.includes('R.L=function(e){return M(i.Parent,this.m.id,e)}')) {
+        content = content.replace(
+          'R.L=function(e){return M(i.Parent,this.m.id,e)}',
+          'R.L=function(e){let normE=(typeof e=="string"&&e.startsWith("/")&&typeof window!=="undefined"&&window.__WEBOS_APP_BASE__)?(window.__WEBOS_APP_BASE__+e.slice(1)):(typeof e=="string"&&e.startsWith("/")&&typeof document!=="undefined"&&(document.baseURI||location.href))?new URL("."+e,document.baseURI||location.href).href:e;return M(i.Parent,this.m.id,normE)}'
+        );
+        modified = true;
       }
 
       if (content.includes('__webpack_require__.p')) {

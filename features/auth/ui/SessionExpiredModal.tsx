@@ -87,7 +87,7 @@ export function SessionExpiredModal() {
     //    Using window.location.href instead of router.push to guarantee a full
     //    page reload — this clears any in-memory React/Zustand state that
     //    localStorage.clear() alone wouldn't touch.
-    window.location.href = ROUTES.LOGIN;
+    window.location.replace(ROUTES.LOGIN);
   };
 
   return (

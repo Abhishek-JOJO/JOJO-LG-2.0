@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { normalizePathname } from '@/lib/utils/pathname';
 import { exitWebOSApp } from '@/lib/webos';
 
 // LG webOS Remote Key Codes
@@ -33,7 +34,8 @@ export const useRemoteManager = () => {
           e.preventDefault();
           // If we're on the root page, minimize the app (platform convention),
           // otherwise go back in history
-          if (window.location.pathname === '/' || window.location.pathname === '/landing') {
+          const currentPath = normalizePathname(window.location.pathname);
+          if (currentPath === '/' || currentPath === '/landing') {
             exitWebOSApp();
           } else {
             window.history.back();

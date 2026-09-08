@@ -14,6 +14,7 @@ import { guestLogin } from "@/features/auth/api/guestLogin";
 import { isPublicRoute, isGuestAllowedRoute } from "@lib/constants/routes";
 import { localStorageManager } from "@lib/localStorage/localStorage.manager";
 import { StorageKey } from "@enums/storage.enum";
+import { normalizePathname } from "@/lib/utils/pathname";
 
 interface BootstrapProviderProps {
   children: ReactNode;
@@ -71,7 +72,7 @@ export function BootstrapProvider({ children }: BootstrapProviderProps) {
         const needsGuestSession = !token || isExistingGuest;
 
         if (needsGuestSession) {
-          const pathname = window.location.pathname;
+          const pathname = normalizePathname(window.location.pathname);
           // Do not initialize guest session on auth routes (login, register, landing)
           const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register') || pathname === '/landing';
 

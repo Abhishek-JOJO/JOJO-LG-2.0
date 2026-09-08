@@ -1,5 +1,6 @@
 import { usePathname } from "next/navigation";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
+import { normalizePathname } from "@/lib/utils/pathname";
 
 /**
  * Custom hook to get the active pathname of the page.
@@ -16,11 +17,11 @@ export function useActivePathname() {
     try {
       // originalPath can be a full URL, relative URL, or just a pathname with search params
       const url = new URL(originalPath, "http://localhost");
-      return url.pathname;
+      return normalizePathname(url.pathname);
     } catch {
-      return originalPath.split("?")[0];
+      return normalizePathname(originalPath.split("?")[0]);
     }
   }
 
-  return pathname;
+  return normalizePathname(pathname);
 }

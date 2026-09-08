@@ -8,11 +8,17 @@ export function normalizePathname(pathname: string): string {
     return "/";
   }
 
-  // Handle webOS / local file system paths (e.g. /media/developer/apps/usr/palm/applications/in.jojoapp.jojo/index.html)
+  // Handle webOS installed app paths:
+  // e.g. /media/developer/apps/usr/palm/applications/in.jojoapp.jojo/index.html
+  // or   /usr/palm/applications/in.jojoapp.jojo/index.html
   let clean = pathname;
-  if (clean.includes("/out/")) {
+  const appMatch = clean.match(/(?:.*\/applications\/[^/]+)(.*)/);
+  if (appMatch && appMatch[1] !== undefined) {
+    clean = appMatch[1] || "/";
+  } else if (clean.includes("/out/")) {
     clean = clean.split("/out")[1] || "/";
   }
+
   if (clean.endsWith("/index.html") || clean === "index.html" || clean === "/index.html") {
     clean = clean.replace(/\/index\.html$/, "").replace(/^index\.html$/, "");
   }

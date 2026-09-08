@@ -210,7 +210,7 @@ export const AdOverlay = memo(function AdOverlay({
               onClick={(e) => {
                 e.stopPropagation();
                 if (onGoAdsFree) onGoAdsFree();
-                else window.location.href = '/subscription';
+                else window.location.replace('/subscription');
               }}
               style={{
                 background: 'linear-gradient(44.13deg, rgb(250, 175, 63) 21.63%, rgb(255, 214, 145) 49.52%, rgb(250, 175, 63) 81.68%)',

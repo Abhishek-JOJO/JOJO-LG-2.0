@@ -27,7 +27,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_BUILD_TIME: BUILD_TIME,
   },
   // Output export is required for LG webOS TV (.ipk) packages
-  output: 'export', 
+  output: 'export',
   reactStrictMode: true,
   images: {
     unoptimized: true,
@@ -43,19 +43,6 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
       { protocol: 'https', hostname: 'inc1.devtunnels.ms' },
     ],
-  },
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' }
-        ],
-      },
-    ];
   },
   trailingSlash: true, // Output clean folder index.html files for static export
   compiler: {

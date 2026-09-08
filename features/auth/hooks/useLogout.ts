@@ -69,11 +69,11 @@ export function useLogout() {
       logger.info('[Logout] ✅ Logout complete, redirecting to login');
 
       // 6. Redirect to login with full page reload to clear all React state and Suspense boundaries
-      window.location.href = ROUTES.LOGIN;
+      window.location.replace(ROUTES.LOGIN);
     } catch (error) {
       logger.error('[Logout] Error during logout', { error });
       // Still redirect to login even if there's an error
-      window.location.href = ROUTES.LOGIN;
+      window.location.replace(ROUTES.LOGIN);
     }
   };
 

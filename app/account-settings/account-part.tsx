@@ -46,7 +46,7 @@ export default function AccountPart() {
             window.localStorage.clear();
             window.sessionStorage.clear();
             clearCookies();
-            window.location.href = targetRoute;
+            window.location.replace(targetRoute);
         }
     };
 
