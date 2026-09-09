@@ -31,6 +31,8 @@ interface ContentRailListProps {
   isExpanded?: boolean;
   showAutoplayProgress?: boolean;
   isLoadingMore?: boolean;
+  isFirstContentRail?: boolean;
+  onArrowUpDown?: (direction: "up" | "down") => boolean | void;
 }
 
 interface SpotlightCommonProps {
@@ -60,7 +62,9 @@ function renderSpotlightRailItem(
   config: RailCardDesignConfig,
   leadFocusKey: string,
   railActive: boolean,
-  onCycle: (direction: "left" | "right") => void
+  cycleDirection: "left" | "right",
+  onCycle: (direction: "left" | "right") => void,
+  onArrowUpDown?: (direction: "up" | "down") => boolean | void
 ) {
   const isContinueWatching =
     config.variant === RailCardVariant.CONTINUE_WATCHING ||
@@ -71,11 +75,11 @@ function renderSpotlightRailItem(
       ...config,
       variant: isContinueWatching
         ? RailCardVariant.CONTINUE_WATCHING
-        : (railActive ? RailCardVariant.LANDSCAPE : RailCardVariant.PORTRAIT),
-      width: (railActive ? 870.89 : 325.77) as any,
+        : RailCardVariant.LANDSCAPE,
+      width: 870.89 as any,
       height: 490 as any,
       borderRadius: 16,
-      aspectRatio: railActive ? RailCardAspectRatio.WIDESCREEN_16_9 : RailCardAspectRatio.PORTRAIT_2_3,
+      aspectRatio: RailCardAspectRatio.WIDESCREEN_16_9,
       hover: {
         ...config.hover,
         enabled: railActive,
@@ -97,6 +101,7 @@ function renderSpotlightRailItem(
           forceFocusRing={railActive}
           railActive={railActive}
           onArrowLeftRight={onCycle}
+          onArrowUpDown={onArrowUpDown}
         />
       );
     }
@@ -112,6 +117,7 @@ function renderSpotlightRailItem(
         forceFocusRing={railActive}
         railActive={railActive}
         onArrowLeftRight={onCycle}
+        onArrowUpDown={onArrowUpDown}
       />
     );
   }
@@ -164,6 +170,8 @@ export function ContentRailList({
   isExpanded = false,
   showAutoplayProgress = appConfig.flags.isShowAutoProgressBarHeroBanner,
   isLoadingMore = false,
+  isFirstContentRail = false,
+  onArrowUpDown,
 }: ContentRailListProps) {
   const [virtualIndex, setVirtualIndex] = useState(0);
   const activeIndex = items?.length ? ((virtualIndex % items.length) + items.length) % items.length : 0;
@@ -191,18 +199,15 @@ export function ContentRailList({
   }, [isHeroVariant, items, activeIndex]);
 
   // Spotlight rail config (sticky card 0 + fixed focus cycling)
-  const railInstanceId = useId();
-  const isSpotlightRail = !isHeroVariant && !isExpanded && (
-    config.variant === RailCardVariant.SERIES_MIXED ||
-    config.variant === RailCardVariant.PORTRAIT ||
-    config.variant === RailCardVariant.CONTINUE_WATCHING ||
-    type === ContentRailType.CONTINUE_WATCHING
-  );
-  const leadFocusKey = `spotlight-lead-${railInstanceId}`;
+  // ONLY enabled for the single active spotlight rail (isFirstContentRail)
+  const isSpotlightRail = !isHeroVariant && !isExpanded && Boolean(isFirstContentRail);
+  const leadFocusKey = "spotlight-lead-fixed";
   const [spotlightIndex, setSpotlightIndex] = useState(0);
+  const [cycleDirection, setCycleDirection] = useState<"left" | "right">("right");
 
   const handleCycle = useCallback((direction: "left" | "right") => {
     if (!items?.length) return;
+    setCycleDirection(direction);
     setSpotlightIndex((prev) => {
       const next = direction === "right" ? prev + 1 : prev - 1;
       return ((next % items.length) + items.length) % items.length;
@@ -212,6 +217,12 @@ export function ContentRailList({
   useEffect(() => {
     setSpotlightIndex(0);
   }, [items?.[0]?.id]);
+
+  useEffect(() => {
+    if (isSpotlightRail && listRef?.current) {
+      listRef.current.scrollLeft = 0;
+    }
+  }, [isSpotlightRail, spotlightIndex, listRef]);
 
   // Ambient tint: also update when spotlight rail cycles its active item
   useEffect(() => {
@@ -323,25 +334,28 @@ export function ContentRailList({
         return false;
       }
       if (direction === 'down') {
-        // Always focus the 1st card in the content section directly below hero carousel, regardless of active hero slider index
-        const firstCardBelowHero = document.querySelector(
-          'section:not(:first-child) [data-focuskey]:not([data-focuskey="hero-carousel"])'
+        // Always focus the 1st card in the content section directly below hero carousel (Section 1)
+        const firstCardBelowHero = (
+          document.querySelector('section[data-section-index="1"] [data-focuskey*="spotlight-lead"]') ||
+          document.querySelector('section[data-section-index="1"] a[data-focuskey]') ||
+          document.querySelector('section:not(:first-child) a[data-focuskey]')
         ) as HTMLElement | null;
         if (firstCardBelowHero) {
           const targetFocusKey = firstCardBelowHero.getAttribute('data-focuskey');
-          firstCardBelowHero.focus();
-          if (targetFocusKey) {
-            try { setFocus(targetFocusKey); } catch {}
-          }
           const currentSection = firstCardBelowHero.closest('section');
           if (currentSection) {
             const sIndex = currentSection.getAttribute('data-section-index');
             useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : 1);
             const rect = currentSection.getBoundingClientRect();
+            const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + rect.top - 95);
             window.scrollTo({
-              top: Math.max(0, window.scrollY + rect.top - 95),
+              top: targetTop,
               behavior: 'smooth'
             });
+          }
+          firstCardBelowHero.focus({ preventScroll: true });
+          if (targetFocusKey) {
+            try { setFocus(targetFocusKey); } catch {}
           }
           return false;
         }
@@ -371,6 +385,7 @@ export function ContentRailList({
         id="hero-carousel-container"
         ref={focusKeyRef}
         data-focuskey={focusKey}
+        tabIndex={0}
         className={`relative overflow-hidden w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)] lg:w-[calc(100%-8rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] shadow-[0_20px_50px_rgba(0,0,0,0.95)] transition-all duration-300 ${focused ? "ring-[4px] ring-white z-[99] border-white" : "border-white/10"}`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
@@ -487,6 +502,20 @@ export function ContentRailList({
     );
   }
 
+  const standardCardConfig: RailCardDesignConfig = {
+    ...config,
+    variant: RailCardVariant.PORTRAIT,
+    width: 325.77 as any,
+    height: 490 as any,
+    aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,
+    borderRadius: 16,
+    hover: {
+      ...config.hover,
+      enabled: false,
+      type: "simple",
+    },
+  };
+
   const cardElements = items?.map((originalItem, index) => {
     const effectiveItem = isSpotlightRail && items?.length
       ? items[(spotlightIndex + index) % items.length]
@@ -496,14 +525,44 @@ export function ContentRailList({
       item: effectiveItem,
       index,
       itemsLength: items?.length,
-      config,
+      config: isSpotlightRail ? config : standardCardConfig,
       onClick: handleItemClick,
     };
 
     switch (config.variant) {
       case RailCardVariant.LANDSCAPE:
+        if (isSpotlightRail) {
+          return renderSpotlightRailItem(
+            index,
+            effectiveItem,
+            `spotlight-slot-${index}`,
+            commonProps,
+            config,
+            leadFocusKey,
+            railActive,
+            cycleDirection,
+            handleCycle,
+            onArrowUpDown
+          );
+        }
+        return (
+          <PortraitCard
+            key={originalItem?.id || index}
+            {...commonProps}
+            config={standardCardConfig}
+            focusable={false}
+          />
+        );
+
       case RailCardVariant.GENRE:
-        return <LandscapeCard key={originalItem?.id || index} {...commonProps} />;
+        return (
+          <PortraitCard
+            key={originalItem?.id || index}
+            {...commonProps}
+            config={standardCardConfig}
+            focusable={false}
+          />
+        );
 
       case RailCardVariant.CONTINUE_WATCHING:
         if (isSpotlightRail) {
@@ -515,11 +574,21 @@ export function ContentRailList({
             config,
             leadFocusKey,
             railActive,
-            handleCycle
+            cycleDirection,
+            handleCycle,
+            onArrowUpDown
           );
         }
-        return <ContinueWatchingCard key={originalItem?.id || index} {...commonProps} />;
+        return (
+          <PortraitCard
+            key={originalItem?.id || index}
+            {...commonProps}
+            config={standardCardConfig}
+            focusable={false}
+          />
+        );
 
+      case RailCardVariant.TOP_TEN:
       case RailCardVariant.SERIES_MIXED:
       case RailCardVariant.PORTRAIT:
       default:
@@ -532,15 +601,30 @@ export function ContentRailList({
             config,
             leadFocusKey,
             railActive,
-            handleCycle
+            cycleDirection,
+            handleCycle,
+            onArrowUpDown
           );
         }
-        return <PortraitCard key={originalItem?.id || index} {...commonProps} />;
+        return (
+          <PortraitCard
+            key={originalItem?.id || index}
+            {...commonProps}
+            config={standardCardConfig}
+            focusable={false}
+          />
+        );
 
-      case RailCardVariant.TOP_TEN:
       case RailCardVariant.ARTIST:
       case RailCardVariant.UPCOMING:
-        return <PortraitCard key={originalItem?.id || index} {...commonProps} />;
+        return (
+          <PortraitCard
+            key={originalItem?.id || index}
+            {...commonProps}
+            config={standardCardConfig}
+            focusable={false}
+          />
+        );
     }
   });
 

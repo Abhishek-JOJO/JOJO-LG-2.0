@@ -23,6 +23,7 @@ interface Props {
   focusable?: boolean;
   railActive?: boolean;
   onArrowLeftRight?: (direction: "left" | "right") => void;
+  onArrowUpDown?: (direction: "up" | "down") => boolean | void;
 }
 
 export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({
@@ -38,6 +39,7 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({
   focusable,
   railActive,
   onArrowLeftRight,
+  onArrowUpDown,
 }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -58,14 +60,15 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({
   };
 
   // Adaptive image selection: 16:9 landscape image when expanded/active, 2:3 portrait image when normal
-  const isLandscape =
-    config.variant === RailCardVariant.LANDSCAPE ||
-    config.aspectRatio === RailCardAspectRatio.WIDESCREEN_16_9 ||
-    Number(config.width) >= 500;
-
-  const imageUrl = isLandscape
-    ? (item.landscapeImage || item.posterImage || item.image)
-    : (item.portraitImage || item.posterImage || item.image);
+  const isLandscape = config.variant === RailCardVariant.CONTINUE_WATCHING;
+  const imageUrl =
+    (isLandscape && (item.landscapeImage || item.heroImage)) ||
+    item.portraitImage ||
+    item.posterImage ||
+    item.image ||
+    item.landscapeImage ||
+    item.heroImage ||
+    "";
 
   return (
     <>
@@ -81,6 +84,7 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({
         forceFocusRing={forceFocusRing}
         focusable={focusable}
         onArrowLeftRight={onArrowLeftRight}
+        onArrowUpDown={onArrowUpDown}
         className={className}
       >
         {/* Continue Watching: Bottom Progress Bar — ALWAYS SHOW AT BOTTOM OF CARD */}

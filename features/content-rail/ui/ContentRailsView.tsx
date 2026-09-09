@@ -12,7 +12,9 @@ import { useBootstrap } from "@lib/bootstrap/BootstrapContext";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useActivePathname } from "@/hooks/useActivePathname";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { useContentRails } from "../hooks/useContentRails";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 import { useWatchlistStore } from "@/store/useWatchlistStore";
@@ -236,34 +238,6 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     };
   }, [cwItemsRaw, isGuest]);
 
-  // ── Initial load: TV Hero Slider skeleton matching 75vh layout ──
-  const showSkeleton = isLoading || (isFetching && !data);
-  if (showSkeleton) {
-    return (
-      <div className="min-h-screen overflow-x-hidden pt-0" style={{ background: "var(--theme_12)" }}>
-        <HeroSliderSkeleton />
-        <div className="mt-8 px-4 sm:px-6 lg:px-8 space-y-4">
-          <div className="w-48 h-6 rounded-md bg-white/10" />
-          <div className="flex gap-4 overflow-hidden">
-            <div className="w-[462px] h-[270px] rounded-lg bg-white/5 shrink-0" />
-            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
-            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
-            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
-            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-32 text-red-500 font-medium">
-        {t("error_load")}
-      </div>
-    );
-  }
-
   const responsePages = data?.pages || [];
 
   const rawRails = responsePages.flatMap((page) => {
@@ -295,36 +269,166 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     }
   }
 
+  const [activeRailIndex, setActiveRailIndex] = useState(0);
+  const activeRailIndexRef = useRef(0);
+  activeRailIndexRef.current = activeRailIndex;
+
+  useEffect(() => {
+    setActiveRailIndex(0);
+  }, [subnavId]);
+
+  const isFirstHero = mappedRails.length > 0 ? mappedRails[0].type === ContentRailType.HERO_CAROUSEL : false;
+  const heroRail = isFirstHero ? mappedRails[0] : null;
+  const contentRails = isFirstHero ? mappedRails.slice(1) : mappedRails;
+
+  const safeActiveRailIndex = Math.min(
+    Math.max(0, activeRailIndex),
+    Math.max(0, contentRails.length - 1)
+  );
+  const activeRail = contentRails[safeActiveRailIndex];
+  const upcomingRails = contentRails.slice(safeActiveRailIndex + 1, safeActiveRailIndex + 5);
+
+  // TV remote vertical navigation: ArrowDown / ArrowUp updates the active rail in place
+  const handleArrowUpDown = useCallback((direction: "up" | "down") => {
+    if (direction === "down") {
+      setActiveRailIndex((prev) => {
+        if (prev < contentRails.length - 1) {
+          return prev + 1;
+        }
+        return prev;
+      });
+      setTimeout(() => {
+        const lead = document.querySelector('[data-focuskey="spotlight-lead-fixed"]') as HTMLElement | null;
+        lead?.focus({ preventScroll: true });
+        try { setFocus("spotlight-lead-fixed"); } catch {}
+      }, 50);
+      return true;
+    }
+    if (direction === "up") {
+      if (activeRailIndexRef.current > 0) {
+        setActiveRailIndex((prev) => Math.max(0, prev - 1));
+        setTimeout(() => {
+          const lead = document.querySelector('[data-focuskey="spotlight-lead-fixed"]') as HTMLElement | null;
+          lead?.focus({ preventScroll: true });
+          try { setFocus("spotlight-lead-fixed"); } catch {}
+        }, 50);
+        return true;
+      }
+      if (isFirstHero) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        const hero = document.getElementById("hero-carousel-container");
+        hero?.focus({ preventScroll: true });
+        try { setFocus("hero-carousel"); } catch {}
+        useActiveRailStore.getState().setActiveSectionIndex(0);
+        return true;
+      }
+    }
+    return true;
+  }, [contentRails.length, isFirstHero]);
+
+  // Infinite pagination when reaching near end of rails
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && safeActiveRailIndex >= contentRails.length - 3) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, safeActiveRailIndex, contentRails.length, fetchNextPage]);
+
+  // ── Initial load: TV Hero Slider skeleton matching 75vh layout ──
+  const showSkeleton = isLoading || (isFetching && !data);
+  if (showSkeleton) {
+    return (
+      <div className="min-h-screen overflow-x-hidden pt-0" style={{ background: "var(--theme_12)" }}>
+        <HeroSliderSkeleton />
+        <div className="mt-8 px-4 sm:px-6 lg:px-8 space-y-4">
+          <div className="w-48 h-6 rounded-md bg-white/10" />
+          <div className="flex gap-4 overflow-hidden">
+            <div className="w-[462px] h-[270px] rounded-lg bg-white/5 shrink-0" />
+            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
+            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
+            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
+            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-32 text-red-500 font-medium">
+        {t("error_load")}
+      </div>
+    );
+  }
+
   if (mappedRails.length === 0) {
     return <div className="min-h-screen" />;
   }
 
-  const isFirstHero = mappedRails.length > 0 ? mappedRails[0].type === ContentRailType.HERO_CAROUSEL : false;
-
   return (
     <div className={`overflow-x-hidden ${isFirstHero ? "pt-0" : "pt-4 sm:pt-6"}`}>
-      {mappedRails.map((rail,index) => {
-        return (
-          <ContentRailSection
-            key={rail.id}
-            index={index}
-            cr_title={rail.title}
-            type={rail.type}
-            items={rail.items}
-            onItemClick={
-              rail.type === ContentRailType.CONTINUE_WATCHING
-                ? handleContinueWatchingClick
-                : handleRailItemClick
-            }
-            railId={rail.id}
-            totalPages={rail.totalPages}
-            limit={rail.limit}
-            subnavId={subnavId}
-            button_name={rail?.button_name}
-            more_enabled={rail?.more_enabled}
-          />
-        );
-      })}
+      {/* Hero Carousel (Section index 0) */}
+      {heroRail && (
+        <ContentRailSection
+          key={heroRail.id}
+          index={0}
+          isFirstContentRail={false}
+          cr_title={heroRail.title}
+          type={heroRail.type}
+          items={heroRail.items}
+          onItemClick={handleRailItemClick}
+          railId={heroRail.id}
+          totalPages={heroRail.totalPages}
+          limit={heroRail.limit}
+          subnavId={subnavId}
+          button_name={heroRail?.button_name}
+          more_enabled={heroRail?.more_enabled}
+        />
+      )}
+
+      {/* Active Spotlight Rail (Section index 1) - ONLY this has the fixed Landscape Card at Slot 0 */}
+      {activeRail && (
+        <ContentRailSection
+          key="active-spotlight-rail"
+          index={1}
+          isFirstContentRail={true}
+          cr_title={activeRail.title}
+          type={activeRail.type}
+          items={activeRail.items}
+          onItemClick={
+            activeRail.type === ContentRailType.CONTINUE_WATCHING
+              ? handleContinueWatchingClick
+              : handleRailItemClick
+          }
+          railId={activeRail.id}
+          totalPages={activeRail.totalPages}
+          limit={activeRail.limit}
+          subnavId={subnavId}
+          button_name={activeRail?.button_name}
+          more_enabled={activeRail?.more_enabled}
+          onArrowUpDown={handleArrowUpDown}
+        />
+      )}
+
+      {/* Upcoming Preview Rails (Section index 2+) - 100% standard portrait cards only */}
+      {upcomingRails.map((rail, idx) => (
+        <ContentRailSection
+          key={rail.id}
+          index={2 + idx}
+          isFirstContentRail={false}
+          disableHover={true}
+          cr_title={rail.title}
+          type={rail.type}
+          items={rail.items}
+          onItemClick={handleRailItemClick}
+          railId={rail.id}
+          totalPages={rail.totalPages}
+          limit={rail.limit}
+          subnavId={subnavId}
+          button_name={rail?.button_name}
+          more_enabled={rail?.more_enabled}
+        />
+      ))}
 
       {/* Gating Dialog Popup Overlay */}
       {gateResult && gateResult.gate !== "none" && (

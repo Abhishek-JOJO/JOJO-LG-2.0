@@ -31,14 +31,26 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
     item?.image ||
     item?.posterImage;
 
+  const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
+
   useEffect(() => {
     setVideoReady(false);
     setVideoError(false);
-  }, [previewUrl, item?.id]);
+    setShouldLoadVideo(false);
+
+    if (!isExpanded || !previewUrl) return;
+
+    // Debounce 700ms before allocating webOS hardware video decoders
+    const timer = setTimeout(() => {
+      setShouldLoadVideo(true);
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [previewUrl, item?.id, isExpanded]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !previewUrl || !isExpanded) return;
+    if (!video || !previewUrl || !shouldLoadVideo) return;
 
     let hlsInstance: any = null;
 
@@ -105,7 +117,7 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
         }
       }
     };
-  }, [isExpanded, previewUrl]);
+  }, [shouldLoadVideo, previewUrl]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -132,8 +144,8 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
         )}
       </div>
 
-      {/* Video Player - Only mounted when card is active/expanded */}
-      {isExpanded && previewUrl && !videoError && (
+      {/* Video Player - Only mounted when card is active/expanded, debounced, and hidden until first frame is ready */}
+      {shouldLoadVideo && previewUrl && !videoError && (
         <video
           ref={videoRef}
           muted={isMuted}
@@ -141,6 +153,7 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
           playsInline
           preload="auto"
           onPlaying={() => setVideoReady(true)}
+          style={{ display: videoReady ? "block" : "none" }}
           className={cn(
             "absolute inset-0 w-full h-full object-cover transition-opacity duration-500",
             videoReady ? "opacity-100" : "opacity-0"

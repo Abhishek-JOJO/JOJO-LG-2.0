@@ -32,6 +32,8 @@ interface BaseContentCardProps {
   focusable?: boolean;
   /** When provided, Left/Right presses call this instead of the default nearest-neighbor move — used by spotlight rails' lead card to cycle which item occupies each slot. */
   onArrowLeftRight?: (direction: "left" | "right") => void;
+  /** When provided, Up/Down presses call this to cycle sections vertically while keeping the 1st landscape card fixed in place. */
+  onArrowUpDown?: (direction: "up" | "down") => boolean | void;
 }
 
 import Link from "next/link";
@@ -62,6 +64,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   forceFocusRing = false,
   focusable = true,
   onArrowLeftRight,
+  onArrowUpDown,
 }: BaseContentCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isDomFocused, setIsDomFocused] = useState(false);
@@ -77,6 +80,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         onArrowLeftRight(direction);
         return false;
       }
+      if ((direction === 'up' || direction === 'down') && onArrowUpDown) {
+        const handled = onArrowUpDown(direction);
+        if (handled !== false) return false;
+      }
       if (direction === 'up' || direction === 'down') {
         if (cardRef.current) {
           const currentSection = cardRef.current.closest('section');
@@ -88,10 +95,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
               if (currentIndex <= 1) {
                 const hero = document.getElementById('hero-carousel-container');
                 if (hero) {
-                  hero.focus();
-                  try { setFocus('hero-carousel'); } catch {}
                   useActiveRailStore.getState().setActiveSectionIndex(0);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
+                  hero.focus({ preventScroll: true });
+                  try { setFocus('hero-carousel'); } catch {}
                   return false;
                 }
               } else {
@@ -99,17 +106,18 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                 const targetCard = prevSection?.querySelector('[data-focuskey*="spotlight-lead"], a[data-focuskey]') as HTMLElement | null;
                 if (targetCard) {
                   const targetKey = targetCard.getAttribute('data-focuskey');
-                  targetCard.focus();
-                  if (targetKey) {
-                    try { setFocus(targetKey); } catch {}
-                  }
                   const sIndex = prevSection.getAttribute('data-section-index');
                   useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex - 1);
                   const sectionRect = prevSection.getBoundingClientRect();
+                  const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95);
                   window.scrollTo({
-                    top: Math.max(0, window.scrollY + sectionRect.top - 95),
+                    top: targetTop,
                     behavior: 'smooth'
                   });
+                  targetCard.focus({ preventScroll: true });
+                  if (targetKey) {
+                    try { setFocus(targetKey); } catch {}
+                  }
                   return false;
                 }
               }
@@ -119,17 +127,18 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                 const targetCard = nextSection?.querySelector('[data-focuskey*="spotlight-lead"], a[data-focuskey]') as HTMLElement | null;
                 if (targetCard) {
                   const targetKey = targetCard.getAttribute('data-focuskey');
-                  targetCard.focus();
-                  if (targetKey) {
-                    try { setFocus(targetKey); } catch {}
-                  }
                   const sIndex = nextSection.getAttribute('data-section-index');
                   useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex + 1);
                   const sectionRect = nextSection.getBoundingClientRect();
+                  const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95);
                   window.scrollTo({
-                    top: Math.max(0, window.scrollY + sectionRect.top - 95),
+                    top: targetTop,
                     behavior: 'smooth'
                   });
+                  targetCard.focus({ preventScroll: true });
+                  if (targetKey) {
+                    try { setFocus(targetKey); } catch {}
+                  }
                   return false;
                 }
               }
@@ -154,9 +163,9 @@ export const BaseContentCard = React.memo(function BaseContentCard({
             }
           }
           const sectionRect = currentSection.getBoundingClientRect();
-          if (Math.abs(sectionRect.top - 95) > 10) {
+          if (Math.abs(sectionRect.top - 95) > 25) {
             window.scrollTo({
-              top: Math.max(0, window.scrollY + sectionRect.top - 95),
+              top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95),
               behavior: 'smooth'
             });
           }
@@ -193,12 +202,14 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     }
   }, [focused, item]);
 
-  // When card expands to landscape, smoothly center it in view
+  const isMixedSeries = Boolean((config as any)?.isMixedSeries);
+
+  // When card expands to landscape, smoothly center it in view (only for non-spotlight accordion cards)
   useEffect(() => {
-    if (isFocusExpanded && cardRef.current) {
+    if (isFocusExpanded && cardRef.current && !isMixedSeries && config.variant !== RailCardVariant.LANDSCAPE && config.variant !== RailCardVariant.CONTINUE_WATCHING) {
       cardRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
     }
-  }, [isFocusExpanded]);
+  }, [isFocusExpanded, isMixedSeries, config.variant]);
 
 
   const handleMouseEnter = () => {
@@ -216,7 +227,6 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   const isSimple = config.hover.type === "simple" || !config.hover.enabled;
   const showBorder = config.hover.enabled && isHovered;
 
-  const isMixedSeries = Boolean((config as any)?.isMixedSeries);
   const isExpanded = !isMixedSeries && !!config?.hover?.enabled && (isHovered || isFocusExpanded) && !isAssetDetailOpen;
   const isLandscapeCard =
     config?.variant === RailCardVariant.LANDSCAPE ||
@@ -242,8 +252,9 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         outlineOffset: "-2px",
       }}
     >
-      {!((config as any)?.isMixedSeries && config.variant === RailCardVariant.LANDSCAPE) && (
+      {imageUrl && (
         <JOJOCommonImage
+          key={imageUrl}
           src={imageUrl}
           alt={item.title}
           width={desktopWidth}
@@ -259,8 +270,8 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                   ? "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                   : "(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw"
           }
-          className={`object-cover transition-all duration-300 pointer-events-none select-none`}
-          wrapperClassName="w-full h-full pointer-events-none select-none"
+          className="object-cover transition-all duration-300 pointer-events-none select-none animate-ott-fade"
+          wrapperClassName="w-full h-full pointer-events-none select-none animate-ott-fade"
           onLoad={() => setImageLoaded(true)}
         />
       )}

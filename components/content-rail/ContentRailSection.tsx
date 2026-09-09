@@ -34,6 +34,8 @@ interface ContentRailSectionProps {
   button_name?: string;
   more_enabled?: boolean;
   index: number;
+  isFirstContentRail?: boolean;
+  onArrowUpDown?: (direction: "up" | "down") => boolean | void;
 }
 
 export function ContentRailSection({
@@ -50,7 +52,9 @@ export function ContentRailSection({
   subnavId,
   button_name,
   more_enabled,
-  index
+  index,
+  isFirstContentRail = false,
+  onArrowUpDown,
 }: ContentRailSectionProps) {
   const t = useTranslations("contentRails");
   const router = useRouter();
@@ -228,6 +232,8 @@ export function ContentRailSection({
           listRef={listRef}
           isExpanded={isExpanded}
           isLoadingMore={isLoadingMore}
+          isFirstContentRail={isFirstContentRail}
+          onArrowUpDown={onArrowUpDown}
         />
       </div>
     </section>

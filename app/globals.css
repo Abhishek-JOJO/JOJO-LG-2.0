@@ -1115,3 +1115,33 @@ input.bg-transparent-forced {
 .animate-ott-slide {
   animation: ottSlideUp 0.45s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
+
+@keyframes ottSlideInRight {
+  from {
+    opacity: 0.3;
+    transform: translateX(36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ottSlideInLeft {
+  from {
+    opacity: 0.3;
+    transform: translateX(-36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-ott-slide-right {
+  animation: ottSlideInRight 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+.animate-ott-slide-left {
+  animation: ottSlideInLeft 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}

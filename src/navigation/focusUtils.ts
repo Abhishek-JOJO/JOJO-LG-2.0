@@ -38,7 +38,7 @@ export function restorePageFocus() {
 
     // 1. Check if an element on screen ALREADY has visual spatial navigation focus
     const activeFocused = document.querySelector(
-      "[data-focuskey].ring-\\[4px\\], [data-focuskey].ring-white, [data-focuskey].border-white"
+      "[data-focuskey].ring-\\[4px\\], [data-focuskey].ring-white"
     );
     if (activeFocused) {
       clearInterval(interval);

@@ -19,6 +19,7 @@ interface Props {
   forceFocusRing?: boolean;
   railActive?: boolean;
   onArrowLeftRight?: (direction: "left" | "right") => void;
+  onArrowUpDown?: (direction: "up" | "down") => boolean | void;
 }
 
 export const LandscapeCard = React.memo(function LandscapeCard({
@@ -33,6 +34,7 @@ export const LandscapeCard = React.memo(function LandscapeCard({
   forceFocusRing,
   railActive,
   onArrowLeftRight,
+  onArrowUpDown,
 }: Props) {
   const handleClick = useCallback(() => {
     onClick?.(item);
@@ -51,9 +53,13 @@ export const LandscapeCard = React.memo(function LandscapeCard({
   }
 
   const isMixedSeries = Boolean((config as any)?.isMixedSeries);
-  const imageUrl = railActive
-    ? (item.landscapeImage || item.posterImage || item.image)
-    : (item.portraitImage || item.image);
+  const imageUrl =
+    item.landscapeImage ||
+    item.heroImage ||
+    item.posterImage ||
+    item.image ||
+    item.portraitImage ||
+    "";
 
   return (
     <BaseContentCard
@@ -68,6 +74,7 @@ export const LandscapeCard = React.memo(function LandscapeCard({
       focusKey={focusKey}
       forceFocusRing={forceFocusRing}
       onArrowLeftRight={onArrowLeftRight}
+      onArrowUpDown={onArrowUpDown}
     >
       {/* Title & Metadata overlay for standard landscape cards */}
       {!isMixedSeries && (config?.hover?.showTitle || item?.title) && (
