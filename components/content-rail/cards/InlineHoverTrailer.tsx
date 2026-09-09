@@ -10,9 +10,11 @@ import { ContentRailItem } from "../config/contentRail.types";
 interface InlineHoverTrailerProps {
   item: ContentRailItem;
   isExpanded: boolean;
+  /** Pass true when this trailer is mounted inside the spotlight landscape lead card (870px wide) */
+  isLandscape?: boolean;
 }
 
-export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps) {
+export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: InlineHoverTrailerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [videoError, setVideoError] = useState(false);
@@ -148,12 +150,20 @@ export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps
       )}
       
       {/* Shadow overlay for text */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 via-35% to-transparent pointer-events-none" />
       
       {/* Meta details at bottom left */}
-      <div className="absolute bottom-3 left-4 right-4 flex flex-col justify-end z-20">
+      <div className={`absolute flex flex-col justify-end z-20 pointer-events-none ${
+        isLandscape
+          ? "bottom-8 left-8 right-8"
+          : "bottom-6 left-6 right-6 sm:bottom-8 sm:left-8 sm:right-8"
+      }`}>
         {item?.title_image ? (
-          <div className="relative w-[120px] sm:w-[150px] h-[35px] sm:h-[45px] mb-0.5">
+          <div className={`relative mb-3 ${
+            isLandscape
+              ? "w-[280px] h-[90px]"
+              : "w-[160px] sm:w-[220px] lg:w-[280px] h-[50px] sm:h-[65px] lg:h-[80px]"
+          }`}>
             <JOJOCommonImage
               src={item.title_image}
               alt={item.title}
@@ -163,10 +173,16 @@ export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps
             />
           </div>
         ) : (
-          <h3 className="text-white font-bold text-sm sm:text-base line-clamp-1 shadow-sm">{item.title}</h3>
+          <h3 className={`text-white font-extrabold line-clamp-1 drop-shadow-lg mb-2 ${
+            isLandscape ? "text-3xl" : "text-xl sm:text-2xl"
+          }`}>
+            {item.title}
+          </h3>
         )}
         {item.genres && item.genres.length > 0 && (
-          <span className="text-white/80 font-medium text-[10px] sm:text-[11px] mt-0.5 truncate drop-shadow-md">
+          <span className={`text-white/90 font-semibold truncate drop-shadow-md ${
+            isLandscape ? "text-base" : "text-sm sm:text-base"
+          }`}>
             {item.genres.join(" • ")}
           </span>
         )}

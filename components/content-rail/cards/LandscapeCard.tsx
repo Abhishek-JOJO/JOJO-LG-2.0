@@ -87,7 +87,7 @@ export const LandscapeCard = React.memo(function LandscapeCard({
 
       {/* Spotlight lead card: mounts InlineHoverTrailer only when rail is active */}
       {isMixedSeries && railActive && (
-        <InlineHoverTrailer item={item} isExpanded={Boolean(railActive || forceFocusRing)} />
+        <InlineHoverTrailer item={item} isExpanded={Boolean(railActive || forceFocusRing)} isLandscape />
       )}
     </BaseContentCard>
   );

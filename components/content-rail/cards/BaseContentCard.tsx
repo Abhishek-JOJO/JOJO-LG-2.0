@@ -9,6 +9,8 @@ import { RailCardDesignConfig, RailCardWidth } from "../config/contentRail.confi
 import { LOGOS } from "@/lib/constants/assets";
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
+import { extractDominantAmbientColor } from "@/lib/utils/colorExtractor";
+import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 
 interface BaseContentCardProps {
   item: ContentRailItem;
@@ -160,6 +162,17 @@ export const BaseContentCard = React.memo(function BaseContentCard({
           }
         }
       }
+      // Update ambient tint to match the focused card's image
+      const imageUrl =
+        item?.heroImage ||
+        item?.landscapeImage ||
+        item?.posterImage ||
+        item?.image;
+      if (imageUrl) {
+        extractDominantAmbientColor(imageUrl).then((color) => {
+          useAmbientTintStore.getState().setAmbientColor(color);
+        });
+      }
       onFocusChange?.(index);
     },
     onEnterPress: () => {
@@ -269,11 +282,31 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       {/* TOP 10 Badge */}
       {config?.variant !== RailCardVariant?.TOP_TEN && item?.isTop10 && (
         <div
-          className="absolute top-0 left-0 z-30 flex font-bold flex-col items-center rounded-br-md px-1.5 pt-1 leading-none text-theme_1"
+          className={`absolute top-0 left-0 z-30 flex font-bold flex-col items-center leading-none text-theme_1 ${
+            config?.variant === RailCardVariant.LANDSCAPE || Number(config?.width) > 500
+              ? "px-3.5 pt-2.5 pb-2 rounded-br-2xl shadow-xl"
+              : "px-1.5 pt-1 rounded-br-md"
+          }`}
           style={{ background: "var(--theme_13_samecolour)" }}
         >
-          <span className="text-xs sm:text-xs">{t("top")}</span>
-          <span className="text-lg sm:text-lg -mt-1">{t("ten")}</span>
+          <span
+            className={
+              config?.variant === RailCardVariant.LANDSCAPE || Number(config?.width) > 500
+                ? "text-sm sm:text-base font-bold tracking-wider"
+                : "text-xs sm:text-xs"
+            }
+          >
+            {t("top")}
+          </span>
+          <span
+            className={
+              config?.variant === RailCardVariant.LANDSCAPE || Number(config?.width) > 500
+                ? "text-2xl sm:text-3xl font-black -mt-0.5"
+                : "text-lg sm:text-lg -mt-1"
+            }
+          >
+            {t("ten")}
+          </span>
         </div>
       )}
 

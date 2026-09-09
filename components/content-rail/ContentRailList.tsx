@@ -172,6 +172,22 @@ export function ContentRailList({
     setSpotlightIndex(0);
   }, [items?.[0]?.id]);
 
+  // Ambient tint: also update when spotlight rail cycles its active item
+  useEffect(() => {
+    if (isHeroVariant || !isSpotlightRail || !items?.length) return;
+    const activeItem = items[spotlightIndex % items.length];
+    const imageUrl =
+      activeItem?.heroImage ||
+      activeItem?.landscapeImage ||
+      activeItem?.posterImage ||
+      activeItem?.image;
+    if (imageUrl) {
+      extractDominantAmbientColor(imageUrl).then((color) => {
+        useAmbientTintStore.getState().setAmbientColor(color);
+      });
+    }
+  }, [isHeroVariant, isSpotlightRail, items, spotlightIndex]);
+
   const { ref: railBoundaryRef, focusKey: railBoundaryFocusKey, hasFocusedChild: railActive } = useFocusable({
     focusable: false,
     trackChildren: true,
