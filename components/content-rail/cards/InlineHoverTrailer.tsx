@@ -25,7 +25,11 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
     return item?.previewUrl || (item as any)?.preview_url || null;
   }, [item]);
 
-  const landscapeImageUrl = item?.posterImage || item?.landscapeImage || item?.heroImage || item?.image;
+  const landscapeImageUrl =
+    item?.landscapeImage ||
+    item?.heroImage ||
+    item?.image ||
+    item?.posterImage;
 
   useEffect(() => {
     setVideoReady(false);
@@ -37,7 +41,6 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
     if (!video || !previewUrl || !isExpanded) return;
 
     let hlsInstance: any = null;
-    let playTimeout: NodeJS.Timeout | null = null;
 
     const isHls = isHlsUrl(previewUrl);
     const canNativeHls = Boolean(video.canPlayType(VIDEO_CONSTANTS.HLS_MIME_TYPE));
@@ -53,21 +56,19 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
           }
 
           hlsInstance = new Hls({
-            maxBufferLength: 5,
-            maxMaxBufferLength: 10,
+            maxBufferLength: 4,
+            maxMaxBufferLength: 8,
             enableWorker: true,
           });
           hlsInstance.loadSource(previewUrl);
           hlsInstance.attachMedia(videoRef.current);
 
           hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-            playTimeout = setTimeout(() => {
-              if (videoRef.current) {
-                videoRef.current.play().then(() => {
-                  setVideoReady(true);
-                }).catch(() => {});
-              }
-            }, 200);
+            if (videoRef.current) {
+              videoRef.current.play().then(() => {
+                setVideoReady(true);
+              }).catch(() => {});
+            }
           });
 
           hlsInstance.on(Hls.Events.ERROR, (_event: any, data: any) => {
@@ -84,18 +85,12 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
     } else {
       video.src = previewUrl;
       video.load();
-      playTimeout = setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.currentTime = 0;
-          videoRef.current.play().then(() => {
-            setVideoReady(true);
-          }).catch(() => {});
-        }
-      }, 200);
+      video.play().then(() => {
+        setVideoReady(true);
+      }).catch(() => {});
     }
 
     return () => {
-      if (playTimeout) clearTimeout(playTimeout);
       if (hlsInstance) {
         hlsInstance.destroy();
         hlsInstance = null;
@@ -119,13 +114,15 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
   }, [isMuted]);
 
   return (
-    <div className="absolute inset-0 w-full h-full pointer-events-none z-10">
+    <div className="absolute inset-0 w-full h-full pointer-events-none z-10 bg-neutral-900 overflow-hidden">
       {/* Landscape image: ALWAYS visible behind video */}
-      <div className="absolute inset-0 w-full h-full">
+      <div className="absolute inset-0 w-full h-full bg-neutral-900">
         {landscapeImageUrl && (
           <JOJOCommonImage
             src={landscapeImageUrl}
             alt={item.title}
+            width={isLandscape ? 870 : 580}
+            height={isLandscape ? 490 : 326}
             fill
             contentMode="cover"
             wrapperClassName="w-full h-full"

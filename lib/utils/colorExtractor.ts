@@ -4,6 +4,8 @@
  * dominant ambient color scaled to dark cinematic contrast (~47% brightness).
  */
 
+import { jojoResizedImageURL } from "@/lib/config/imageRequest.config";
+
 interface RGBColor {
   r: number;
   g: number;
@@ -123,7 +125,10 @@ export async function extractDominantAmbientColor(imageUrl?: string): Promise<RG
         resolve(DEFAULT_AMBIENT_RGB);
       };
 
-      img.src = imageUrl;
+      img.src = jojoResizedImageURL(imageUrl, {
+        targetSize: { width: 64, height: 64 },
+        quality: 30,
+      });
     } catch {
       resolve(DEFAULT_AMBIENT_RGB);
     }

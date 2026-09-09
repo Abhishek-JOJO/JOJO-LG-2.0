@@ -162,17 +162,6 @@ export const BaseContentCard = React.memo(function BaseContentCard({
           }
         }
       }
-      // Update ambient tint to match the focused card's image
-      const imageUrl =
-        item?.heroImage ||
-        item?.landscapeImage ||
-        item?.posterImage ||
-        item?.image;
-      if (imageUrl) {
-        extractDominantAmbientColor(imageUrl).then((color) => {
-          useAmbientTintStore.getState().setAmbientColor(color);
-        });
-      }
       onFocusChange?.(index);
     },
     onEnterPress: () => {
@@ -181,15 +170,28 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   });
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
 
-  // Debounce expansion on focus so fast remote navigation doesn't expand intermediate cards
+  // Debounce expansion & ambient color extraction on focus (180ms)
+  // so fast remote navigation stays at 60fps without lag or trailer churn
   useEffect(() => {
     if (focused) {
-      const timer = setTimeout(() => setIsFocusExpanded(true), 350);
+      const timer = setTimeout(() => {
+        setIsFocusExpanded(true);
+        const ambientImg =
+          item?.landscapeImage ||
+          item?.heroImage ||
+          item?.posterImage ||
+          item?.image;
+        if (ambientImg) {
+          extractDominantAmbientColor(ambientImg).then((color) => {
+            useAmbientTintStore.getState().setAmbientColor(color);
+          });
+        }
+      }, 180);
       return () => clearTimeout(timer);
     } else {
       setIsFocusExpanded(false);
     }
-  }, [focused]);
+  }, [focused, item]);
 
   // When card expands to landscape, smoothly center it in view
   useEffect(() => {
