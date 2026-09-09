@@ -94,7 +94,7 @@ export default function RootLayout({
         <link rel="preload" href="/lottie/auth_background_data.json" as="fetch" crossOrigin="anonymous" />
       </head>
       <body
-        className={`${poppins.className} ${poppins.variable}`}
+        className={`${poppins.className} ${poppins.variable} relative`}
         suppressHydrationWarning
         style={{ background: "var(--theme_12)" }}
       >

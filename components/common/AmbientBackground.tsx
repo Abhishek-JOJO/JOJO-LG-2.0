@@ -8,12 +8,12 @@ export function AmbientBackground() {
   const activeLayer = useAmbientTintStore((s) => s.activeLayer);
 
   const getGradient = (rgb: { r: number; g: number; b: number }) =>
-    `linear-gradient(180deg, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.95) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.65) 25%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3) 55%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08) 80%, transparent 100%)`;
+    `linear-gradient(180deg, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 1) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.95) 25%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.85) 50%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.65) 75%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35) 90%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1) 98%, transparent 100%)`;
 
   return (
     <div
       aria-hidden="true"
-      className="fixed inset-x-0 top-0 h-[850px] pointer-events-none z-0 overflow-hidden"
+      className="absolute inset-x-0 top-0 h-[100vh] pointer-events-none z-0 overflow-hidden"
     >
       {/* Ambient Layer A */}
       <div
