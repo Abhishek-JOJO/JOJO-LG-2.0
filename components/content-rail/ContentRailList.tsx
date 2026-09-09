@@ -69,6 +69,7 @@ function renderSpotlightRailItem(
   const isContinueWatching =
     config.variant === RailCardVariant.CONTINUE_WATCHING ||
     Boolean((config as any)?.showProgress);
+  const isTopTen = config.variant === RailCardVariant.TOP_TEN;
 
   if (slotIdx === 0) {
     const slot0Config: RailCardDesignConfig = {
@@ -89,24 +90,20 @@ function renderSpotlightRailItem(
       isMixedSeries: !isContinueWatching,
     };
 
-    if (isContinueWatching) {
-      return (
-        <ContinueWatchingCard
-          key={keyId}
-          {...commonProps}
-          item={effectiveItem}
-          config={slot0Config}
-          className="relative shrink-0 z-20"
-          focusKey={leadFocusKey}
-          forceFocusRing={railActive}
-          railActive={railActive}
-          onArrowLeftRight={onCycle}
-          onArrowUpDown={onArrowUpDown}
-        />
-      );
-    }
-
-    return (
+    const leadCard = isContinueWatching ? (
+      <ContinueWatchingCard
+        key={keyId}
+        {...commonProps}
+        item={effectiveItem}
+        config={slot0Config}
+        className="relative shrink-0 z-20"
+        focusKey={leadFocusKey}
+        forceFocusRing={railActive}
+        railActive={railActive}
+        onArrowLeftRight={onCycle}
+        onArrowUpDown={onArrowUpDown}
+      />
+    ) : (
       <LandscapeCard
         key={keyId}
         {...commonProps}
@@ -120,11 +117,31 @@ function renderSpotlightRailItem(
         onArrowUpDown={onArrowUpDown}
       />
     );
+
+    if (isTopTen) {
+      const rank = effectiveItem.rank ?? slotIdx + 1;
+      return (
+        <div key={keyId} className="relative flex shrink-0 items-end pl-8 sm:pl-10 md:pl-12">
+          <span
+            className="absolute left-0 -bottom-4 z-20 text-[80px] sm:text-[95px] md:text-[125px] font-black leading-none text-neutral-950 [-webkit-text-stroke:2px_var(--theme_1)] sm:[-webkit-text-stroke:3px_var(--theme_1)] drop-shadow-[0_0_10px_rgba(0,0,0,0.8)]"
+          >
+            {rank}
+          </span>
+          {leadCard}
+        </div>
+      );
+    }
+
+    return leadCard;
   }
 
   const portraitConfig: RailCardDesignConfig = {
     ...config,
-    variant: isContinueWatching ? RailCardVariant.CONTINUE_WATCHING : RailCardVariant.PORTRAIT,
+    variant: isContinueWatching
+      ? RailCardVariant.CONTINUE_WATCHING
+      : isTopTen
+      ? RailCardVariant.TOP_TEN
+      : RailCardVariant.PORTRAIT,
     width: 325.77 as any,
     height: 490 as any,
     borderRadius: 16,
@@ -504,7 +521,7 @@ export function ContentRailList({
 
   const standardCardConfig: RailCardDesignConfig = {
     ...config,
-    variant: RailCardVariant.PORTRAIT,
+    variant: config.variant === RailCardVariant.TOP_TEN ? RailCardVariant.TOP_TEN : RailCardVariant.PORTRAIT,
     width: 325.77 as any,
     height: 490 as any,
     aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,

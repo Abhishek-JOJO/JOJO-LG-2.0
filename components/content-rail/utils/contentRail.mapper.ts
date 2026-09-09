@@ -279,6 +279,11 @@ export function mapApiRailItem(
     previewUrl: asset?.preview_url || cr_item?.preview_url || cr_item?.previewUrl || asset?.previewUrl,
     isTop10: asset?.isintop10,
     numberintop10: asset?.numberintop10,
+    rank: asset?.numberintop10 !== undefined && asset?.numberintop10 !== null
+      ? Number(asset.numberintop10)
+      : (cr_item?.numberintop10 !== undefined && cr_item?.numberintop10 !== null
+        ? Number(cr_item.numberintop10)
+        : index + 1),
     redirectUrl: cr_item?.redirect_url || asset?.redirect_url || cr_item?.genre?.redirect_url || cr_item?.redirectUrl || asset?.redirectUrl || cr_item?.genre?.redirectUrl,
 
     // Asset classifications
