@@ -330,7 +330,7 @@ export function ContentRailList({
         id="hero-carousel-container"
         ref={focusKeyRef}
         data-focuskey={focusKey}
-        className={`relative overflow-hidden w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] lg:w-[calc(100%-4rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] shadow-[0_20px_50px_rgba(0,0,0,0.95)] transition-all duration-300 ${focused ? "ring-[4px] ring-white z-[99] border-white scale-[1.01]" : "border-white/10"}`}
+        className={`relative overflow-hidden w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)] lg:w-[calc(100%-8rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] shadow-[0_20px_50px_rgba(0,0,0,0.95)] transition-all duration-300 ${focused ? "ring-[4px] ring-white z-[99] border-white" : "border-white/10"}`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
