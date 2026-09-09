@@ -51,7 +51,9 @@ export const LandscapeCard = React.memo(function LandscapeCard({
   }
 
   const isMixedSeries = Boolean((config as any)?.isMixedSeries);
-  const imageUrl = item.landscapeImage || item.posterImage || item.image;
+  const imageUrl = railActive
+    ? (item.landscapeImage || item.posterImage || item.image)
+    : (item.portraitImage || item.image);
 
   return (
     <BaseContentCard
@@ -83,8 +85,8 @@ export const LandscapeCard = React.memo(function LandscapeCard({
         </div>
       )}
 
-      {/* Spotlight lead card: mounts InlineHoverTrailer when rail is active */}
-      {isMixedSeries && (
+      {/* Spotlight lead card: mounts InlineHoverTrailer only when rail is active */}
+      {isMixedSeries && railActive && (
         <InlineHoverTrailer item={item} isExpanded={Boolean(railActive || forceFocusRing)} />
       )}
     </BaseContentCard>

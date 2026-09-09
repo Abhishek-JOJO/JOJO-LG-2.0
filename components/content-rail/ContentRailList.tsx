@@ -18,6 +18,7 @@ import { ContentRailItem, ContentRailType, RailCardVariant } from "./config/cont
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 import { mapBatchAssetAccess, useBatchAssetAccess } from "@/features/content/hooks/useBatchAssetAccess";
+import { useActiveRailStore } from "@/store/useActiveRailStore";
 
 interface ContentRailListProps {
   items: ContentRailItem[];
@@ -60,16 +61,17 @@ function renderSpotlightRailItem(
   onCycle: (direction: "left" | "right") => void
 ) {
   if (slotIdx === 0) {
-    const landscapeConfig: RailCardDesignConfig = {
+    const slot0Config: RailCardDesignConfig = {
       ...config,
-      variant: RailCardVariant.LANDSCAPE,
-      width: RailCardWidth.W_462,
-      height: RailCardHeight.H_270,
-      aspectRatio: RailCardAspectRatio.WIDESCREEN_16_9,
+      variant: railActive ? RailCardVariant.LANDSCAPE : RailCardVariant.PORTRAIT,
+      width: (railActive ? 824.39 : 308.48) as any,
+      height: 464 as any,
+      borderRadius: 16,
+      aspectRatio: railActive ? RailCardAspectRatio.WIDESCREEN_16_9 : RailCardAspectRatio.PORTRAIT_2_3,
       hover: {
         ...config.hover,
-        enabled: true,
-        type: "card",
+        enabled: railActive,
+        type: railActive ? "card" : "simple",
       },
       // @ts-ignore
       isMixedSeries: true,
@@ -79,7 +81,7 @@ function renderSpotlightRailItem(
         key={keyId}
         {...commonProps}
         item={effectiveItem}
-        config={landscapeConfig}
+        config={slot0Config}
         className="sticky left-0 z-20"
         focusKey={leadFocusKey}
         forceFocusRing={railActive}
@@ -92,8 +94,9 @@ function renderSpotlightRailItem(
   const portraitConfig: RailCardDesignConfig = {
     ...config,
     variant: RailCardVariant.PORTRAIT,
-    width: RailCardWidth.W_180,
-    height: RailCardHeight.H_270,
+    width: 308.48 as any,
+    height: 464 as any,
+    borderRadius: 16,
     aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,
     hover: {
       ...config.hover,
@@ -255,7 +258,16 @@ export function ContentRailList({
           if (targetFocusKey) {
             try { setFocus(targetFocusKey); } catch {}
           }
-          firstCardBelowHero.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const currentSection = firstCardBelowHero.closest('section');
+          if (currentSection) {
+            const sIndex = currentSection.getAttribute('data-section-index');
+            useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : 1);
+            const rect = currentSection.getBoundingClientRect();
+            window.scrollTo({
+              top: Math.max(0, window.scrollY + rect.top - 95),
+              behavior: 'smooth'
+            });
+          }
           return false;
         }
       }
@@ -267,10 +279,9 @@ export function ContentRailList({
       }
     },
     onFocus: () => {
-      // D-pad focus should stop autoplay just like mouse hover does — otherwise
-      // the slide can keep auto-advancing behind the remote user while they're
-      // deciding, so pressing OK opens something other than what they last saw.
+      // D-pad focus should stop autoplay just like mouse hover does
       setIsAutoplayPaused(true);
+      useActiveRailStore.getState().setActiveSectionIndex(0);
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }

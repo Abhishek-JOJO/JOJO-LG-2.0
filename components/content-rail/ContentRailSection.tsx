@@ -17,6 +17,7 @@ import { slugify } from "@/features/asset/store/useAssetDetailStore";
 import { logger } from "@/lib/logger/logger";
 import { useTranslations } from "next-intl";
 import { useBrowseHiddenStore } from "@/store/useBrowseHiddenStore";
+import { useActiveRailStore } from "@/store/useActiveRailStore";
 
 interface ContentRailSectionProps {
   cr_title: string;
@@ -170,11 +171,35 @@ export function ContentRailSection({
   const isW_270 = config.width === 270;
   const mobileHeight = isLandscape ? "170px" : isGenre ? "58px" : isW_270 ? "210px" : "200px";
 
+  const activeSectionIndex = useActiveRailStore((s) => s.activeSectionIndex);
+  const isSectionActive = activeSectionIndex === index;
+  const hasAnyRailActive = activeSectionIndex !== null && activeSectionIndex > 0;
+
+  const isSpotlightRail = !isHero && (config.variant === RailCardVariant.SERIES_MIXED || config.variant === RailCardVariant.PORTRAIT);
+  const railCardDesktopHeight = isSpotlightRail ? "464px" : `${config.height}px`;
+
   return (
-    <section ref={sectionRef} className={`${isHero ? "mb-10 w-full" : "mb-2 w-full hover:z-[50]"} relative`}>
+    <section
+      ref={sectionRef}
+      data-section-index={index}
+      className={`${isHero ? "mb-10 w-full" : "mb-10 w-full"} relative transition-opacity duration-300 ease-out ${
+        !isHero && hasAnyRailActive
+          ? isSectionActive
+            ? "opacity-100 z-20"
+            : "opacity-35 z-10"
+          : "opacity-100"
+      }`}
+      style={{
+        scrollMarginTop: "95px",
+      }}
+    >
       {!isHero && (
-        <div className="relative z-50 flex items-center justify-between w-full px-4 sm:px-6 lg:px-8">
-          <h2 className="text-lg font-semibold sm:title-lg-semibold text-theme_1">
+        <div className="relative z-50 flex items-center justify-between w-full px-4 sm:px-6 lg:px-8 mb-3">
+          <h2
+            className={`text-xl sm:text-2xl font-bold transition-colors duration-300 ${
+              hasAnyRailActive && !isSectionActive ? "text-white/40" : "text-white"
+            }`}
+          >
             {cr_title}
           </h2>
 
@@ -183,14 +208,12 @@ export function ContentRailSection({
       )}
 
       <div
-        className={`relative group/rail-container w-full ${isHero ? "mt-0" : "mt-[15px]"}`}
+        className={`relative group/rail-container w-full ${isHero ? "mt-0" : "mt-2"}`}
         style={{
-          "--rail-card-desktop-height": `${config.height}px`,
+          "--rail-card-desktop-height": railCardDesktopHeight,
           "--rail-card-mobile-height": mobileHeight,
         } as React.CSSProperties}
       >
-
-
         <ContentRailList
           items={items}
           config={config}

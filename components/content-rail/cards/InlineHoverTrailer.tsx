@@ -118,11 +118,8 @@ export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps
 
   return (
     <div className="absolute inset-0 w-full h-full pointer-events-none z-10">
-      {/* Landscape image: ALWAYS visible when video is not playing */}
-      <div className={cn(
-        "absolute inset-0 w-full h-full transition-opacity duration-300",
-        videoReady && isExpanded ? "opacity-0" : "opacity-100"
-      )}>
+      {/* Landscape image: ALWAYS visible behind video */}
+      <div className="absolute inset-0 w-full h-full">
         {landscapeImageUrl && (
           <JOJOCommonImage
             src={landscapeImageUrl}

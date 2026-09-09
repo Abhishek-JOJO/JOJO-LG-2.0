@@ -8,6 +8,7 @@ import { ContentRailItem, RailCardVariant } from "../config/contentRail.types";
 import { RailCardDesignConfig, RailCardWidth } from "../config/contentRail.config";
 import { LOGOS } from "@/lib/constants/assets";
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
+import { useActiveRailStore } from "@/store/useActiveRailStore";
 
 interface BaseContentCardProps {
   item: ContentRailItem;
@@ -87,7 +88,8 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                 if (hero) {
                   hero.focus();
                   try { setFocus('hero-carousel'); } catch {}
-                  hero.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  useActiveRailStore.getState().setActiveSectionIndex(0);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
                   return false;
                 }
               } else {
@@ -99,7 +101,13 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                   if (targetKey) {
                     try { setFocus(targetKey); } catch {}
                   }
-                  targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  const sIndex = prevSection.getAttribute('data-section-index');
+                  useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex - 1);
+                  const sectionRect = prevSection.getBoundingClientRect();
+                  window.scrollTo({
+                    top: Math.max(0, window.scrollY + sectionRect.top - 95),
+                    behavior: 'smooth'
+                  });
                   return false;
                 }
               }
@@ -113,7 +121,13 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                   if (targetKey) {
                     try { setFocus(targetKey); } catch {}
                   }
-                  targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  const sIndex = nextSection.getAttribute('data-section-index');
+                  useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex + 1);
+                  const sectionRect = nextSection.getBoundingClientRect();
+                  window.scrollTo({
+                    top: Math.max(0, window.scrollY + sectionRect.top - 95),
+                    behavior: 'smooth'
+                  });
                   return false;
                 }
               }
@@ -125,7 +139,26 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     },
     onFocus: () => {
       if (cardRef.current) {
-        cardRef.current.scrollIntoView({ behavior: "smooth", block: "center", inline: "start" });
+        const currentSection = cardRef.current.closest('section');
+        if (currentSection) {
+          const sIndex = currentSection.getAttribute('data-section-index');
+          if (sIndex !== null) {
+            useActiveRailStore.getState().setActiveSectionIndex(Number(sIndex));
+          } else if (currentSection.parentElement) {
+            const allSections = Array.from(currentSection.parentElement.querySelectorAll('section'));
+            const idx = allSections.indexOf(currentSection);
+            if (idx !== -1) {
+              useActiveRailStore.getState().setActiveSectionIndex(idx);
+            }
+          }
+          const sectionRect = currentSection.getBoundingClientRect();
+          if (Math.abs(sectionRect.top - 95) > 10) {
+            window.scrollTo({
+              top: Math.max(0, window.scrollY + sectionRect.top - 95),
+              behavior: 'smooth'
+            });
+          }
+        }
       }
       onFocusChange?.(index);
     },
@@ -317,11 +350,13 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   }
 
   const cardStyle = {
+    width: `${desktopWidth}px`,
+    height: `${desktopHeight}px`,
     "--desktop-width": `${desktopWidth}px`,
     "--desktop-height": `${desktopHeight}px`,
     "--mobile-width": mobileWidth,
     "--mobile-height": mobileHeight,
-    borderRadius: config.borderRadius,
+    borderRadius: `${config.borderRadius || 16}px`,
   } as React.CSSProperties;
 
   const showFocusRing = focused || forceFocusRing || isDomFocused;
@@ -391,7 +426,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         <div
           className="absolute inset-0 z-50 pointer-events-none transition-opacity duration-200"
           style={{
-            borderRadius: config.borderRadius,
+            borderRadius: `${config.borderRadius || 16}px`,
             border: "4px solid #ffffff",
             boxShadow: "0 0 25px rgba(255, 255, 255, 1), inset 0 0 10px rgba(255, 255, 255, 0.6)",
           }}

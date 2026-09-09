@@ -17,9 +17,25 @@ interface Props {
   focusKey?: string;
   /** When false, excluded from D-pad/spatial-nav entirely (still clickable by mouse) — used by spotlight rails' non-lead slots. */
   focusable?: boolean;
+  forceFocusRing?: boolean;
+  railActive?: boolean;
+  onArrowLeftRight?: (direction: "left" | "right") => void;
 }
 
-export const PortraitCard = React.memo(function PortraitCard({ item, config, index, itemsLength, onClick, onFocusChange, className, focusKey, focusable }: Props) {
+export const PortraitCard = React.memo(function PortraitCard({
+  item,
+  config,
+  index,
+  itemsLength,
+  onClick,
+  onFocusChange,
+  className,
+  focusKey,
+  focusable,
+  forceFocusRing,
+  railActive,
+  onArrowLeftRight,
+}: Props) {
   const t = useTranslations("contentRails");
   
   const handleClick = useCallback(() => {
@@ -194,6 +210,8 @@ export const PortraitCard = React.memo(function PortraitCard({ item, config, ind
       onFocusChange={onFocusChange}
       focusKey={focusKey}
       focusable={focusable}
+      forceFocusRing={forceFocusRing}
+      onArrowLeftRight={onArrowLeftRight}
     >
       {config.hover.type !== "card" && (
         <div className="absolute bottom-0 left-0 right-0 z-30 translate-y-2 p-3 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
