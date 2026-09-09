@@ -218,6 +218,17 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   const isSimple = config.hover.type === "simple" || !config.hover.enabled;
   const showBorder = config.hover.enabled && isHovered;
 
+  const isMixedSeries = Boolean((config as any)?.isMixedSeries);
+  const isExpanded = !isMixedSeries && !!config?.hover?.enabled && (isHovered || isFocusExpanded) && !isAssetDetailOpen;
+  const isLandscapeCard =
+    config?.variant === RailCardVariant.LANDSCAPE ||
+    config?.variant === RailCardVariant.CONTINUE_WATCHING ||
+    Number(config?.width) >= 500 ||
+    isExpanded;
+
+  let desktopWidth = config.width;
+  const desktopHeight = config.height;
+
   const cardInner = (
     <div
       className="relative h-full w-full overflow-hidden bg-neutral-900 transition-colors transform-gpu isolation-isolate"
@@ -237,6 +248,8 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         <JOJOCommonImage
           src={imageUrl}
           alt={item.title}
+          width={desktopWidth}
+          height={desktopHeight}
           fill
           contentMode="cover"
           sizes={
@@ -283,7 +296,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       {config?.variant !== RailCardVariant?.TOP_TEN && item?.isTop10 && (
         <div
           className={`absolute top-0 left-0 z-30 flex font-bold flex-col items-center leading-none text-theme_1 ${
-            config?.variant === RailCardVariant.LANDSCAPE || Number(config?.width) > 500
+            isLandscapeCard
               ? "px-3.5 pt-2.5 pb-2 rounded-br-2xl shadow-xl"
               : "px-1.5 pt-1 rounded-br-md"
           }`}
@@ -291,7 +304,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         >
           <span
             className={
-              config?.variant === RailCardVariant.LANDSCAPE || Number(config?.width) > 500
+              isLandscapeCard
                 ? "text-sm sm:text-base font-bold tracking-wider"
                 : "text-xs sm:text-xs"
             }
@@ -300,7 +313,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
           </span>
           <span
             className={
-              config?.variant === RailCardVariant.LANDSCAPE || Number(config?.width) > 500
+              isLandscapeCard
                 ? "text-2xl sm:text-3xl font-black -mt-0.5"
                 : "text-lg sm:text-lg -mt-1"
             }
@@ -312,15 +325,15 @@ export const BaseContentCard = React.memo(function BaseContentCard({
 
       {config?.showBadge && item?.asset_tags_badgeText && (
         <div
-          className={`absolute bottom-0 left-1/2 caption-sm-semibold -translate-x-1/2 text-center uppercase z-30 ${config.variant === RailCardVariant.LANDSCAPE ||
-            config?.variant === RailCardVariant.CONTINUE_WATCHING ||
-            config?.width >= RailCardWidth.W_580
-            ? "w-[110px]"
-            : "w-[110px]"
-            } ${item?.isPremium
-              ? "premium-badge-bg shadow-md shadow-amber-500/20 pt-0.5 pb-0 !text-black rounded-t-md"
-              : "bg-theme_13_samecolour rounded-[6px] py-0.5"
-            }`}
+          className={`absolute bottom-0 left-1/2 -translate-x-1/2 text-center uppercase z-30 font-bold transition-all duration-300 ${
+            isLandscapeCard
+              ? "w-[170px] sm:w-[210px] text-xs sm:text-sm tracking-wider py-1 sm:py-1.5 rounded-t-lg shadow-lg"
+              : "w-[110px] text-[11px] tracking-wide py-0.5 rounded-t-md"
+          } ${
+            item?.isPremium
+              ? "premium-badge-bg shadow-md shadow-amber-500/20 !text-black"
+              : "bg-theme_13_samecolour text-white"
+          }`}
         >
           {item?.asset_tags_badgeText}
         </div>
@@ -328,8 +341,14 @@ export const BaseContentCard = React.memo(function BaseContentCard({
 
       {/* Crown badge for premium items */}
       {item.isSVOD && (
-        <div className="absolute top-2 right-2 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-theme_11_60 transition-transform duration-300 group-hover:scale-110">
-          <div className="relative w-3 h-3">
+        <div
+          className={`absolute z-20 flex items-center justify-center rounded-full bg-theme_11_60 transition-transform duration-300 group-hover:scale-110 shadow-md ${
+            isLandscapeCard
+              ? "top-3 right-3 sm:top-4 sm:right-4 h-10 w-10 sm:h-11 sm:w-11"
+              : "top-2 right-2 h-6 w-6"
+          }`}
+        >
+          <div className={`relative ${isLandscapeCard ? "w-5.5 h-5.5 sm:w-6 sm:h-6" : "w-3 h-3"}`}>
             <JOJOCommonImage
               src={LOGOS.CROWN_LOGO}
               alt={t("premium_badge_alt")}
@@ -341,9 +360,15 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         </div>
       )}
       {item.isTVOD && (
-        <div className="absolute top-2 right-2 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-theme_11_60 transition-transform duration-300 group-hover:scale-110">
+        <div
+          className={`absolute z-20 flex items-center justify-center rounded-full bg-theme_11_60 transition-transform duration-300 group-hover:scale-110 shadow-md ${
+            isLandscapeCard
+              ? "top-3 right-3 sm:top-4 sm:right-4 h-10 w-10 sm:h-11 sm:w-11"
+              : "top-2 right-2 h-6 w-6"
+          }`}
+        >
           <TvodIcon
-            size={15}
+            size={isLandscapeCard ? 24 : 15}
             className="shrink-0"
           />
         </div>
@@ -352,14 +377,8 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     </div>
   );
 
-  let desktopWidth = config.width;
-  const desktopHeight = config.height;
-
   let mobileWidth = "135px";
   let mobileHeight = "203px"; // Perfect 2:3 ratio
-
-  const isMixedSeries = Boolean((config as any)?.isMixedSeries);
-  const isExpanded = !isMixedSeries && !!config?.hover?.enabled && (isHovered || isFocusExpanded) && !isAssetDetailOpen;
 
   // Accordion Inline Expansion logic for portrait cards (only when not a spotlight rail)
   if (isExpanded && (config.variant === RailCardVariant.PORTRAIT || config.variant === RailCardVariant.TOP_TEN)) {

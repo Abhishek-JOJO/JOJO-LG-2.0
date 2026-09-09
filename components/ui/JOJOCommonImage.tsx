@@ -6,10 +6,24 @@ import {
   useEffect,
   useState,
   useRef,
+  useMemo,
   type CSSProperties,
   type ReactEventHandler,
   type ReactNode,
 } from "react";
+import {
+  JOJOImageFit,
+  JOJOImageRequestConfiguration,
+  jojoResizedImageURL,
+  type JOJOCGSize,
+} from "@/lib/config/imageRequest.config";
+
+export {
+  JOJOImageFit,
+  JOJOImageRequestConfiguration,
+  jojoResizedImageURL,
+  type JOJOCGSize,
+};
 
 export enum JOJOImageRadius {
   None = "none",
@@ -263,6 +277,17 @@ export type JOJOCommonImageProps = Omit<
    */
   wrapperStyle?: CSSProperties;
 
+  /**
+   * Whether to optimize remote image requests with JOJOImageRequestConfiguration
+   * (appends width, height, fit, quality, format query parameters). Defaults to true.
+   */
+  optimizeRequestURL?: boolean;
+
+  /**
+   * Override quality (1-100). Defaults to 80.
+   */
+  quality?: number;
+
   onError?: ReactEventHandler<HTMLImageElement>;
   onLoad?: ReactEventHandler<HTMLImageElement>;
 };
@@ -340,6 +365,8 @@ export default function JOJOCommonImage({
   height,
   sizes,
   title,
+  optimizeRequestURL = true,
+  quality,
   onError,
   onLoad,
 
@@ -380,31 +407,80 @@ export default function JOJOCommonImage({
     getInitialState(src, fallbackType)
   );
 
+  const [retriedOriginal, setRetriedOriginal] = useState(false);
+
   const imgRef = useRef<HTMLImageElement>(null);
 
+  const rawUrl = typeof src === "string" ? src : (src as any)?.src || "";
+  const isRemote = Boolean(rawUrl?.startsWith("http://") || rawUrl?.startsWith("https://"));
+  const shouldOptimize =
+    optimizeRequestURL &&
+    !retriedOriginal &&
+    isRemote &&
+    resolvedPreset !== JOJOImagePreset.Logo;
+
+  const targetSize: JOJOCGSize = useMemo(() => {
+    const numWidth = typeof width === "number" ? width : Number(width) || 0;
+    const numHeight = typeof height === "number" ? height : Number(height) || 0;
+
+    if (numWidth > 0 && numHeight > 0) {
+      return { width: numWidth, height: numHeight };
+    }
+
+    switch (resolvedPreset) {
+      case JOJOImagePreset.Avatar:
+        return { width: 120, height: 120 };
+      case JOJOImagePreset.Thumbnail:
+        return { width: 300, height: 300 };
+      case JOJOImagePreset.Product:
+        return { width: 400, height: 300 };
+      case JOJOImagePreset.Banner:
+        return { width: 1280, height: 720 };
+      case JOJOImagePreset.Logo:
+        return { width: 300, height: 120 };
+      default:
+        return JOJOImageRequestConfiguration.fallbackTargetSize;
+    }
+  }, [width, height, resolvedPreset]);
+
+  const activeSrc = useMemo(() => {
+    if (!rawUrl) return src;
+    if (retriedOriginal || !shouldOptimize) return src;
+
+    return jojoResizedImageURL(rawUrl, {
+      targetSize,
+      fit: JOJOImageFit.resolved(String(resolvedContentMode)),
+      quality,
+    });
+  }, [rawUrl, src, retriedOriginal, shouldOptimize, targetSize, resolvedContentMode, quality]);
+
   const [isLoaded, setIsLoaded] = useState(() => {
-    const key = getImageUrlKey(src);
+    const key = getImageUrlKey(activeSrc);
     return key ? loadedImageUrls.has(key) : false;
   });
 
   useEffect(() => {
+    setRetriedOriginal(false);
+  }, [src]);
+
+  useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setImageState(getInitialState(src, fallbackType));
-    const key = getImageUrlKey(src);
+    setImageState(getInitialState(activeSrc, fallbackType));
+    const key = getImageUrlKey(activeSrc);
     setIsLoaded(key ? loadedImageUrls.has(key) : false);
-  }, [src, fallbackType]);
+  }, [activeSrc, fallbackType]);
 
   // Synchronously catch browser cached image loads where onload doesn't fire
   useEffect(() => {
     if (imgRef.current?.complete) {
-      const key = getImageUrlKey(src);
+      const key = getImageUrlKey(activeSrc);
       if (key) {
         markImageAsLoaded(key);
       }
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsLoaded(true);
     }
-  }, [src]);
+  }, [activeSrc]);
 
   const translate = (key?: string, fallbackValue = "") => {
     if (!key) return fallbackValue;
@@ -464,6 +540,17 @@ export default function JOJOCommonImage({
   );
 
   const handleError: ReactEventHandler<HTMLImageElement> = (event) => {
+    // If the optimized URL failed, retry with original unresized URL first
+    if (
+      shouldOptimize &&
+      !retriedOriginal &&
+      rawUrl &&
+      JOJOImageRequestConfiguration.shouldRetryOriginal(event)
+    ) {
+      setRetriedOriginal(true);
+      return;
+    }
+
     onError?.(event);
 
     /**
@@ -484,7 +571,7 @@ export default function JOJOCommonImage({
     return null;
   }
 
-  if (!src || imageState === JOJOImageRenderState.FallbackText) {
+  if (!activeSrc || imageState === JOJOImageRenderState.FallbackText) {
     return (
       <div className={wrapperClass} style={computedWrapperStyle}>
         <div
@@ -524,7 +611,7 @@ export default function JOJOCommonImage({
       <Image
         ref={imgRef}
         {...rest}
-        src={src}
+        src={activeSrc}
         alt={resolvedAlt || fallbackAlt}
         title={title}
         sizes={shouldUseFill ? sizes ?? JOJO_IMAGE_DEFAULTS.sizes : sizes}
@@ -533,7 +620,7 @@ export default function JOJOCommonImage({
         fill={shouldUseFill}
         onError={handleError}
         onLoad={(e) => {
-          const key = getImageUrlKey(src);
+          const key = getImageUrlKey(activeSrc);
           if (key) {
             markImageAsLoaded(key);
           }

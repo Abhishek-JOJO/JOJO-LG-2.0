@@ -169,6 +169,7 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
               alt={item.title}
               fill
               contentMode="contain"
+              optimizeRequestURL={false}
               wrapperClassName="w-full h-full object-contain object-left-bottom origin-bottom-left"
             />
           </div>

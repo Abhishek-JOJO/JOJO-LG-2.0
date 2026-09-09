@@ -588,6 +588,7 @@ export function HoverCard({
                   fill
                   contentMode="contain"
                   position="left"
+                  optimizeRequestURL={false}
                   wrapperClassName="w-full h-full"
                 />
               </div>

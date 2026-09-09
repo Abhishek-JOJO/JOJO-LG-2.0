@@ -1286,6 +1286,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                     fill
                     contentMode="contain"
                     position="left"
+                    optimizeRequestURL={false}
                     wrapperClassName="w-full h-full"
                   />
                 </div>

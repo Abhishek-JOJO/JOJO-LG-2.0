@@ -1,7 +1,7 @@
 "use client";
 
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
-import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
+import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import JOJOCommonVideo from "@/components/ui/JOJOCommonVideo";
 import { LikeLovePartHerocarousel } from "@/enums/ui.enum";
 import { useWatchGating } from "@/features/asset/hooks/useWatchGating";
@@ -312,10 +312,13 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
             <JOJOCommonImage
               src={heroImageUrl}
               alt={item?.title}
+              width={1600}
+              height={900}
+              preset={JOJOImagePreset.Banner}
               fill
               priority={true}
               sizes="100vw"
-              quality={90}
+              quality={80}
               className="object-cover"
               wrapperClassName="w-full h-full"
             />
@@ -347,6 +350,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
                   fill
                   contentMode="contain"
                   position="left"
+                  optimizeRequestURL={false}
                   wrapperClassName="h-full w-full drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]"
                 />
               </div>
