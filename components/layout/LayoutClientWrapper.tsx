@@ -10,6 +10,7 @@ import { AssetDetailModal } from "@/features/asset/components/AssetDetailModal";
 import { GuestLoginPopup } from "@/features/auth/ui/GuestLoginPopup";
 import { SessionExpiredModal } from "@/features/auth/ui/SessionExpiredModal";
 import { StatusLine } from "@/components/common/StatusLine";
+import { AmbientBackground } from "@/components/common/AmbientBackground";
 export function LayoutClientWrapper({ children }: { children: React.ReactNode }) {
   const { showNavbar, showFooter } = appConfig?.flags;
   const pathname = useActivePathname();
@@ -48,10 +49,10 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
 
   return (
     <>
+      <AmbientBackground />
       {showNavbar && !hideHeaderFooter && <Navbar />}
       <main
-        className={mainClassName}
-        style={{ background: "var(--theme_12)" }}
+        className={`${mainClassName} bg-transparent`}
       >
         {children}
       </main>

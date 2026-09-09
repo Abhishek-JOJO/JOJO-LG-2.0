@@ -182,8 +182,15 @@ export function Navbar() {
 
   return (
     <header
-      className="z-[999] overflow-visible transition-all duration-300 sticky top-0 left-0 right-0 w-full backdrop-blur-xl shadow-2xl"
-      style={{ background: "var(--theme_12)", WebkitBackdropFilter: "blur(12px)", backdropFilter: "blur(12px)" }}
+      className={`z-[999] overflow-visible transition-all duration-300 sticky top-0 left-0 right-0 w-full ${
+        isScrolled
+          ? "bg-[#050505]/95 backdrop-blur-xl shadow-2xl"
+          : "bg-transparent shadow-none"
+      }`}
+      style={{
+        WebkitBackdropFilter: isScrolled ? "blur(16px)" : "none",
+        backdropFilter: isScrolled ? "blur(16px)" : "none",
+      }}
     >
 
       {isBrowsingMode ? (

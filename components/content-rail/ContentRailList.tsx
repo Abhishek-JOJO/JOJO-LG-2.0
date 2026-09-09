@@ -19,6 +19,8 @@ import { usePlayerStore } from "@/store/usePlayerStore";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 import { mapBatchAssetAccess, useBatchAssetAccess } from "@/features/content/hooks/useBatchAssetAccess";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
+import { extractDominantAmbientColor } from "@/lib/utils/colorExtractor";
+import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 
 interface ContentRailListProps {
   items: ContentRailItem[];
@@ -135,6 +137,22 @@ export function ContentRailList({
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
 
   const isHeroVariant = config?.variant === RailCardVariant.HERO || type === ContentRailType.HERO_CAROUSEL;
+
+  useEffect(() => {
+    if (!isHeroVariant || !items?.length) return;
+    const activeItem = items[activeIndex];
+    const heroImageUrl =
+      activeItem?.heroImage ||
+      activeItem?.landscapeImage ||
+      activeItem?.posterImage ||
+      activeItem?.image;
+
+    if (heroImageUrl) {
+      extractDominantAmbientColor(heroImageUrl).then((color) => {
+        useAmbientTintStore.getState().setAmbientColor(color);
+      });
+    }
+  }, [isHeroVariant, items, activeIndex]);
 
   // Spotlight rail config (sticky card 0 + fixed focus cycling)
   const railInstanceId = useId();
