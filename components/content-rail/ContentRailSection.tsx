@@ -175,8 +175,12 @@ export function ContentRailSection({
   const isSectionActive = activeSectionIndex === index;
   const hasAnyRailActive = activeSectionIndex !== null && activeSectionIndex > 0;
 
-  const isSpotlightRail = !isHero && (config.variant === RailCardVariant.SERIES_MIXED || config.variant === RailCardVariant.PORTRAIT);
-  const railCardDesktopHeight = isSpotlightRail ? "464px" : `${config.height}px`;
+  const isPortraitRail = !isHero && (
+    config.variant === RailCardVariant.SERIES_MIXED ||
+    config.variant === RailCardVariant.PORTRAIT ||
+    config.variant === RailCardVariant.TOP_TEN
+  );
+  const railCardDesktopHeight = isPortraitRail ? "490px" : `${config.height}px`;
 
   return (
     <section
@@ -194,7 +198,7 @@ export function ContentRailSection({
       }}
     >
       {!isHero && (
-        <div className="relative z-50 flex items-center justify-between w-full px-4 sm:px-6 lg:px-8 mb-3">
+        <div className="relative z-50 flex items-center justify-between w-full px-6 sm:px-12 lg:px-16 mb-3">
           <h2
             className={`text-xl sm:text-2xl font-bold transition-colors duration-300 ${
               hasAnyRailActive && !isSectionActive ? "text-white/40" : "text-white"

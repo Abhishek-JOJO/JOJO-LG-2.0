@@ -64,8 +64,8 @@ function renderSpotlightRailItem(
     const slot0Config: RailCardDesignConfig = {
       ...config,
       variant: railActive ? RailCardVariant.LANDSCAPE : RailCardVariant.PORTRAIT,
-      width: (railActive ? 824.39 : 308.48) as any,
-      height: 464 as any,
+      width: (railActive ? 870.89 : 325.77) as any,
+      height: 490 as any,
       borderRadius: 16,
       aspectRatio: railActive ? RailCardAspectRatio.WIDESCREEN_16_9 : RailCardAspectRatio.PORTRAIT_2_3,
       hover: {
@@ -82,7 +82,7 @@ function renderSpotlightRailItem(
         {...commonProps}
         item={effectiveItem}
         config={slot0Config}
-        className="sticky left-0 z-20"
+        className="relative shrink-0 z-20"
         focusKey={leadFocusKey}
         forceFocusRing={railActive}
         railActive={railActive}
@@ -94,8 +94,8 @@ function renderSpotlightRailItem(
   const portraitConfig: RailCardDesignConfig = {
     ...config,
     variant: RailCardVariant.PORTRAIT,
-    width: 308.48 as any,
-    height: 464 as any,
+    width: 325.77 as any,
+    height: 490 as any,
     borderRadius: 16,
     aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,
     hover: {
@@ -477,7 +477,7 @@ export function ContentRailList({
           (listRef as any).current = node;
         }
       }}
-      className={`flex flex-nowrap overflow-x-auto overflow-y-hidden scrollbar-hide pb-6 pt-2 mt-0 px-4 sm:px-6 lg:px-8 ${isDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"}`}
+      className={`flex flex-nowrap overflow-x-auto overflow-y-hidden scrollbar-hide pb-6 pt-2 mt-0 px-6 sm:px-12 lg:px-16 ${isDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"}`}
       style={{ gap: `${config?.gap ?? 16}px` }}
     >
       {isSpotlightRail ? (

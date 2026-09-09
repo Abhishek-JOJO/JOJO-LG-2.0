@@ -95,20 +95,16 @@ export const CONTENT_RAIL_DESIGN_CONFIG: Record<ContentRailType, RailCardDesignC
 
   [ContentRailType.TOP_10]: {
     variant: RailCardVariant.TOP_TEN,
-    width: RailCardWidth.W_180,
-    height: RailCardHeight.H_270,
+    width: 325.77 as any,
+    height: 490 as any,
     aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,
-    borderRadius: 8,
-    gap: 10,
+    borderRadius: 16,
+    gap: 16,
     showTitle: false,
     showRank: true,
     hover: {
-      enabled: true,
-      type: "card",
-      scale: 1.08,
-      showOverlay: false,
-      showTitle: false,
-      showPlayButton: false,
+      enabled: false,
+      type: "simple",
     },
   },
 
@@ -152,21 +148,16 @@ export const CONTENT_RAIL_DESIGN_CONFIG: Record<ContentRailType, RailCardDesignC
 
   [ContentRailType.PORTRAIT]: {
     variant: RailCardVariant.PORTRAIT,
-    width: RailCardWidth.W_173,
-    height: RailCardHeight.H_260,
+    width: 325.77 as any,
+    height: 490 as any,
     aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,
-    borderRadius: 8,
+    borderRadius: 16,
     gap: 16,
     showTitle: false,
     showBadge: true,
     hover: {
-      enabled: true,
-      type: "card",
-      scale: 1.08,
-      showOverlay: false,
-      showTitle: false,
-      showMeta: false,
-      showPlayButton: false,
+      enabled: false,
+      type: "simple",
     },
   },
 
@@ -208,18 +199,15 @@ export const CONTENT_RAIL_DESIGN_CONFIG: Record<ContentRailType, RailCardDesignC
 
   [ContentRailType.SERIES_MIXED]: {
     variant: RailCardVariant.SERIES_MIXED,
-    width: RailCardWidth.W_480,
-    height: RailCardHeight.H_300,
+    width: 325.77 as any,
+    height: 490 as any,
     aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,
-    borderRadius: 8,
+    borderRadius: 16,
     gap: 16,
     showTitle: false,
     hover: {
-      enabled: true,
-      scale: 1.08,
-      showOverlay: false,
-      showTitle: false,
-      showPlayButton: false,
+      enabled: false,
+      type: "simple",
     },
   },
 
