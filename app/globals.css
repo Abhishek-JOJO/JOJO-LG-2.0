@@ -428,18 +428,8 @@ select:focus-visible {
 }
 
 /* ============================================================
-   SKELETON SHIMMER
+   SKELETON PLACEHOLDER
 ============================================================ */
-
-@keyframes shimmer {
-  0% {
-    background-position: -400px 0;
-  }
-
-  100% {
-    background-position: 400px 0;
-  }
-}
 
 @keyframes slideUp {
   from {
@@ -577,13 +567,16 @@ select:focus-visible {
   font-size: var(--caption-font-size, 1.35rem);
 }
 
+/*
+ * TV note: this used to be an animated shimmer (background-position keyframe,
+ * ~1.4s infinite) applied to every skeleton card at once. That property isn't
+ * compositor-only — the engine repaints it every frame — so with 100-300+
+ * skeleton cards mounted simultaneously on a low-power TV SoC, it was a major
+ * source of jank during every load and every "load more" page fetch. A static
+ * placeholder is what most TV apps (Netflix, YouTube TV) actually ship.
+ */
 .skeleton {
-  background: linear-gradient(90deg,
-      var(--theme_9) 0%,
-      var(--theme_8) 40%,
-      var(--theme_9) 80%);
-  background-size: 800px 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+  background: var(--theme_8);
 }
 
 .animate-slide-up {

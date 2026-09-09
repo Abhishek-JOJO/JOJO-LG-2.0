@@ -56,6 +56,12 @@ export const useRemoteManager = () => {
         case WEBOS_KEYS.RW:
           document.dispatchEvent(new CustomEvent('tv-media-rw'));
           break;
+        case WEBOS_KEYS.INFO:
+          // Toggles the on-screen debug overlay (components/debug/DebugOverlay.tsx) —
+          // lets us diagnose focus/lag issues directly on the TV without a separate
+          // dev machine. Remove this case (and the overlay) once diagnosis is done.
+          document.dispatchEvent(new CustomEvent('tv-debug-toggle'));
+          break;
         default:
           break;
       }

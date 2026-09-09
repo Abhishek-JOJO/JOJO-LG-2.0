@@ -77,15 +77,18 @@ function RailSectionSkeleton({ type, titleWidth = "w-40 sm:w-48" }: RailSectionS
   if (!config) return null;
 
   const gap = config.gap;
-  let cardCount = 15;
+  // Only enough cards to fill one TV screen width plus a small buffer — the
+  // rest would be off-screen and never seen before real data replaces them,
+  // so rendering more than this is pure wasted DOM/paint on a low-power SoC.
+  let cardCount = 7;
   if (type === ContentRailType.LANDSCAPE || type === ContentRailType.CONTINUE_WATCHING) {
-    cardCount = 10;
+    cardCount = 5;
   } else if (type === ContentRailType.RED_CARPET) {
-    cardCount = 10;
+    cardCount = 5;
   } else if (type === ContentRailType.GENRE) {
-    cardCount = 10;
+    cardCount = 6;
   } else if (type === ContentRailType.SERIES_MIXED) {
-    cardCount = 10;
+    cardCount = 5;
   }
 
   const isTop10 = type === ContentRailType.TOP_10;
@@ -111,7 +114,7 @@ function RailSectionSkeleton({ type, titleWidth = "w-40 sm:w-48" }: RailSectionS
       return (
         <>
           <SkeletonCard config={landscapeConfig} />
-          {[...Array(10)].map((_, i) => (
+          {[...Array(5)].map((_, i) => (
             <SkeletonCard key={i} config={portraitConfig} />
           ))}
         </>
@@ -161,73 +164,64 @@ function RailSectionSkeleton({ type, titleWidth = "w-40 sm:w-48" }: RailSectionS
   );
 }
 
+// Kept short on purpose: this is a loading placeholder, not real content — on
+// a TV, the hero alone fills the first screen (100vh), so anything past the
+// first few rails is off-screen the whole time it's shown and just adds
+// paint/DOM cost for nothing. Enough rails to cover one extra scroll's worth.
 const SKELETON_RAILS = [
   { type: ContentRailType.PORTRAIT, titleWidth: "w-36 sm:w-40" }, // portrait
-  { type: ContentRailType.PORTRAIT, titleWidth: "w-32 sm:w-36" }, // portrait
   { type: ContentRailType.LANDSCAPE, titleWidth: "w-48 sm:w-56" }, // landscape
-  { type: ContentRailType.PORTRAIT, titleWidth: "w-36 sm:w-40" }, // portrait
   { type: ContentRailType.SERIES_MIXED, titleWidth: "w-40 sm:w-48" }, // mix series
   { type: ContentRailType.PORTRAIT, titleWidth: "w-32 sm:w-36" }, // portrait
-  { type: ContentRailType.SERIES_MIXED, titleWidth: "w-40 sm:w-48" }, // mix series
-  { type: ContentRailType.PORTRAIT, titleWidth: "w-36 sm:w-40" }, // portrait
-  { type: ContentRailType.PORTRAIT, titleWidth: "w-32 sm:w-36" }, // portrait
-  { type: ContentRailType.PORTRAIT, titleWidth: "w-40 sm:w-44" }, // portrait
   { type: ContentRailType.LANDSCAPE, titleWidth: "w-44 sm:w-52" }, // landscape
-  { type: ContentRailType.LANDSCAPE, titleWidth: "w-48 sm:w-56" }, // landscape
-  { type: ContentRailType.LANDSCAPE, titleWidth: "w-36 sm:w-44" }, // landscape
-  { type: ContentRailType.SERIES_MIXED, titleWidth: "w-40 sm:w-48" }, // mix series
-  { type: ContentRailType.PORTRAIT, titleWidth: "w-32 sm:w-36" }, // portrait
-  { type: ContentRailType.SERIES_MIXED, titleWidth: "w-44 sm:w-52" }, // mix series
-  { type: ContentRailType.LANDSCAPE, titleWidth: "w-40 sm:w-48" }, // landscape
-  { type: ContentRailType.GENRE, titleWidth: "w-28 sm:w-32" }, // genre
-  { type: ContentRailType.PORTRAIT, titleWidth: "w-36 sm:w-40" }, // portrait
-  { type: ContentRailType.SERIES_MIXED, titleWidth: "w-40 sm:w-48" }, // mix series
-  { type: ContentRailType.PORTRAIT, titleWidth: "w-32 sm:w-36" }, // portrait
-  { type: ContentRailType.SERIES_MIXED, titleWidth: "w-44 sm:w-52" }, // mix series
-  { type: ContentRailType.PORTRAIT, titleWidth: "w-36 sm:w-44" }, // portrait
 ];
+
+export function HeroSliderSkeleton() {
+  return (
+    <div className="relative overflow-hidden w-[calc(100%-2rem)] sm:w-[calc(100%-3rem)] lg:w-[calc(100%-4rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] border-white/10 bg-neutral-900 shadow-[0_20px_50px_rgba(0,0,0,0.95)]">
+      {/* Hotstar Left Gradient */}
+      <div className="absolute inset-y-0 left-0 w-full sm:w-[50%] md:w-[45%] lg:w-[40%] xl:w-[35%] bg-gradient-to-r from-black/80 via-black/40 to-transparent z-10 pointer-events-none" />
+
+      {/* Hotstar Bottom Gradient */}
+      <div className="absolute inset-x-0 bottom-0 h-[60%] sm:h-[50%] bg-gradient-to-t from-black via-black/80 to-transparent z-10 pointer-events-none" />
+
+      {/* Hero content placeholder matching real HeroCarouselCard layout */}
+      <div className="absolute bottom-12 sm:bottom-16 lg:bottom-20 left-6 sm:left-8 lg:left-12 right-[120px] max-w-4xl text-left z-20 space-y-3 pointer-events-none">
+        {/* Title placeholder */}
+        <div className="w-64 sm:w-80 md:w-96 h-12 sm:h-16 rounded-xl bg-white/10" />
+
+        {/* Badge placeholder */}
+        <div className="w-24 h-5 rounded-full bg-white/5" />
+
+        {/* Certification & Duration pills */}
+        <div className="flex items-center gap-2 pt-1">
+          <div className="w-12 h-5 rounded-full bg-white/10" />
+          <div className="w-12 h-5 rounded-full bg-white/10" />
+          <div className="w-16 h-5 rounded-full bg-white/10" />
+        </div>
+
+        {/* Genres */}
+        <div className="w-44 h-5 rounded-md bg-white/10 mt-1" />
+      </div>
+
+      {/* Pagination Dots placeholder */}
+      <div className="absolute bottom-6 right-6 sm:bottom-10 sm:right-12 lg:bottom-12 lg:right-16 flex gap-2 z-20 pointer-events-none">
+        <div className="h-2 w-6 rounded-full bg-white/40" />
+        <div className="h-2 w-2 rounded-full bg-white/20" />
+        <div className="h-2 w-2 rounded-full bg-white/20" />
+        <div className="h-2 w-2 rounded-full bg-white/20" />
+      </div>
+    </div>
+  );
+}
 
 export function ContentRailsSkeleton({ hasHero = true }: ContentRailsSkeletonProps) {
   return (
     <div
       className={`space-y-10 pb-16 overflow-x-hidden w-full select-none ${hasHero ? "pt-0" : "mt-3 sm:pt-5"}`}
     >
-      {/* ── Hero Banner Skeleton ─────────────────────────────────────────── */}
-      {hasHero && (
-        <div className="relative overflow-hidden w-full skeleton rounded-none h-[100vh] max-sm:h-[65dvh]">
-          {/* Gradient overlays to match real hero */}
-          <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/40 to-transparent z-10 pointer-events-none" />
-          <div className="absolute inset-0 bg-gradient-to-r from-neutral-950/80 via-neutral-950/20 to-transparent z-10 pointer-events-none" />
-
-          {/* Content placeholder */}
-          <div className="absolute bottom-20 sm:bottom-24 md:bottom-28 lg:bottom-32 left-4 sm:left-6 lg:left-16 right-4 max-w-2xl z-20 space-y-4">
-            <div className="h-10 sm:h-14 bg-theme_1/10 rounded-md w-3/4 animate-pulse" />
-            <div className="flex gap-2 pt-2">
-              <div className="h-6 w-16 bg-theme_1/10 rounded animate-pulse" />
-              <div className="h-6 w-16 bg-theme_1/10 rounded animate-pulse" />
-              <div className="h-6 w-20 bg-theme_1/10 rounded animate-pulse" />
-            </div>
-            <div className="space-y-2 pt-2">
-              <div className="h-4 bg-theme_1/10 rounded w-full animate-pulse" />
-              <div className="h-4 bg-theme_1/10 rounded w-5/6 animate-pulse" />
-              <div className="h-4 bg-theme_1/10 rounded w-2/3 animate-pulse" />
-            </div>
-            <div className="flex items-center gap-3 pt-4">
-              <div className="h-10 w-32 bg-theme_1/15 rounded-full animate-pulse" />
-              <div className="h-10 w-10 bg-theme_1/10 rounded-full animate-pulse" />
-              <div className="h-10 w-10 bg-theme_1/10 rounded-full animate-pulse" />
-              <div className="h-10 w-10 bg-theme_1/10 rounded-full animate-pulse" />
-            </div>
-          </div>
-
-          {/* Thumbnail strip placeholder (bottom-right) */}
-          <div className="absolute bottom-6 right-4 sm:right-6 lg:right-16 z-20 hidden lg:flex gap-2.5">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="w-20 md:w-24 lg:w-28 aspect-video rounded-md skeleton opacity-60" />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ── Hero Banner Skeleton matching real 75vh carousel ──────────────── */}
+      {hasHero && <HeroSliderSkeleton />}
 
       {/* ── Content Rail Skeletons ───────────────────────────────────────── */}
       {SKELETON_RAILS.map((rail, idx) => (

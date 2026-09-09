@@ -519,7 +519,7 @@ export default function JOJOCommonImage({
   return (
     <div className={wrapperClass} style={computedWrapperStyle}>
       {!isLoaded && (
-        <div className="absolute inset-0 bg-theme_1/5 animate-pulse rounded-lg" />
+        <div className="absolute inset-0 bg-theme_1/5 rounded-lg" />
       )}
       <Image
         ref={imgRef}

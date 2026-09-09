@@ -2,7 +2,7 @@
 
 import { ContentRailItem, ContentRailType } from "@/components/content-rail/config/contentRail.types";
 import { ContentRailSection } from "@/components/content-rail/ContentRailSection";
-import { ContentRailsSkeleton } from "@/components/content-rail/ContentRailsSkeleton";
+import { HeroSliderSkeleton } from "@/components/content-rail/ContentRailsSkeleton";
 import { mapApiRail } from "@/components/content-rail/utils/contentRail.mapper";
 import { useAppNavigation } from "@/features/navigation/hooks/useAppNavigation";
 import { NavigationItem } from "@/features/navigation/model/types";
@@ -16,7 +16,6 @@ import { useEffect, useRef, useState } from "react";
 import { useContentRails } from "../hooks/useContentRails";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 import { useWatchlistStore } from "@/store/useWatchlistStore";
-import { setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { useAuthStore } from "@store/useAuthStore";
 import { useLocaleStore } from "@store/useLocaleStore";
 import { useContinueWatchingStore } from "@store/useContinueWatchingStore";
@@ -237,25 +236,24 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     };
   }, [cwItemsRaw, isGuest]);
 
-  // Force default focus to the first card on the screen when rails load
-  useEffect(() => {
-    if (!isLoading && data && data.pages.length > 0) {
-      const timer = setTimeout(() => {
-        const firstCard = document.querySelector('[data-focuskey]');
-        if (firstCard) {
-          const focusKey = firstCard.getAttribute('data-focuskey');
-          if (focusKey) setFocus(focusKey);
-        }
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading, data]);
-
-  // ── Initial load skeleton ──────────────────────────────────────────────────
+  // ── Initial load: TV Hero Slider skeleton matching 75vh layout ──
   const showSkeleton = isLoading || (isFetching && !data);
   if (showSkeleton) {
-    const hasHero = pathname !== ROUTES.KIDS && pathname !== ROUTES.HOT_AND_NEW;
-    return <ContentRailsSkeleton hasHero={hasHero} />;
+    return (
+      <div className="min-h-screen overflow-x-hidden pt-0" style={{ background: "var(--theme_12)" }}>
+        <HeroSliderSkeleton />
+        <div className="mt-8 px-4 sm:px-6 lg:px-8 space-y-4">
+          <div className="w-48 h-6 rounded-md bg-white/10" />
+          <div className="flex gap-4 overflow-hidden">
+            <div className="w-[462px] h-[270px] rounded-lg bg-white/5 shrink-0" />
+            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
+            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
+            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
+            <div className="w-[180px] h-[270px] rounded-lg bg-white/5 shrink-0" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
@@ -341,11 +339,16 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
       )}
 
       {/*
-        - Still fetching more pages → show skeleton cards
+        - Still fetching more pages → small spinner only. This used to mount the
+          entire ~5-rail skeleton (with dozens of placeholder cards) underneath
+          content that's already loaded and visible, on every single page fetch
+          while scrolling — needless paint/DOM cost for a "more is coming" cue.
         - All pages loaded (hasNextPage = false) → fixed empty spacer, no skeleton/spinner
       */}
       {isFetchingNextPage ? (
-        <ContentRailsSkeleton hasHero={false} />
+        <div className="h-16 w-full flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-t-transparent border-white/40 rounded-full animate-spin" />
+        </div>
       ) : (
         <div className="h-16" />
       )}

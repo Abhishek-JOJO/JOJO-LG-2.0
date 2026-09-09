@@ -155,13 +155,6 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
   const containerRef = useRef<HTMLDivElement>(null);
   const [isIntersecting, setIsIntersecting] = useState(false);
   const wasActiveRef = useRef(false);
-  const [hasBeenActive, setHasBeenActive] = useState(false);
-
-  useEffect(() => {
-    if (isActive) {
-      setHasBeenActive(true);
-    }
-  }, [isActive]);
 
   const { scrollY } = useScroll();
   const bgY = useTransform(scrollY, (value) => {
@@ -294,7 +287,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
           <div className="absolute inset-0 w-full h-full z-0">
             <JOJOCommonVideo
               ref={videoRef}
-              src={hasBeenActive ? item.previewUrl : undefined}
+              src={isActive ? item.previewUrl : undefined}
               autoPlay={isActive && isIntersecting && !isAnyCardHovered && !isAssetDetailOpen && !isSessionExpiredVisible}
               muted={!(isActive && isIntersecting && !isAnyCardHovered && !isAssetDetailOpen && !isSessionExpiredVisible) || isMuted}
               loop

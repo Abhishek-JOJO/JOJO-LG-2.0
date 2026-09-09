@@ -62,30 +62,8 @@ export function ContentRailSection({
     type === ContentRailType.CONTINUE_WATCHING
   );
 
-  const [hasBeenVisible, setHasBeenVisible] = useState(() => {
-    return index < 2 || type === ContentRailType.HERO_CAROUSEL;
-  });
   const sectionRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = sectionRef.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setHasBeenVisible(true);
-          observer.disconnect();
-        }
-      },
-      {
-        rootMargin: "1500px",
-      }
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const isHeroSection = type === ContentRailType.HERO_CAROUSEL;
   const baseConfig = CONTENT_RAIL_DESIGN_CONFIG[type];
   const config = baseConfig
     ? {
@@ -147,7 +125,7 @@ export function ContentRailSection({
         setShowArrows(scrollWidth > clientWidth);
         // Fetch the next page if the user scrolls near the right end of the loaded list (within 400px)
         const isNearRightEnd = scrollWidth - scrollLeft - clientWidth < 400;
-        if (isNearRightEnd && hasBeenVisible) {
+        if (isNearRightEnd) {
           loadNextPage();
         }
       }
@@ -168,7 +146,7 @@ export function ContentRailSection({
       }
       clearTimeout(timer);
     };
-  }, [items, isExpanded, loadNextPage, railId, cr_title, hasBeenVisible]);
+  }, [items, isExpanded, loadNextPage, railId, cr_title]);
 
 
   if (!config || !items?.length) return null;
@@ -191,64 +169,6 @@ export function ContentRailSection({
   const isGenre = config.variant === RailCardVariant.GENRE;
   const isW_270 = config.width === 270;
   const mobileHeight = isLandscape ? "170px" : isGenre ? "58px" : isW_270 ? "210px" : "200px";
-
-  if (!hasBeenVisible && !isHero) {
-    const gap = config.gap ?? 16;
-    const cardCount = type === ContentRailType.LANDSCAPE || type === ContentRailType.CONTINUE_WATCHING ? 6 : 10;
-    const desktopWidth = config.width;
-    const desktopHeight = config.height;
-
-    let mobileWidth = "135px";
-    let mobileHeightVal = "200px";
-
-    if (
-      desktopWidth >= 580 ||
-      config.variant === "landscape" ||
-      config.variant === "continueWatching"
-    ) {
-      mobileWidth = "280px";
-      mobileHeightVal = "170px";
-    } else if (config.variant === RailCardVariant.GENRE) {
-      mobileWidth = "130px";
-      mobileHeightVal = "58px";
-    } else if (desktopWidth === 270) {
-      mobileWidth = "145px";
-      mobileHeightVal = "210px";
-    }
-
-    return (
-      <section
-        ref={sectionRef}
-        className="mb-5 w-full"
-        style={{
-          "--rail-card-desktop-height": `${config.height}px`,
-          "--rail-card-mobile-height": mobileHeight,
-        } as React.CSSProperties}
-      >
-        <div className="flex items-center justify-between w-full px-4 sm:px-6 lg:px-8">
-          <h2 className="text-lg font-semibold sm:title-lg-semibold text-theme_1 mb-3">{cr_title}</h2>
-        </div>
-        <div
-          className="flex overflow-x-hidden pb-4 px-4 sm:px-6 lg:px-14"
-          style={{ gap: `${gap}px` }}
-        >
-          {[...Array(cardCount)].map((_, i) => (
-            <div
-              key={i}
-              className="shrink-0 bg-theme_1/8 rounded-lg animate-pulse w-[var(--d-w)] h-[var(--d-h)] max-sm:w-[var(--m-w)] max-sm:h-[var(--m-h)]"
-              style={{
-                "--d-w": `${desktopWidth}px`,
-                "--d-h": `${desktopHeight}px`,
-                "--m-w": mobileWidth,
-                "--m-h": mobileHeightVal,
-                borderRadius: `${config.borderRadius ?? 8}px`,
-              } as React.CSSProperties}
-            />
-          ))}
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section ref={sectionRef} className={`${isHero ? "mb-10 w-full" : "mb-2 w-full hover:z-[50]"} relative`}>

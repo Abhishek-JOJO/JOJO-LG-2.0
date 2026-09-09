@@ -7,9 +7,6 @@ import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
 import { ContentRailItem, RailCardVariant } from "../config/contentRail.types";
 import { RailCardDesignConfig, RailCardWidth } from "../config/contentRail.config";
 import { LOGOS } from "@/lib/constants/assets";
-import { HoverCard, HoverCardAlignment } from "./HoverCard";
-import { InlineHoverTrailer } from "./InlineHoverTrailer";
-import { usePlayerStore } from "@/store/usePlayerStore";
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
 
 interface BaseContentCardProps {
@@ -36,6 +33,7 @@ interface BaseContentCardProps {
 
 import Link from "next/link";
 import { TvodIcon } from "@/public/svg/TVODIcon";
+import { InlineHoverTrailer } from "./InlineHoverTrailer";
 
 function getContentTypeSlug(assetType?: string, assetTypeCode?: number): string {
   const type = String(assetType || "").toUpperCase();
@@ -63,10 +61,9 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   onArrowLeftRight,
 }: BaseContentCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isDomFocused, setIsDomFocused] = useState(false);
   const [isFocusExpanded, setIsFocusExpanded] = useState(false);
-  const [hoverAlignment, setHoverAlignment] = useState<HoverCardAlignment>("center");
   const [imageLoaded, setImageLoaded] = useState(false);
-  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLAnchorElement>(null);
   const t = useTranslations("contentRails");
   const { ref: focusRef, focused, focusKey } = useFocusable({
@@ -80,32 +77,46 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       if (direction === 'up' || direction === 'down') {
         if (cardRef.current) {
           const currentSection = cardRef.current.closest('section');
-          if (!currentSection) return true;
-          
-          const parent = currentSection.parentElement;
-          if (!parent) return true;
-          
-          // Get all sections in the container to avoid issues with non-section siblings (like Next.js injected scripts)
-          const allSections = Array.from(parent.querySelectorAll('section'));
-          const currentIndex = allSections.indexOf(currentSection);
-          
-          if (currentIndex !== -1) {
-            const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-            const targetSection = allSections[targetIndex];
-            
-            if (targetSection) {
-              const firstCard = targetSection.querySelector('[data-focuskey]');
-              if (firstCard) {
-                const targetFocusKey = firstCard.getAttribute('data-focuskey');
-                if (targetFocusKey) {
-                  setFocus(targetFocusKey);
+          if (currentSection && currentSection.parentElement) {
+            const allSections = Array.from(currentSection.parentElement.querySelectorAll('section'));
+            const currentIndex = allSections.indexOf(currentSection);
+
+            if (direction === 'up') {
+              if (currentIndex <= 1) {
+                const hero = document.getElementById('hero-carousel-container');
+                if (hero) {
+                  hero.focus();
+                  try { setFocus('hero-carousel'); } catch {}
+                  hero.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  return false;
+                }
+              } else {
+                const prevSection = allSections[currentIndex - 1];
+                const targetCard = prevSection?.querySelector('[data-focuskey*="spotlight-lead"], a[data-focuskey]') as HTMLElement | null;
+                if (targetCard) {
+                  const targetKey = targetCard.getAttribute('data-focuskey');
+                  targetCard.focus();
+                  if (targetKey) {
+                    try { setFocus(targetKey); } catch {}
+                  }
+                  targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
                   return false;
                 }
               }
-            } else if (direction === 'up' && currentIndex === 0) {
-              // If we are at the first section and press up, try to focus the hero carousel
-              setFocus('hero-carousel');
-              return false;
+            } else if (direction === 'down') {
+              if (currentIndex < allSections.length - 1) {
+                const nextSection = allSections[currentIndex + 1];
+                const targetCard = nextSection?.querySelector('[data-focuskey*="spotlight-lead"], a[data-focuskey]') as HTMLElement | null;
+                if (targetCard) {
+                  const targetKey = targetCard.getAttribute('data-focuskey');
+                  targetCard.focus();
+                  if (targetKey) {
+                    try { setFocus(targetKey); } catch {}
+                  }
+                  targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  return false;
+                }
+              }
             }
           }
         }
@@ -114,132 +125,47 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     },
     onFocus: () => {
       if (cardRef.current) {
-        cardRef.current.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        cardRef.current.scrollIntoView({ behavior: "smooth", block: "center", inline: "start" });
       }
-      handleMouseEnter();
       onFocusChange?.(index);
-    },
-    onBlur: () => {
-      handleMouseLeave();
     },
     onEnterPress: () => {
       onClick?.(item);
     }
   });
-  const setIsAnyCardHovered = usePlayerStore((s) => s.setIsAnyCardHovered);
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
 
-  // Close hover card if detail modal is opened
-  useEffect(() => {
-    if (isAssetDetailOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsHovered(false);
-      if (hoverTimerRef.current) {
-        clearTimeout(hoverTimerRef.current);
-      }
-    }
-  }, [isAssetDetailOpen]);
-
-  // Add delay for focus expansion to prevent all cards from expanding when scrolling fast
+  // Debounce expansion on focus so fast remote navigation doesn't expand intermediate cards
   useEffect(() => {
     if (focused) {
-      const timer = setTimeout(() => setIsFocusExpanded(true), 400);
+      const timer = setTimeout(() => setIsFocusExpanded(true), 350);
       return () => clearTimeout(timer);
     } else {
       setIsFocusExpanded(false);
     }
   }, [focused]);
 
-  const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // When card expands to landscape, smoothly center it in view
+  useEffect(() => {
+    if (isFocusExpanded && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, [isFocusExpanded]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setImageLoaded(false);
   }, [imageUrl]);
 
-  useEffect(() => {
-    return () => {
-      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    };
-  }, []);
-
   const handleMouseEnter = () => {
     if (isDragging || isAssetDetailOpen) return;
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-
-    if (cardRef.current) {
-      const cardRect = cardRef.current.getBoundingClientRect();
-      const containerEl = cardRef.current.closest(".overflow-x-auto");
-
-      let containerLeft = 0;
-      let containerRight = typeof window !== "undefined" ? window.innerWidth : 1920;
-
-      if (containerEl) {
-        const containerRect = containerEl.getBoundingClientRect();
-        containerLeft = containerRect.left;
-        containerRight = containerRect.right;
-
-        // 8px threshold to detect if card is cut off at the boundary
-        // Do not block hover for the first card on the left boundary
-        // or the last card on the right boundary, since they align inside the viewport.
-        const isCutLeft = index > 0 && cardRect.left < containerRect.left + 8;
-        const isCutRight = index < itemsLength - 1 && cardRect.right > containerRect.right - 8;
-
-        if (isCutLeft || isCutRight) {
-          return;
-        }
-      }
-
-      // Calculate dynamic alignment based on viewport space
-      const hoverCardWidth = config.variant === RailCardVariant.LANDSCAPE || config.variant === RailCardVariant.CONTINUE_WATCHING
-        ? (config.width === 580 ? 500 : 400) // landscape width on desktop
-        : 300; // portrait width on desktop
-
-      const spaceLeft = cardRect.left - containerLeft;
-      const spaceRight = containerRight - cardRect.right;
-      const cardWidth = cardRect.width;
-
-      const isGrid = !containerEl;
-
-      if (!isGrid && index === 0) {
-        setHoverAlignment("left");
-      } else if (!isGrid && index === itemsLength - 1) {
-        setHoverAlignment("right");
-      } else if (spaceLeft + cardWidth / 2 < hoverCardWidth / 2) {
-        setHoverAlignment("left");
-      } else if (spaceRight + cardWidth / 2 < hoverCardWidth / 2) {
-        setHoverAlignment("right");
-      } else {
-        setHoverAlignment("center");
-      }
-    }
-
-    setIsAnyCardHovered(true);
-
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    // Delay only for card-type hover (popup card needs slight pause before showing)
-    const delay = config.hover.type === "card" ? 350 : 0;
-    if (delay > 0) {
-      hoverTimerRef.current = setTimeout(() => {
-        setIsHovered(true);
-        onHoverChange?.(true);
-      }, delay);
-    } else {
-      setIsHovered(true);
-      onHoverChange?.(true);
-    }
+    setIsHovered(true);
+    onHoverChange?.(true);
   };
 
   const handleMouseLeave = () => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-
-    closeTimerRef.current = setTimeout(() => {
-      setIsAnyCardHovered(false);
-      setIsHovered(false);
-      onHoverChange?.(false);
-    }, 150); // 150ms buffer to transition mouse between card and portal
+    setIsHovered(false);
+    onHoverChange?.(false);
   };
 
   // true when hover type is "simple" — no overlay, no scale, no dim
@@ -366,26 +292,16 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   let mobileWidth = "135px";
   let mobileHeight = "203px"; // Perfect 2:3 ratio
 
-  const isExpanded = !!config?.hover?.enabled && (isHovered || isFocusExpanded) && !isAssetDetailOpen;
+  const isMixedSeries = Boolean((config as any)?.isMixedSeries);
+  const isExpanded = !isMixedSeries && !!config?.hover?.enabled && (isHovered || isFocusExpanded) && !isAssetDetailOpen;
 
-  // Accordion Inline Expansion logic for portrait cards
+  // Accordion Inline Expansion logic for portrait cards (only when not a spotlight rail)
   if (isExpanded && (config.variant === RailCardVariant.PORTRAIT || config.variant === RailCardVariant.TOP_TEN)) {
     desktopWidth = Math.round(desktopHeight * (16 / 9));
     mobileWidth = `${Math.round(parseInt(mobileHeight) * (16 / 9))}px`;
   }
 
-  const isMixedSeries = (config as any).isMixedSeries;
-
-  if (isMixedSeries) {
-    // Force both landscape and portrait to the same height (158px) in a mixed rail
-    if (config.variant === RailCardVariant.LANDSCAPE) {
-      mobileWidth = "280px";
-      mobileHeight = "158px";
-    } else {
-      mobileWidth = "105px";
-      mobileHeight = "158px"; // Same height, 2:3 ratio width
-    }
-  } else if (
+  if (
     desktopWidth >= RailCardWidth.W_580 ||
     config.variant === RailCardVariant.LANDSCAPE ||
     config.variant === RailCardVariant.CONTINUE_WATCHING
@@ -408,12 +324,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     borderRadius: config.borderRadius,
   } as React.CSSProperties;
 
-  // Spotlight rails (isMixedSeries): the visible focus ring always stays on
-  // the fixed landscape card (0), not on whichever small portrait sibling is
-  // being browsed — that sibling only drives what card 0 previews, it never
-  // shows a ring of its own.
-  const isSpotlightSibling = isMixedSeries && config.variant === RailCardVariant.PORTRAIT;
-  const showFocusRing = isSpotlightSibling ? false : focused || forceFocusRing;
+  const showFocusRing = focused || forceFocusRing || isDomFocused;
 
   const categorySlug = getContentTypeSlug(item.assetType, item.assetTypeCode);
   const slug = item.title ? slugify(item.title) : "watch";
@@ -445,6 +356,15 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       }}
       href={itemUrl}
       data-focuskey={focusKey}
+      onFocus={() => {
+        setIsDomFocused(true);
+        if (focusKeyProp) {
+          try { setFocus(focusKeyProp); } catch {}
+        }
+      }}
+      onBlur={() => {
+        setIsDomFocused(false);
+      }}
       onClick={(e) => {
         if (onClick) {
           e.preventDefault();
@@ -453,18 +373,29 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)] ${className} ${showFocusRing ? "ring-[4px] ring-white z-[99]" : ""}`}
+      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-all duration-300 ease-out w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)] ${className} ${showFocusRing ? "ring-[4px] ring-white z-30 shadow-2xl" : "scale-100"}`}
       style={{
         ...cardStyle,
-        // Elevate z-index when hovered so HoverCard renders above siblings
-        zIndex: isHovered && config.hover.enabled ? 50 : undefined,
+        zIndex: showFocusRing ? 30 : undefined,
       }}
     >
       {cardInner}
 
-      {/* Accordion Trailer Overlay */}
-      {config?.hover?.enabled && (config.variant === RailCardVariant.PORTRAIT || config.variant === RailCardVariant.TOP_TEN) && (
+      {/* Accordion Trailer Overlay (only for non-spotlight rails) */}
+      {!isMixedSeries && config?.hover?.enabled && (config.variant === RailCardVariant.PORTRAIT || config.variant === RailCardVariant.TOP_TEN) && (
         <InlineHoverTrailer item={item} isExpanded={isExpanded} />
+      )}
+
+      {/* TV Focus Ring Overlay: 4px solid white with glow, sits on top of all images/video/badges */}
+      {showFocusRing && (
+        <div
+          className="absolute inset-0 z-50 pointer-events-none transition-opacity duration-200"
+          style={{
+            borderRadius: config.borderRadius,
+            border: "4px solid #ffffff",
+            boxShadow: "0 0 25px rgba(255, 255, 255, 1), inset 0 0 10px rgba(255, 255, 255, 0.6)",
+          }}
+        />
       )}
     </a>
   );

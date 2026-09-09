@@ -16,7 +16,6 @@ export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [videoError, setVideoError] = useState(false);
-  const [shouldPassSrcNatively, setShouldPassSrcNatively] = useState(false);
   
   const isMuted = usePlayerStore((s) => s.isMuted);
 
@@ -24,7 +23,7 @@ export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps
     return item?.previewUrl || (item as any)?.preview_url || null;
   }, [item]);
 
-  const landscapeImageUrl = item?.posterImage || item?.landscapeImage || item?.image;
+  const landscapeImageUrl = item?.posterImage || item?.landscapeImage || item?.heroImage || item?.image;
 
   useEffect(() => {
     setVideoReady(false);
@@ -32,26 +31,19 @@ export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps
   }, [previewUrl, item?.id]);
 
   useEffect(() => {
-    if (!previewUrl) return;
     const video = videoRef.current;
-    const isHls = isHlsUrl(previewUrl);
-    const nativeHls = video ? video.canPlayType(VIDEO_CONSTANTS.HLS_MIME_TYPE) : false;
-    setShouldPassSrcNatively(!isHls || !!nativeHls);
-  }, [previewUrl]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !previewUrl) return;
+    if (!video || !previewUrl || !isExpanded) return;
 
     let hlsInstance: any = null;
     let playTimeout: NodeJS.Timeout | null = null;
 
-    if (isExpanded && previewUrl) {
-      const isHls = isHlsUrl(previewUrl);
-      const nativeHls = video.canPlayType(VIDEO_CONSTANTS.HLS_MIME_TYPE);
+    const isHls = isHlsUrl(previewUrl);
+    const canNativeHls = Boolean(video.canPlayType(VIDEO_CONSTANTS.HLS_MIME_TYPE));
+    const isNative = !isHls || canNativeHls;
 
-      if (isHls && !nativeHls) {
-        import("hls.js").then(({ default: Hls }) => {
+    if (isHls && !isNative) {
+      import("hls.js")
+        .then(({ default: Hls }) => {
           if (!videoRef.current) return;
           if (!Hls.isSupported()) {
             setVideoError(true);
@@ -64,7 +56,7 @@ export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps
             enableWorker: true,
           });
           hlsInstance.loadSource(previewUrl);
-          hlsInstance.attachMedia(video);
+          hlsInstance.attachMedia(videoRef.current);
 
           hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
             playTimeout = setTimeout(() => {
@@ -73,31 +65,31 @@ export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps
                   setVideoReady(true);
                 }).catch(() => {});
               }
-            }, 300);
+            }, 200);
           });
 
-          hlsInstance.on(Hls.Events.ERROR, (event: any, data: any) => {
-            if (data.fatal) {
+          hlsInstance.on(Hls.Events.ERROR, (_event: any, data: any) => {
+            if (data?.fatal) {
               setVideoError(true);
               hlsInstance?.destroy();
               hlsInstance = null;
             }
           });
+        })
+        .catch(() => {
+          setVideoError(true);
         });
-      } else {
-        playTimeout = setTimeout(() => {
-          if (videoRef.current) {
-            videoRef.current.currentTime = 0;
-            videoRef.current.play().then(() => {
-              setVideoReady(true);
-            }).catch(() => {});
-          }
-        }, 300);
-      }
     } else {
-      video.pause();
-      video.currentTime = 0;
-      setVideoReady(false);
+      video.src = previewUrl;
+      video.load();
+      playTimeout = setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.currentTime = 0;
+          videoRef.current.play().then(() => {
+            setVideoReady(true);
+          }).catch(() => {});
+        }
+      }, 200);
     }
 
     return () => {
@@ -105,6 +97,15 @@ export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps
       if (hlsInstance) {
         hlsInstance.destroy();
         hlsInstance = null;
+      }
+      if (video) {
+        video.pause();
+        try {
+          video.removeAttribute("src");
+          video.load();
+        } catch {
+          // ignore
+        }
       }
     };
   }, [isExpanded, previewUrl]);
@@ -116,14 +117,11 @@ export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps
   }, [isMuted]);
 
   return (
-    <div className={cn(
-      "absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-500 z-10",
-      isExpanded ? "opacity-100" : "opacity-0"
-    )}>
-      {/* Landscape fallback image shown before video loads */}
+    <div className="absolute inset-0 w-full h-full pointer-events-none z-10">
+      {/* Landscape image: ALWAYS visible when video is not playing */}
       <div className={cn(
         "absolute inset-0 w-full h-full transition-opacity duration-300",
-        videoReady ? "opacity-0" : "opacity-100"
+        videoReady && isExpanded ? "opacity-0" : "opacity-100"
       )}>
         {landscapeImageUrl && (
           <JOJOCommonImage
@@ -136,15 +134,15 @@ export function InlineHoverTrailer({ item, isExpanded }: InlineHoverTrailerProps
         )}
       </div>
 
-      {/* Video Player */}
-      {previewUrl && !videoError && (
+      {/* Video Player - Only mounted when card is active/expanded */}
+      {isExpanded && previewUrl && !videoError && (
         <video
           ref={videoRef}
-          src={shouldPassSrcNatively ? previewUrl : undefined}
           muted={isMuted}
           loop
           playsInline
-          preload="metadata"
+          preload="auto"
+          onPlaying={() => setVideoReady(true)}
           className={cn(
             "absolute inset-0 w-full h-full object-cover transition-opacity duration-500",
             videoReady ? "opacity-100" : "opacity-0"

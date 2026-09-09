@@ -5,11 +5,23 @@ import { init, FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-
 import { useRemoteManager } from './RemoteManager';
 import { useRemotePointer } from './PointerManager';
 
-// Initialize spatial navigation once (only on client side)
+// Initialize spatial navigation once (only on client side).
+// Debug mode (verbose console logs + on-screen focusable bounding boxes) is
+// gated behind the same flag as the on-TV DebugOverlay HUD (toggled with the
+// remote's INFO key — see RemoteManager.ts). It's read here at module-eval
+// time because `init()` only applies visualDebug once, at startup — so
+// toggling it takes effect on the next app reload, not instantly.
 if (typeof window !== 'undefined') {
+  let debugEnabled = false;
+  try {
+    debugEnabled = localStorage.getItem('jojo_debug_overlay') === '1';
+  } catch {
+    // ignore — localStorage unavailable
+  }
+
   init({
-    debug: false,
-    visualDebug: false,
+    debug: debugEnabled,
+    visualDebug: debugEnabled,
   });
 }
 

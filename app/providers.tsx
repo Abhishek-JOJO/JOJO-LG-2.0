@@ -13,6 +13,7 @@ import { MobileAccessGuard } from "@/components/common/MobileAccessGuard";
 import { VersionUpdateBanner } from "@/components/common/VersionUpdateBanner";
 import { ProductionSecurityGuard } from "@/components/security/ProductionSecurityGuard";
 import { SpatialNavigationProvider } from "@/src/navigation/SpatialNavigationProvider";
+import { DebugOverlay } from "@/components/debug/DebugOverlay";
 
 import defaultMessages from "@/messages/en.json";
 import guMessages from "@/messages/gu.json";
@@ -68,6 +69,8 @@ export function Providers({ children, locale: serverLocale = "en", isMobileServe
                     <ToastContainer />
                     {/* Version update detection — polls /api/version and auto-reloads on mismatch */}
                     <VersionUpdateBanner />
+                    {/* On-TV diagnostic HUD — toggle with the remote's INFO key. See components/debug/DebugOverlay.tsx */}
+                    <DebugOverlay />
                   </SpatialNavigationProvider>
                 </ProductionSecurityGuard>
               </AppProvider>
