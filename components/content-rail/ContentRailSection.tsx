@@ -175,12 +175,14 @@ export function ContentRailSection({
   const isSectionActive = activeSectionIndex === index;
   const hasAnyRailActive = activeSectionIndex !== null && activeSectionIndex > 0;
 
-  const isPortraitRail = !isHero && (
+  const isStandardTvRail = !isHero && (
     config.variant === RailCardVariant.SERIES_MIXED ||
     config.variant === RailCardVariant.PORTRAIT ||
-    config.variant === RailCardVariant.TOP_TEN
+    config.variant === RailCardVariant.TOP_TEN ||
+    config.variant === RailCardVariant.LANDSCAPE ||
+    config.variant === RailCardVariant.CONTINUE_WATCHING
   );
-  const railCardDesktopHeight = isPortraitRail ? "490px" : `${config.height}px`;
+  const railCardDesktopHeight = isStandardTvRail ? "490px" : `${config.height}px`;
 
   return (
     <section

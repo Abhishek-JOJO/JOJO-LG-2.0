@@ -200,10 +200,6 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     }
   }, [isFocusExpanded]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setImageLoaded(false);
-  }, [imageUrl]);
 
   const handleMouseEnter = () => {
     if (isDragging || isAssetDetailOpen) return;
@@ -269,8 +265,8 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         />
       )}
 
-      {/* Title shown while image is loading */}
-      {!((config as any)?.isMixedSeries && config.variant === RailCardVariant.LANDSCAPE) && !imageLoaded && !!imageUrl && (
+      {/* Fallback title shown only if no image URL is available */}
+      {!imageUrl && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-neutral-900 px-2 pointer-events-none select-none">
           <span className="text-[11px] sm:text-xs text-theme_1/50 font-semibold text-center line-clamp-3 leading-snug px-1">
             {item.title}

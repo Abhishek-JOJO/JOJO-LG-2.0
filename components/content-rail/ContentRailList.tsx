@@ -62,10 +62,16 @@ function renderSpotlightRailItem(
   railActive: boolean,
   onCycle: (direction: "left" | "right") => void
 ) {
+  const isContinueWatching =
+    config.variant === RailCardVariant.CONTINUE_WATCHING ||
+    Boolean((config as any)?.showProgress);
+
   if (slotIdx === 0) {
     const slot0Config: RailCardDesignConfig = {
       ...config,
-      variant: railActive ? RailCardVariant.LANDSCAPE : RailCardVariant.PORTRAIT,
+      variant: isContinueWatching
+        ? RailCardVariant.CONTINUE_WATCHING
+        : (railActive ? RailCardVariant.LANDSCAPE : RailCardVariant.PORTRAIT),
       width: (railActive ? 870.89 : 325.77) as any,
       height: 490 as any,
       borderRadius: 16,
@@ -76,8 +82,25 @@ function renderSpotlightRailItem(
         type: railActive ? "card" : "simple",
       },
       // @ts-ignore
-      isMixedSeries: true,
+      isMixedSeries: !isContinueWatching,
     };
+
+    if (isContinueWatching) {
+      return (
+        <ContinueWatchingCard
+          key={keyId}
+          {...commonProps}
+          item={effectiveItem}
+          config={slot0Config}
+          className="relative shrink-0 z-20"
+          focusKey={leadFocusKey}
+          forceFocusRing={railActive}
+          railActive={railActive}
+          onArrowLeftRight={onCycle}
+        />
+      );
+    }
+
     return (
       <LandscapeCard
         key={keyId}
@@ -95,7 +118,7 @@ function renderSpotlightRailItem(
 
   const portraitConfig: RailCardDesignConfig = {
     ...config,
-    variant: RailCardVariant.PORTRAIT,
+    variant: isContinueWatching ? RailCardVariant.CONTINUE_WATCHING : RailCardVariant.PORTRAIT,
     width: 325.77 as any,
     height: 490 as any,
     borderRadius: 16,
@@ -106,8 +129,21 @@ function renderSpotlightRailItem(
       type: "simple",
     },
     // @ts-ignore
-    isMixedSeries: true,
+    isMixedSeries: !isContinueWatching,
   };
+
+  if (isContinueWatching) {
+    return (
+      <ContinueWatchingCard
+        key={keyId}
+        {...commonProps}
+        item={effectiveItem}
+        config={portraitConfig}
+        focusable={false}
+      />
+    );
+  }
+
   return (
     <PortraitCard
       key={keyId}
@@ -156,7 +192,12 @@ export function ContentRailList({
 
   // Spotlight rail config (sticky card 0 + fixed focus cycling)
   const railInstanceId = useId();
-  const isSpotlightRail = !isHeroVariant && !isExpanded && (config.variant === RailCardVariant.SERIES_MIXED || config.variant === RailCardVariant.PORTRAIT);
+  const isSpotlightRail = !isHeroVariant && !isExpanded && (
+    config.variant === RailCardVariant.SERIES_MIXED ||
+    config.variant === RailCardVariant.PORTRAIT ||
+    config.variant === RailCardVariant.CONTINUE_WATCHING ||
+    type === ContentRailType.CONTINUE_WATCHING
+  );
   const leadFocusKey = `spotlight-lead-${railInstanceId}`;
   const [spotlightIndex, setSpotlightIndex] = useState(0);
 
@@ -465,6 +506,18 @@ export function ContentRailList({
         return <LandscapeCard key={originalItem?.id || index} {...commonProps} />;
 
       case RailCardVariant.CONTINUE_WATCHING:
+        if (isSpotlightRail) {
+          return renderSpotlightRailItem(
+            index,
+            effectiveItem,
+            `spotlight-slot-${index}`,
+            commonProps,
+            config,
+            leadFocusKey,
+            railActive,
+            handleCycle
+          );
+        }
         return <ContinueWatchingCard key={originalItem?.id || index} {...commonProps} />;
 
       case RailCardVariant.SERIES_MIXED:

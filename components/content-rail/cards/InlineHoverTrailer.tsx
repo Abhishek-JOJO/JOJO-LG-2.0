@@ -115,17 +115,19 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
 
   return (
     <div className="absolute inset-0 w-full h-full pointer-events-none z-10 bg-neutral-900 overflow-hidden">
-      {/* Landscape image: ALWAYS visible behind video */}
+      {/* Landscape image: ALWAYS visible behind video with smooth crossfade */}
       <div className="absolute inset-0 w-full h-full bg-neutral-900">
         {landscapeImageUrl && (
           <JOJOCommonImage
+            key={landscapeImageUrl}
             src={landscapeImageUrl}
             alt={item.title}
             width={isLandscape ? 870 : 580}
             height={isLandscape ? 490 : 326}
             fill
             contentMode="cover"
-            wrapperClassName="w-full h-full"
+            className="animate-ott-fade"
+            wrapperClassName="w-full h-full animate-ott-fade"
           />
         )}
       </div>
@@ -149,8 +151,10 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
       {/* Shadow overlay for text */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 via-35% to-transparent pointer-events-none" />
       
-      {/* Meta details at bottom left */}
-      <div className={`absolute flex flex-col justify-end z-20 pointer-events-none ${
+      {/* Meta details at bottom left with cinematic OTT slide-up entrance */}
+      <div
+        key={item?.id || item?.title}
+        className={`absolute flex flex-col justify-end z-20 pointer-events-none animate-ott-slide ${
         isLandscape
           ? "bottom-8 left-8 right-8"
           : "bottom-6 left-6 right-6 sm:bottom-8 sm:left-8 sm:right-8"
