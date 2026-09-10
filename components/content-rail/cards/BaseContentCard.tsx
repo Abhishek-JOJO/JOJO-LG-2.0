@@ -96,7 +96,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                   useActiveRailStore.getState().setActiveSectionIndex(0);
                   window.scrollTo({ top: 0, behavior: 'auto' });
                   hero.focus({ preventScroll: true });
-                  try { setFocus('hero-carousel'); } catch {}
+                  try { setFocus('hero-carousel'); } catch { }
                   return false;
                 }
               } else {
@@ -107,14 +107,14 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                   const sIndex = prevSection.getAttribute('data-section-index');
                   useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex - 1);
                   const sectionRect = prevSection.getBoundingClientRect();
-                  const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95);
+                  const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105);
                   window.scrollTo({
                     top: targetTop,
                     behavior: 'auto'
                   });
                   targetCard.focus({ preventScroll: true });
                   if (targetKey) {
-                    try { setFocus(targetKey); } catch {}
+                    try { setFocus(targetKey); } catch { }
                   }
                   return false;
                 }
@@ -128,14 +128,14 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                   const sIndex = nextSection.getAttribute('data-section-index');
                   useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex + 1);
                   const sectionRect = nextSection.getBoundingClientRect();
-                  const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95);
+                  const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105);
                   window.scrollTo({
                     top: targetTop,
                     behavior: 'auto'
                   });
                   targetCard.focus({ preventScroll: true });
                   if (targetKey) {
-                    try { setFocus(targetKey); } catch {}
+                    try { setFocus(targetKey); } catch { }
                   }
                   return false;
                 }
@@ -161,9 +161,9 @@ export const BaseContentCard = React.memo(function BaseContentCard({
             }
           }
           const sectionRect = currentSection.getBoundingClientRect();
-          if (Math.abs(sectionRect.top - 95) > 35) {
+          if (Math.abs(sectionRect.top - 105) > 35) {
             window.scrollTo({
-              top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95),
+              top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105),
               behavior: 'auto'
             });
           }
@@ -292,11 +292,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       {/* TOP 10 Badge */}
       {config?.variant !== RailCardVariant?.TOP_TEN && item?.isTop10 && (
         <div
-          className={`absolute top-0 left-0 z-30 flex font-bold flex-col items-center leading-none text-theme_1 ${
-            isLandscapeCard
-              ? "px-3.5 pt-2.5 pb-2 rounded-br-2xl shadow-xl"
-              : "px-1.5 pt-1 rounded-br-md"
-          }`}
+          className={`absolute top-0 left-0 z-30 flex font-bold flex-col items-center leading-none text-theme_1 ${isLandscapeCard
+            ? "px-3.5 pt-2.5 pb-2 rounded-br-2xl shadow-xl"
+            : "px-1.5 pt-1 rounded-br-md"
+            }`}
           style={{ background: "var(--theme_13_samecolour)" }}
         >
           <span
@@ -322,15 +321,13 @@ export const BaseContentCard = React.memo(function BaseContentCard({
 
       {config?.showBadge && item?.asset_tags_badgeText && (
         <div
-          className={`absolute bottom-0 left-1/2 -translate-x-1/2 text-center uppercase z-30 font-bold transition-all duration-300 ${
-            isLandscapeCard
-              ? "w-[170px] sm:w-[210px] text-xs sm:text-sm tracking-wider py-1 sm:py-1.5 rounded-t-lg shadow-lg"
-              : "w-[110px] text-[11px] tracking-wide py-0.5 rounded-t-md"
-          } ${
-            item?.isPremium
+          className={`absolute bottom-0 left-1/2 -translate-x-1/2 text-center uppercase z-30 font-bold transition-all duration-300 ${isLandscapeCard
+            ? "w-[170px] sm:w-[210px] text-xs sm:text-sm tracking-wider py-1 sm:py-1.5 rounded-t-lg shadow-lg"
+            : "w-[110px] text-[11px] tracking-wide py-0.5 rounded-t-md"
+            } ${item?.isPremium
               ? "premium-badge-bg shadow-md shadow-amber-500/20 !text-black"
               : "bg-theme_13_samecolour text-white"
-          }`}
+            }`}
         >
           {item?.asset_tags_badgeText}
         </div>
@@ -339,11 +336,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       {/* Crown badge for premium items */}
       {item.isSVOD && (
         <div
-          className={`absolute z-20 flex items-center justify-center rounded-full bg-theme_11_60 transition-transform duration-300 group-hover:scale-110 shadow-md ${
-            isLandscapeCard
-              ? "top-3 right-3 sm:top-4 sm:right-4 h-10 w-10 sm:h-11 sm:w-11"
-              : "top-2 right-2 h-6 w-6"
-          }`}
+          className={`absolute z-20 flex items-center justify-center rounded-full bg-theme_11_60 transition-transform duration-300 group-hover:scale-110 shadow-md ${isLandscapeCard
+            ? "top-3 right-3 sm:top-4 sm:right-4 h-10 w-10 sm:h-11 sm:w-11"
+            : "top-2 right-2 h-6 w-6"
+            }`}
         >
           <div className={`relative ${isLandscapeCard ? "w-5.5 h-5.5 sm:w-6 sm:h-6" : "w-3 h-3"}`}>
             <JOJOCommonImage
@@ -358,11 +354,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       )}
       {item.isTVOD && (
         <div
-          className={`absolute z-20 flex items-center justify-center rounded-full bg-theme_11_60 transition-transform duration-300 group-hover:scale-110 shadow-md ${
-            isLandscapeCard
-              ? "top-3 right-3 sm:top-4 sm:right-4 h-10 w-10 sm:h-11 sm:w-11"
-              : "top-2 right-2 h-6 w-6"
-          }`}
+          className={`absolute z-20 flex items-center justify-center rounded-full bg-theme_11_60 transition-transform duration-300 group-hover:scale-110 shadow-md ${isLandscapeCard
+            ? "top-3 right-3 sm:top-4 sm:right-4 h-10 w-10 sm:h-11 sm:w-11"
+            : "top-2 right-2 h-6 w-6"
+            }`}
         >
           <TvodIcon
             size={isLandscapeCard ? 24 : 15}
@@ -443,7 +438,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       onFocus={() => {
         setIsDomFocused(true);
         if (focusKeyProp) {
-          try { setFocus(focusKeyProp); } catch {}
+          try { setFocus(focusKeyProp); } catch { }
         }
       }}
       onBlur={() => {

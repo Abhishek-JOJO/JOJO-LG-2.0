@@ -192,23 +192,21 @@ export function ContentRailSection({
     <section
       ref={sectionRef}
       data-section-index={index}
-      className={`${isHero ? "mb-10 w-full" : "mb-10 w-full"} relative transition-opacity duration-300 ease-out ${
-        !isHero && hasAnyRailActive
-          ? isSectionActive
-            ? "opacity-100 z-20"
-            : "opacity-35 z-10"
-          : "opacity-100"
-      }`}
+      className={`${isHero ? "mb-10 w-full" : "mb-10 w-full"} relative transition-opacity duration-300 ease-out ${!isHero && hasAnyRailActive
+        ? isSectionActive
+          ? "opacity-100 z-20"
+          : "opacity-35 z-10"
+        : "opacity-100"
+        }`}
       style={{
-        scrollMarginTop: "95px",
+        scrollMarginTop: "105px",
       }}
     >
       {!isHero && (
         <div className="relative z-50 flex items-center justify-between w-full px-6 sm:px-12 lg:px-16 mb-3">
           <h2
-            className={`text-xl sm:text-2xl font-bold transition-colors duration-300 ${
-              hasAnyRailActive && !isSectionActive ? "text-white/40" : "text-white"
-            }`}
+            className={`text-xl sm:text-2xl font-bold transition-colors duration-300 ${hasAnyRailActive && !isSectionActive ? "text-white/40" : "text-white"
+              }`}
           >
             {cr_title}
           </h2>

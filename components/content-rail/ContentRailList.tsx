@@ -141,8 +141,8 @@ function renderSpotlightRailItem(
     variant: isContinueWatching
       ? RailCardVariant.CONTINUE_WATCHING
       : isTopTen
-      ? RailCardVariant.TOP_TEN
-      : RailCardVariant.PORTRAIT,
+        ? RailCardVariant.TOP_TEN
+        : RailCardVariant.PORTRAIT,
     width: 325.77 as any,
     height: 490 as any,
     borderRadius: 16,
@@ -329,10 +329,10 @@ export function ContentRailList({
           navLink.focus();
           const targetKey = navLink.getAttribute('data-focuskey');
           if (targetKey) {
-            try { setFocus(targetKey); } catch {}
+            try { setFocus(targetKey); } catch { }
           }
         } else {
-          try { setFocus('nav-link-0'); } catch {}
+          try { setFocus('nav-link-0'); } catch { }
         }
         return false;
       }
@@ -350,7 +350,7 @@ export function ContentRailList({
             const sIndex = currentSection.getAttribute('data-section-index');
             useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : 1);
             const rect = currentSection.getBoundingClientRect();
-            const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + rect.top - 95);
+            const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + rect.top - 105);
             window.scrollTo({
               top: targetTop,
               behavior: 'auto'
@@ -358,7 +358,7 @@ export function ContentRailList({
           }
           firstCardBelowHero.focus({ preventScroll: true });
           if (targetFocusKey) {
-            try { setFocus(targetFocusKey); } catch {}
+            try { setFocus(targetFocusKey); } catch { }
           }
           return false;
         }

@@ -49,9 +49,9 @@ export function GenreCard({
             useActiveRailStore.getState().setActiveSectionIndex(Number(sIndex));
           }
           const sectionRect = currentSection.getBoundingClientRect();
-          if (Math.abs(sectionRect.top - 95) > 35) {
+          if (Math.abs(sectionRect.top - 105) > 35) {
             window.scrollTo({
-              top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95),
+              top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105),
               behavior: "auto",
             });
           }
@@ -69,7 +69,7 @@ export function GenreCard({
             window.scrollTo({ top: 0, behavior: "auto" });
             const hero = document.getElementById("hero-carousel-container");
             hero?.focus({ preventScroll: true });
-            try { setFocus("hero-carousel"); } catch {}
+            try { setFocus("hero-carousel"); } catch { }
             useActiveRailStore.getState().setActiveSectionIndex(0);
             return false;
           } else {
@@ -83,12 +83,12 @@ export function GenreCard({
               useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex - 1);
               const sectionRect = prevSection.getBoundingClientRect();
               window.scrollTo({
-                top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95),
+                top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105),
                 behavior: "auto",
               });
               targetCard.focus({ preventScroll: true });
               if (targetKey) {
-                try { setFocus(targetKey); } catch {}
+                try { setFocus(targetKey); } catch { }
               }
               return false;
             }
@@ -110,12 +110,12 @@ export function GenreCard({
               useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex + 1);
               const sectionRect = nextSection.getBoundingClientRect();
               window.scrollTo({
-                top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95),
+                top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105),
                 behavior: "auto",
               });
               targetCard.focus({ preventScroll: true });
               if (targetKey) {
-                try { setFocus(targetKey); } catch {}
+                try { setFocus(targetKey); } catch { }
               }
               return false;
             }
@@ -172,11 +172,10 @@ export function GenreCard({
       tabIndex={focusable ? 0 : -1}
       data-focuskey={effectiveFocusKey}
       onClick={handleClick}
-      className={`group relative shrink-0 overflow-hidden text-left transition-all duration-200 cursor-pointer select-none w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)] ${className} ${
-        focused
-          ? "ring-[4px] ring-white scale-105 z-[99] shadow-2xl"
-          : "hover:scale-[1.02] opacity-95"
-      }`}
+      className={`group relative shrink-0 overflow-hidden text-left transition-all duration-200 cursor-pointer select-none w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)] ${className} ${focused
+        ? "ring-[4px] ring-white scale-105 z-[99] shadow-2xl"
+        : "hover:scale-[1.02] opacity-95"
+        }`}
       style={cardStyle}
     >
       {hasImage && (
@@ -201,9 +200,8 @@ export function GenreCard({
 
       {/* Visible Genre Title */}
       <h3
-        className={`absolute bottom-2 left-3 sm:bottom-3 sm:left-4 z-20 font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] line-clamp-1 ${
-          fullWidth ? "text-base sm:text-2xl" : "text-sm sm:text-lg lg:text-xl"
-        }`}
+        className={`absolute bottom-2 left-3 sm:bottom-3 sm:left-4 z-20 font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] line-clamp-1 ${fullWidth ? "text-base sm:text-2xl" : "text-sm sm:text-lg lg:text-xl"
+          }`}
       >
         {item.title}
       </h3>
