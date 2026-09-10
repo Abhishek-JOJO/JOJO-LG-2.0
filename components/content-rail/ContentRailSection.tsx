@@ -59,7 +59,7 @@ export function ContentRailSection({
   const t = useTranslations("contentRails");
   const router = useRouter();
 
-  const { items, isLoadingMore, loadNextPage } = useRailItems(
+  const { items, isLoadingMore, loadNextPage, hasMore } = useRailItems(
     railId,
     initialItems,
     totalPages,
@@ -232,6 +232,8 @@ export function ContentRailSection({
           isLoadingMore={isLoadingMore}
           isFirstContentRail={isFirstContentRail}
           onArrowUpDown={onArrowUpDown}
+          hasMore={hasMore}
+          loadNextPage={loadNextPage}
         />
       </div>
     </section>

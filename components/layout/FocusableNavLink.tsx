@@ -86,11 +86,11 @@ export const FocusableNavLink = React.memo(({
       transition={{ type: "spring", stiffness: 450, damping: 30 }}
       className="relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none"
     >
-      {/* Netflix-style smooth sliding focus pill */}
+      {/* Clean solid sliding focus pill — no glow/bloom, matches standard OTT nav styling */}
       {focused && (
         <motion.div
           layoutId="navbarFocusPill"
-          className="absolute inset-0 bg-white rounded-full shadow-[0_0_22px_rgba(255,255,255,0.75)] border-2 border-white z-0"
+          className="absolute inset-0 bg-white rounded-full z-0"
           transition={{ type: "spring", stiffness: 450, damping: 32 }}
         />
       )}
@@ -99,7 +99,7 @@ export const FocusableNavLink = React.memo(({
       {!focused && isItemActive && (
         <motion.div
           layoutId="navbarActivePill"
-          className="absolute inset-0 bg-white/20 backdrop-blur-md rounded-full border border-white/20 z-0"
+          className="absolute inset-0 bg-white/15 rounded-full border border-white/25 z-0"
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
         />
       )}

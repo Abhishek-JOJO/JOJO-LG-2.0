@@ -35,6 +35,10 @@ interface ContentRailListProps {
   isLoadingMore?: boolean;
   isFirstContentRail?: boolean;
   onArrowUpDown?: (direction: "up" | "down") => boolean | void;
+  /** Whether this rail has more pages left to fetch from the API — used to prefetch page N+1 ahead of the user reaching the end via remote navigation. */
+  hasMore?: boolean;
+  /** Fetches the next page of this rail's items; safe to call repeatedly (no-ops while a fetch is already in flight). */
+  loadNextPage?: () => void;
 }
 
 interface SpotlightCommonProps {
@@ -190,6 +194,8 @@ export function ContentRailList({
   isLoadingMore = false,
   isFirstContentRail = false,
   onArrowUpDown,
+  hasMore = false,
+  loadNextPage,
 }: ContentRailListProps) {
   const [virtualIndex, setVirtualIndex] = useState(0);
   const activeIndex = items?.length ? ((virtualIndex % items.length) + items.length) % items.length : 0;
@@ -268,6 +274,16 @@ export function ContentRailList({
       }
     });
   }, [isSpotlightRail, items, spotlightIndex]);
+
+  // Fetch the next page of this rail's items well before the user reaches the end of what's
+  // already loaded, so cycling Right (even held down, repeat-firing every ~100-150ms on a TV
+  // remote) never outruns a pagination request — mirrors the rail (row) pagination lookahead.
+  useEffect(() => {
+    if (!isSpotlightRail || !hasMore || !loadNextPage || !items?.length) return;
+    if (spotlightIndex >= items.length - 10) {
+      loadNextPage();
+    }
+  }, [isSpotlightRail, hasMore, loadNextPage, items?.length, spotlightIndex]);
 
 
   const { ref: railBoundaryRef, focusKey: railBoundaryFocusKey, hasFocusedChild: railActive } = useFocusable({
@@ -416,7 +432,7 @@ export function ContentRailList({
         ref={focusKeyRef}
         data-focuskey={focusKey}
         tabIndex={0}
-        className={`relative overflow-hidden w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)] lg:w-[calc(100%-8rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] shadow-[0_20px_50px_rgba(0,0,0,0.95)] transition-all duration-300 ${focused ? "ring-[4px] ring-white z-[99] border-white" : "border-white/10"}`}
+        className={`relative overflow-hidden w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)] lg:w-[calc(100%-8rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] shadow-[0_20px_50px_rgba(0,0,0,0.95)] transition-all duration-300 ${focused ? "z-[99] border-white" : "border-white/10"}`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -471,13 +487,12 @@ export function ContentRailList({
           </div>
         )}
 
-        {/* TV Focus Ring Overlay for Hero Slider */}
+        {/* TV Focus Ring Overlay for Hero Slider: clean solid white border, no glow/bloom */}
         {focused && (
           <div
             className="absolute inset-0 z-[110] pointer-events-none rounded-[32px]"
             style={{
-              border: "4px solid #ffffff",
-              boxShadow: "0 0 25px rgba(255, 255, 255, 0.95), inset 0 0 10px rgba(255, 255, 255, 0.4)",
+              border: "3px solid #ffffff",
             }}
           />
         )}

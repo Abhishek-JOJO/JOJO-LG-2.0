@@ -456,7 +456,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-all duration-300 ease-out w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)] ${className} ${showFocusRing ? "ring-[4px] ring-white z-30 shadow-2xl" : "scale-100"}`}
+      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-all duration-300 ease-out w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)] ${className} ${showFocusRing ? "z-30 shadow-2xl" : "scale-100"}`}
       style={{
         ...cardStyle,
         zIndex: showFocusRing ? 30 : undefined,
@@ -469,14 +469,13 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         <InlineHoverTrailer item={item} isExpanded={isExpanded} />
       )}
 
-      {/* TV Focus Ring Overlay: 4px solid white with glow, sits on top of all images/video/badges */}
+      {/* TV Focus Ring Overlay: clean solid white border, no glow/bloom — sits on top of all images/video/badges */}
       {showFocusRing && (
         <div
           className="absolute inset-0 z-50 pointer-events-none transition-opacity duration-200"
           style={{
             borderRadius: `${config.borderRadius || 16}px`,
-            border: "4px solid #ffffff",
-            boxShadow: "0 0 25px rgba(255, 255, 255, 1), inset 0 0 10px rgba(255, 255, 255, 0.6)",
+            border: "3px solid #ffffff",
           }}
         />
       )}

@@ -238,7 +238,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
           ref={focusableRef as any}
           onClick={toggleDropdown}
           className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full border-2 border-[#FF6B00] bg-gradient-to-br from-[#FF6B00]/40 to-amber-500/20 ${
-            focused ? "scale-110 ring-4 ring-white shadow-[0_0_16px_rgba(255,255,255,0.7)]" : "hover:scale-105"
+            focused ? "scale-110 ring-4 ring-white" : "hover:scale-105"
           }`}
           aria-label="Profile Menu"
         >

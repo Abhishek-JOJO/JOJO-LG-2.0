@@ -331,12 +331,26 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     return true;
   }, [contentRails.length, isFirstHero]);
 
-  // Infinite pagination when reaching near end of rails
+  // Prefetch the next page of rails well before the user can reach the end, so a fast/held-down
+  // ArrowDown never outruns the network request and shows the loading spinner. A TV remote can
+  // repeat-fire every ~100-150ms, but a rails page fetch (20 rails' worth of items) can easily take
+  // 1-2s+ on TV hardware/network — a 3-rail buffer gives far less lead time than that requires, so
+  // trigger with a much larger margin (half a page) instead of waiting until the user is nearly there.
+  const RAIL_PAGINATION_LOOKAHEAD = 10;
   useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage && safeActiveRailIndex >= contentRails.length - 3) {
+    if (hasNextPage && !isFetchingNextPage && safeActiveRailIndex >= contentRails.length - RAIL_PAGINATION_LOOKAHEAD) {
       fetchNextPage();
     }
   }, [hasNextPage, isFetchingNextPage, safeActiveRailIndex, contentRails.length, fetchNextPage]);
+
+  // Covers the fastest-possible case (rapid ArrowDown from the very start of a small rail set):
+  // kick off page 2 the moment page 1 finishes loading, without waiting on scroll position at all.
+  // Only fires once — subsequent pages are handled by the lookahead effect above.
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && !isFetching && responsePages.length === 1) {
+      fetchNextPage();
+    }
+  }, [responsePages.length, hasNextPage, isFetchingNextPage, isFetching, fetchNextPage]);
 
   // Ahead-of-time preloading of upcoming rails' lead card images, logos, and side portrait cards
   // Ensures 0ms latency and instant data filling with zero delay on ArrowDown
