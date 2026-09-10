@@ -6,6 +6,7 @@ import { RailCardDesignConfig } from "../config/contentRail.config";
 import { BaseContentCard } from "./BaseContentCard";
 import { GenreCard } from "./GenreCard";
 import { InlineHoverTrailer } from "./InlineHoverTrailer";
+import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
 
 interface Props {
   item: ContentRailItem;
@@ -48,6 +49,8 @@ export const LandscapeCard = React.memo(function LandscapeCard({
         config={config}
         onClick={handleClick}
         className={className}
+        focusKey={focusKey}
+        index={index}
       />
     );
   }
@@ -78,9 +81,22 @@ export const LandscapeCard = React.memo(function LandscapeCard({
       onArrowUpDown={onArrowUpDown}
     >
       {/* Title & Metadata overlay for standard landscape cards */}
-      {!isMixedSeries && (config?.hover?.showTitle || item?.title) && (
+      {!isMixedSeries && (config?.hover?.showTitle || item?.title || item?.title_image) && (
         <div className="absolute bottom-0 left-0 right-0 z-20 p-3 bg-gradient-to-t from-black/85 via-black/30 to-transparent text-left pointer-events-none">
-          {item?.title && (
+          {item?.title_image ? (
+            <div className="relative w-[180px] h-[50px] mb-1 flex justify-start items-end">
+              <JOJOCommonImage
+                src={item.title_image}
+                alt={item.title}
+                fill
+                contentMode="contain"
+                position="left"
+                style={{ objectPosition: "left bottom" }}
+                optimizeRequestURL={false}
+                wrapperClassName="w-full h-full drop-shadow-[0_0_10px_rgba(0,0,0,0.8)]"
+              />
+            </div>
+          ) : item?.title && (
             <h3 className="line-clamp-1 text-sm font-semibold text-white drop-shadow-md">
               {item.title}
             </h3>
@@ -93,8 +109,8 @@ export const LandscapeCard = React.memo(function LandscapeCard({
         </div>
       )}
 
-      {/* Spotlight lead card: mounts InlineHoverTrailer only when rail is active */}
-      {isMixedSeries && railActive && (
+      {/* Spotlight lead card: mounts InlineHoverTrailer */}
+      {isMixedSeries && (
         <InlineHoverTrailer item={item} isExpanded={Boolean(railActive || forceFocusRing)} isLandscape />
       )}
     </BaseContentCard>

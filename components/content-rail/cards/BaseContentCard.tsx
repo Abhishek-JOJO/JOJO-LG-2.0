@@ -9,8 +9,6 @@ import { RailCardDesignConfig, RailCardWidth } from "../config/contentRail.confi
 import { LOGOS } from "@/lib/constants/assets";
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
-import { extractDominantAmbientColor } from "@/lib/utils/colorExtractor";
-import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 
 interface BaseContentCardProps {
   item: ContentRailItem;
@@ -96,14 +94,14 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                 const hero = document.getElementById('hero-carousel-container');
                 if (hero) {
                   useActiveRailStore.getState().setActiveSectionIndex(0);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  window.scrollTo({ top: 0, behavior: 'auto' });
                   hero.focus({ preventScroll: true });
                   try { setFocus('hero-carousel'); } catch {}
                   return false;
                 }
               } else {
                 const prevSection = allSections[currentIndex - 1];
-                const targetCard = prevSection?.querySelector('[data-focuskey*="spotlight-lead"], a[data-focuskey]') as HTMLElement | null;
+                const targetCard = prevSection?.querySelector('[data-focuskey*="spotlight-lead"], [data-focuskey]') as HTMLElement | null;
                 if (targetCard) {
                   const targetKey = targetCard.getAttribute('data-focuskey');
                   const sIndex = prevSection.getAttribute('data-section-index');
@@ -112,7 +110,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                   const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95);
                   window.scrollTo({
                     top: targetTop,
-                    behavior: 'smooth'
+                    behavior: 'auto'
                   });
                   targetCard.focus({ preventScroll: true });
                   if (targetKey) {
@@ -124,7 +122,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
             } else if (direction === 'down') {
               if (currentIndex < allSections.length - 1) {
                 const nextSection = allSections[currentIndex + 1];
-                const targetCard = nextSection?.querySelector('[data-focuskey*="spotlight-lead"], a[data-focuskey]') as HTMLElement | null;
+                const targetCard = nextSection?.querySelector('[data-focuskey*="spotlight-lead"], [data-focuskey]') as HTMLElement | null;
                 if (targetCard) {
                   const targetKey = targetCard.getAttribute('data-focuskey');
                   const sIndex = nextSection.getAttribute('data-section-index');
@@ -133,7 +131,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                   const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95);
                   window.scrollTo({
                     top: targetTop,
-                    behavior: 'smooth'
+                    behavior: 'auto'
                   });
                   targetCard.focus({ preventScroll: true });
                   if (targetKey) {
@@ -163,10 +161,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
             }
           }
           const sectionRect = currentSection.getBoundingClientRect();
-          if (Math.abs(sectionRect.top - 95) > 25) {
+          if (Math.abs(sectionRect.top - 95) > 35) {
             window.scrollTo({
               top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 95),
-              behavior: 'smooth'
+              behavior: 'auto'
             });
           }
         }
@@ -179,35 +177,25 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   });
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
 
-  // Debounce expansion & ambient color extraction on focus (180ms)
+  // Debounce expansion on focus (180ms)
   // so fast remote navigation stays at 60fps without lag or trailer churn
   useEffect(() => {
     if (focused) {
       const timer = setTimeout(() => {
         setIsFocusExpanded(true);
-        const ambientImg =
-          item?.landscapeImage ||
-          item?.heroImage ||
-          item?.posterImage ||
-          item?.image;
-        if (ambientImg) {
-          extractDominantAmbientColor(ambientImg).then((color) => {
-            useAmbientTintStore.getState().setAmbientColor(color);
-          });
-        }
       }, 180);
       return () => clearTimeout(timer);
     } else {
       setIsFocusExpanded(false);
     }
-  }, [focused, item]);
+  }, [focused]);
 
   const isMixedSeries = Boolean((config as any)?.isMixedSeries);
 
-  // When card expands to landscape, smoothly center it in view (only for non-spotlight accordion cards)
+  // When card expands to landscape, center it in view (only for non-spotlight accordion cards)
   useEffect(() => {
     if (isFocusExpanded && cardRef.current && !isMixedSeries && config.variant !== RailCardVariant.LANDSCAPE && config.variant !== RailCardVariant.CONTINUE_WATCHING) {
-      cardRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      cardRef.current.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
     }
   }, [isFocusExpanded, isMixedSeries, config.variant]);
 

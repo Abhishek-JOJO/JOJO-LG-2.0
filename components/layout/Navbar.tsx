@@ -182,12 +182,15 @@ export function Navbar() {
 
   return (
     <header
-      className="z-[999] overflow-visible transition-all duration-500 sticky top-0 left-0 right-0 w-full"
+      className={`z-[999] overflow-visible transition-colors duration-300 sticky top-0 left-0 right-0 w-full ${
+        isScrolled
+          ? "bg-[#050505]/95 shadow-2xl"
+          : "bg-transparent shadow-none"
+      }`}
       style={{
-        background: "transparent",
-        WebkitBackdropFilter: "none",
-        backdropFilter: "none",
-        boxShadow: "none",
+        background: isScrolled ? "rgba(5, 5, 5, 0.95)" : "transparent",
+        boxShadow: isScrolled ? "0 10px 30px rgba(0, 0, 0, 0.9)" : "none",
+        borderBottom: "none",
       }}
     >
 

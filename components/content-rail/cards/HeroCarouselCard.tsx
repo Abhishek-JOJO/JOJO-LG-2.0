@@ -17,7 +17,6 @@ import { TvodIcon } from "@/public/svg/TVODIcon";
 import { useAuthStore } from "@/store/useAuthStore";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useSessionExpiredStore } from "@/store/useSessionExpiredStore";
-import { motion, useScroll, useTransform } from "framer-motion";
 import { Check, Play, Plus, Share2, Volume2, VolumeX } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -156,12 +155,6 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
   const [isIntersecting, setIsIntersecting] = useState(false);
   const wasActiveRef = useRef(false);
 
-  const { scrollY } = useScroll();
-  const bgY = useTransform(scrollY, (value) => {
-    if (!isActive) return 0;
-    return Math.max(0, value);
-  });
-  const bgOpacity = useTransform(scrollY, [0, 500], [1, 0]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -277,9 +270,8 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
       onClick={onClick}
       className={`relative shrink-0 w-full h-full overflow-hidden bg-neutral-950`}
     >
-      {/* Sticky background wrapper */}
-      <motion.div
-        style={{ y: bgY, opacity: bgOpacity }}
+      {/* Background wrapper */}
+      <div
         className="absolute inset-0 w-full h-full z-0 pointer-events-none"
       >
         {/* Background preview video — right-aligned, 80% visible, never cropped at any breakpoint */}
@@ -328,7 +320,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
         </div>
         {/* We keep a subtle left shadow just for text readability if needed, but Hotstar relies more on bottom shadow */}
         <div className={`absolute inset-y-0 left-0 w-full sm:w-[50%] md:w-[45%] lg:w-[40%] xl:w-[35%] bg-gradient-to-r from-black/80 via-black/40 to-transparent z-10 pointer-events-none transition-opacity duration-700 ${isActive ? "opacity-100" : "opacity-0"}`} />
-      </motion.div>
+      </div>
       
       {/* Hotstar Bottom Gradient */}
       <div className={`absolute inset-x-0 bottom-0 h-[60%] sm:h-[50%] bg-gradient-to-t from-black via-black/80 to-transparent z-10 pointer-events-none transition-opacity duration-700 ${isActive ? "opacity-100" : "opacity-0"}`} />

@@ -167,13 +167,13 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
       {/* Meta details at bottom left with cinematic OTT slide-up entrance */}
       <div
         key={item?.id || item?.title}
-        className={`absolute flex flex-col justify-end z-20 pointer-events-none animate-ott-slide ${
+        className={`absolute flex flex-col justify-end items-start text-left z-20 pointer-events-none animate-ott-slide ${
         isLandscape
           ? "bottom-8 left-8 right-8"
           : "bottom-6 left-6 right-6 sm:bottom-8 sm:left-8 sm:right-8"
       }`}>
         {item?.title_image ? (
-          <div className={`relative mb-3 ${
+          <div className={`relative mb-3 flex justify-start items-end ${
             isLandscape
               ? "w-[280px] h-[90px]"
               : "w-[160px] sm:w-[220px] lg:w-[280px] h-[50px] sm:h-[65px] lg:h-[80px]"
@@ -183,19 +183,21 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
               alt={item.title}
               fill
               contentMode="contain"
+              position="left"
+              style={{ objectPosition: "left bottom" }}
               optimizeRequestURL={false}
-              wrapperClassName="w-full h-full object-contain object-left-bottom origin-bottom-left"
+              wrapperClassName="w-full h-full drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]"
             />
           </div>
         ) : (
-          <h3 className={`text-white font-extrabold line-clamp-1 drop-shadow-lg mb-2 ${
+          <h3 className={`text-white font-extrabold line-clamp-1 drop-shadow-lg mb-2 text-left ${
             isLandscape ? "text-3xl" : "text-xl sm:text-2xl"
           }`}>
             {item.title}
           </h3>
         )}
         {item.genres && item.genres.length > 0 && (
-          <span className={`text-white/90 font-semibold truncate drop-shadow-md ${
+          <span className={`text-white/90 font-semibold truncate drop-shadow-md text-left ${
             isLandscape ? "text-base" : "text-sm sm:text-base"
           }`}>
             {item.genres.join(" • ")}

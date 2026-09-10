@@ -13,6 +13,7 @@ import { HeroCarouselCard } from "./cards/HeroCarouselCard";
 import { LandscapeCard } from "./cards/LandscapeCard";
 import { PortraitCard } from "./cards/PortraitCard";
 import { ContinueWatchingCard } from "./cards/ContinueWatchingCard";
+import { GenreCard } from "./cards/GenreCard";
 import { RailCardAspectRatio, RailCardDesignConfig, RailCardHeight, RailCardWidth } from "./config/contentRail.config";
 import { ContentRailItem, ContentRailType, RailCardVariant } from "./config/contentRail.types";
 import { usePlayerStore } from "@/store/usePlayerStore";
@@ -216,8 +217,8 @@ export function ContentRailList({
   }, [isHeroVariant, items, activeIndex]);
 
   // Spotlight rail config (sticky card 0 + fixed focus cycling)
-  // ONLY enabled for the single active spotlight rail (isFirstContentRail)
-  const isSpotlightRail = !isHeroVariant && !isExpanded && Boolean(isFirstContentRail);
+  // ONLY enabled for the single active spotlight rail (isFirstContentRail, never for Genre)
+  const isSpotlightRail = !isHeroVariant && !isExpanded && Boolean(isFirstContentRail) && config?.variant !== RailCardVariant.GENRE && type !== ContentRailType.GENRE;
   const leadFocusKey = "spotlight-lead-fixed";
   const [spotlightIndex, setSpotlightIndex] = useState(0);
   const [cycleDirection, setCycleDirection] = useState<"left" | "right">("right");
@@ -241,21 +242,6 @@ export function ContentRailList({
     }
   }, [isSpotlightRail, spotlightIndex, listRef]);
 
-  // Ambient tint: also update when spotlight rail cycles its active item
-  useEffect(() => {
-    if (isHeroVariant || !isSpotlightRail || !items?.length) return;
-    const activeItem = items[spotlightIndex % items.length];
-    const imageUrl =
-      activeItem?.heroImage ||
-      activeItem?.landscapeImage ||
-      activeItem?.posterImage ||
-      activeItem?.image;
-    if (imageUrl) {
-      extractDominantAmbientColor(imageUrl).then((color) => {
-        useAmbientTintStore.getState().setAmbientColor(color);
-      });
-    }
-  }, [isHeroVariant, isSpotlightRail, items, spotlightIndex]);
 
   const { ref: railBoundaryRef, focusKey: railBoundaryFocusKey, hasFocusedChild: railActive } = useFocusable({
     focusable: false,
@@ -354,8 +340,8 @@ export function ContentRailList({
         // Always focus the 1st card in the content section directly below hero carousel (Section 1)
         const firstCardBelowHero = (
           document.querySelector('section[data-section-index="1"] [data-focuskey*="spotlight-lead"]') ||
-          document.querySelector('section[data-section-index="1"] a[data-focuskey]') ||
-          document.querySelector('section:not(:first-child) a[data-focuskey]')
+          document.querySelector('section[data-section-index="1"] [data-focuskey]') ||
+          document.querySelector('section:not(:first-child) [data-focuskey]')
         ) as HTMLElement | null;
         if (firstCardBelowHero) {
           const targetFocusKey = firstCardBelowHero.getAttribute('data-focuskey');
@@ -367,7 +353,7 @@ export function ContentRailList({
             const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + rect.top - 95);
             window.scrollTo({
               top: targetTop,
-              behavior: 'smooth'
+              behavior: 'auto'
             });
           }
           firstCardBelowHero.focus({ preventScroll: true });
@@ -389,7 +375,7 @@ export function ContentRailList({
       setIsAutoplayPaused(true);
       useActiveRailStore.getState().setActiveSectionIndex(0);
       if (typeof window !== "undefined") {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: "auto" });
       }
     }
   });
@@ -573,11 +559,14 @@ export function ContentRailList({
 
       case RailCardVariant.GENRE:
         return (
-          <PortraitCard
+          <GenreCard
             key={originalItem?.id || index}
-            {...commonProps}
-            config={standardCardConfig}
-            focusable={false}
+            item={originalItem}
+            config={config}
+            index={index}
+            focusKey={`genre-${originalItem?.id || (originalItem as any)?.slug || index}`}
+            focusable={true}
+            onClick={() => handleItemClick(originalItem)}
           />
         );
 

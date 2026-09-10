@@ -245,10 +245,22 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     return responseData?.content_rail_items || [];
   });
 
+  const isHomePage = pathname === ROUTES.HOME || pathname === ROUTES.HOMEPAGE || pathname === "/" || subnavId === 1;
+
   // Map API rails and filter out empty ones, but keep CONTINUE_WATCHING rail even if its items are empty
   let mappedRails = rawRails
     .map((rawRail, idx) => mapApiRail(rawRail as Record<string, unknown>, idx))
-    .filter((rail) => (rail?.items && rail?.items?.length > 0) || rail.type === ContentRailType.CONTINUE_WATCHING);
+    .filter((rail) => (rail?.items && rail?.items?.length > 0) || rail.type === ContentRailType.CONTINUE_WATCHING)
+    .filter((rail) => {
+      // Remove Genre section from Home page per user requirement
+      const isGenreRail =
+        rail.type === ContentRailType.GENRE ||
+        rail.title?.toLowerCase()?.trim() === "genre";
+      if (isGenreRail && isHomePage) {
+        return false;
+      }
+      return true;
+    });
 
   // Check if backend returned a CONTINUE_WATCHING rail position
   const cwRailIndex = mappedRails.findIndex((rail) => rail.type === ContentRailType.CONTINUE_WATCHING);
@@ -315,7 +327,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
         return true;
       }
       if (isFirstHero) {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: "auto" });
         const hero = document.getElementById("hero-carousel-container");
         hero?.focus({ preventScroll: true });
         try { setFocus("hero-carousel"); } catch {}

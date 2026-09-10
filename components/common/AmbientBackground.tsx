@@ -8,12 +8,12 @@ export function AmbientBackground() {
   const activeLayer = useAmbientTintStore((s) => s.activeLayer);
 
   const getGradient = (rgb: { r: number; g: number; b: number }) =>
-    `linear-gradient(180deg, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.92) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.88) 8%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.82) 20%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.70) 40%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.45) 65%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18) 85%, transparent 100%)`;
+    `linear-gradient(180deg, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.88) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.80) 15%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.60) 40%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.30) 65%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08) 85%, transparent 100%)`;
 
   return (
     <div
       aria-hidden="true"
-      className="fixed inset-0 w-full h-full pointer-events-none z-0 overflow-hidden"
+      className="absolute top-0 left-0 right-0 h-[100vh] w-full pointer-events-none z-0 overflow-hidden"
     >
       {/* Ambient Layer A */}
       <div
