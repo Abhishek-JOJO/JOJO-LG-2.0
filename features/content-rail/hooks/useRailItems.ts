@@ -76,6 +76,28 @@ export function useRailItems(
   // Track the pages currently in transit to prevent duplicate requests
   const fetchingPagesRef = useRef<Set<number>>(new Set());
 
+  // Ref-based rail change detection: returns correct items on the FIRST render
+  // after a rail change WITHOUT calling setState during render (which forces
+  // React to bail out and re-render, adding ~16ms per up/down keypress on TV).
+  const prevRailKeyRef = useRef(`${railId}-${initialItems?.[0]?.id}`);
+  const currentRailKey = `${railId}-${initialItems?.[0]?.id}`;
+  const railJustChanged = currentRailKey !== prevRailKeyRef.current;
+  if (railJustChanged) {
+    prevRailKeyRef.current = currentRailKey;
+    fetchingPagesRef.current.clear();
+  }
+
+  // Compute effective items: on the frame the rail changes, use fresh data
+  // directly (cache or props) instead of stale state — zero flicker, zero extra render.
+  let effectiveItems = items;
+  if (railJustChanged) {
+    if (railId && railCache[railId] && !bypassCache) {
+      effectiveItems = railCache[railId].items;
+    } else {
+      effectiveItems = initialItems;
+    }
+  }
+
   // Update maxPages if the prop changes
   useEffect(() => {
     if (railId && railCache[railId] && !bypassCache) {
@@ -88,7 +110,8 @@ export function useRailItems(
     }
   }, [totalPages, railId, bypassCache]);
 
-  // Sync state if initialItems or railId changes (e.g., on language change)
+  // Sync state after paint when rail changes (for pagination to work correctly).
+  // The UI already shows correct data via effectiveItems above.
   useEffect(() => {
     if (railId && railCache[railId] && !bypassCache) {
       setItems(railCache[railId].items);
@@ -236,7 +259,7 @@ export function useRailItems(
   }, [loadedPages, maxPages, fetchPage]);
 
   return {
-    items,
+    items: effectiveItems,
     isLoadingMore,
     loadNextPage,
     hasMore: Math.max(...Array.from(loadedPages)) < maxPages,

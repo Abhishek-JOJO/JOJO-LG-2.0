@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { isHlsUrl, VIDEO_CONSTANTS } from "@/lib/constants/video";
 import { usePlayerStore } from "@/store/usePlayerStore";
-import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
+import { jojoResizedImageURL } from "@/lib/config/imageRequest.config";
 import { ContentRailItem } from "../config/contentRail.types";
 
 interface InlineHoverTrailerProps {
@@ -14,7 +14,7 @@ interface InlineHoverTrailerProps {
   isLandscape?: boolean;
 }
 
-export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: InlineHoverTrailerProps) {
+export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: InlineHoverTrailerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [videoError, setVideoError] = useState(false);
@@ -25,12 +25,6 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
     return item?.previewUrl || (item as any)?.preview_url || null;
   }, [item]);
 
-  const landscapeImageUrl =
-    item?.posterImage ||
-    item?.heroImage ||
-    item?.landscapeImage ||
-    item?.image;
-
   const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
 
   useEffect(() => {
@@ -40,10 +34,10 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
 
     if (!isExpanded || !previewUrl) return;
 
-    // Debounce 700ms before allocating webOS hardware video decoders
+    // Debounce 1200ms before allocating webOS hardware video decoders
     const timer = setTimeout(() => {
       setShouldLoadVideo(true);
-    }, 700);
+    }, 1200);
 
     return () => clearTimeout(timer);
   }, [previewUrl, item?.id, isExpanded]);
@@ -126,23 +120,7 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
   }, [isMuted]);
 
   return (
-    <div className="absolute inset-0 w-full h-full pointer-events-none z-10 bg-neutral-900 overflow-hidden">
-      {/* Landscape image: ALWAYS visible behind video with smooth crossfade */}
-      <div className="absolute inset-0 w-full h-full bg-neutral-900">
-        {landscapeImageUrl && (
-          <JOJOCommonImage
-            key={landscapeImageUrl}
-            src={landscapeImageUrl}
-            alt={item.title}
-            width={isLandscape ? 870 : 580}
-            height={isLandscape ? 490 : 326}
-            fill
-            contentMode="cover"
-            className="animate-ott-fade"
-            wrapperClassName="w-full h-full animate-ott-fade"
-          />
-        )}
-      </div>
+    <div className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-hidden">
 
       {/* Video Player - Only mounted when card is active/expanded, debounced, and hidden until first frame is ready */}
       {shouldLoadVideo && previewUrl && !videoError && (
@@ -164,10 +142,9 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
       {/* Shadow overlay for text */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 via-35% to-transparent pointer-events-none" />
       
-      {/* Meta details at bottom left with cinematic OTT slide-up entrance */}
+      {/* Meta details at bottom left with seamless transition */}
       <div
-        key={item?.id || item?.title}
-        className={`absolute flex flex-col justify-end items-start text-left z-20 pointer-events-none animate-ott-slide ${
+        className={`absolute flex flex-col justify-end items-start text-left z-20 pointer-events-none transition-all duration-200 ${
         isLandscape
           ? "bottom-8 left-8 right-8"
           : "bottom-6 left-6 right-6 sm:bottom-8 sm:left-8 sm:right-8"
@@ -178,26 +155,23 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
               ? "w-[280px] h-[90px]"
               : "w-[160px] sm:w-[220px] lg:w-[280px] h-[50px] sm:h-[65px] lg:h-[80px]"
           }`}>
-            <JOJOCommonImage
-              src={item.title_image}
-              alt={item.title}
-              fill
-              contentMode="contain"
-              position="left"
-              style={{ objectPosition: "left bottom" }}
-              optimizeRequestURL={false}
-              wrapperClassName="w-full h-full drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+            <img
+              src={jojoResizedImageURL(item.title_image, { targetSize: { width: 560, height: 160 } })}
+              alt={item?.title || ""}
+              className="w-full h-full object-contain object-left-bottom drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+              loading="eager"
+              decoding="async"
             />
           </div>
-        ) : (
+        ) : item?.title ? (
           <h3 className={`text-white font-extrabold line-clamp-1 drop-shadow-lg mb-2 text-left ${
             isLandscape ? "text-3xl" : "text-xl sm:text-2xl"
           }`}>
             {item.title}
           </h3>
-        )}
-        {item.genres && item.genres.length > 0 && (
-          <span className={`text-white/90 font-semibold truncate drop-shadow-md text-left ${
+        ) : null}
+        {item?.genres && item.genres.length > 0 && (
+          <span className={`text-white/90 font-semibold truncate drop-shadow-md text-left transition-opacity duration-300 ${
             isLandscape ? "text-base" : "text-sm sm:text-base"
           }`}>
             {item.genres.join(" • ")}
@@ -206,4 +180,4 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
       </div>
     </div>
   );
-}
+});

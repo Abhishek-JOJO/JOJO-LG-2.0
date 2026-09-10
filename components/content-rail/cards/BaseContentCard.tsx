@@ -7,6 +7,7 @@ import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
 import { ContentRailItem, RailCardVariant } from "../config/contentRail.types";
 import { RailCardDesignConfig, RailCardWidth } from "../config/contentRail.config";
 import { LOGOS } from "@/lib/constants/assets";
+import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 
@@ -67,7 +68,6 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   const [isHovered, setIsHovered] = useState(false);
   const [isDomFocused, setIsDomFocused] = useState(false);
   const [isFocusExpanded, setIsFocusExpanded] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
   const cardRef = useRef<HTMLAnchorElement>(null);
   const t = useTranslations("contentRails");
   const { ref: focusRef, focused, focusKey } = useFocusable({
@@ -151,21 +151,25 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         const currentSection = cardRef.current.closest('section');
         if (currentSection) {
           const sIndex = currentSection.getAttribute('data-section-index');
-          if (sIndex !== null) {
-            useActiveRailStore.getState().setActiveSectionIndex(Number(sIndex));
-          } else if (currentSection.parentElement) {
+          const sectionIdx = sIndex !== null ? Number(sIndex) : -1;
+          const store = useActiveRailStore.getState();
+          // Only update store and scroll if the section actually changed
+          // (avoids expensive getBoundingClientRect + scrollTo on every L/R keypress)
+          if (sectionIdx >= 0 && store.activeSectionIndex !== sectionIdx) {
+            store.setActiveSectionIndex(sectionIdx);
+            const sectionRect = currentSection.getBoundingClientRect();
+            if (Math.abs(sectionRect.top - 105) > 35) {
+              window.scrollTo({
+                top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105),
+                behavior: 'auto'
+              });
+            }
+          } else if (sectionIdx < 0 && currentSection.parentElement) {
             const allSections = Array.from(currentSection.parentElement.querySelectorAll('section'));
             const idx = allSections.indexOf(currentSection);
-            if (idx !== -1) {
-              useActiveRailStore.getState().setActiveSectionIndex(idx);
+            if (idx !== -1 && store.activeSectionIndex !== idx) {
+              store.setActiveSectionIndex(idx);
             }
-          }
-          const sectionRect = currentSection.getBoundingClientRect();
-          if (Math.abs(sectionRect.top - 105) > 35) {
-            window.scrollTo({
-              top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105),
-              behavior: 'auto'
-            });
           }
         }
       }
@@ -177,13 +181,13 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   });
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
 
-  // Debounce expansion on focus (180ms)
-  // so fast remote navigation stays at 60fps without lag or trailer churn
+  // Debounce expansion on focus (80ms)
+  // Keeps fast remote navigation at 60fps while still feeling responsive
   useEffect(() => {
     if (focused) {
       const timer = setTimeout(() => {
         setIsFocusExpanded(true);
-      }, 180);
+      }, 80);
       return () => clearTimeout(timer);
     } else {
       setIsFocusExpanded(false);
@@ -225,6 +229,18 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   let desktopWidth = config.width;
   const desktopHeight = config.height;
 
+  // Stable CDN-resized image URL, requested at the card's actual base aspect
+  // ratio/size (e.g. 2:3 portrait) so the CDN crop matches the box the browser
+  // renders it in — requesting a size doesn't need to change on hover/expand
+  // since CSS object-fit: cover already re-crops a same-aspect image cleanly
+  // into the wider expanded box.
+  const resizedImageUrl = imageUrl
+    ? jojoResizedImageURL(imageUrl, {
+        targetSize: { width: config.width, height: config.height },
+        fit: JOJOImageFit.Cover,
+      })
+    : "";
+
   const cardInner = (
     <div
       className="relative h-full w-full overflow-hidden bg-neutral-900 transition-colors transform-gpu isolation-isolate"
@@ -241,27 +257,15 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       }}
     >
       {imageUrl && (
-        <JOJOCommonImage
-          key={imageUrl}
-          src={imageUrl}
-          alt={item.title}
-          width={desktopWidth}
-          height={desktopHeight}
-          fill
-          contentMode="cover"
-          sizes={
-            config.width >= 1000
-              ? "100vw"
-              : config.width >= 500
-                ? "(max-width: 768px) 100vw, 50vw"
-                : config.width >= 300
-                  ? "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                  : "(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 12vw"
-          }
-          className="object-cover transition-all duration-300 pointer-events-none select-none animate-ott-fade"
-          wrapperClassName="w-full h-full pointer-events-none select-none animate-ott-fade"
-          onLoad={() => setImageLoaded(true)}
-        />
+        <div className="absolute inset-0 w-full h-full bg-neutral-900" style={{ transform: 'translateZ(0)', willChange: 'contents' }}>
+          <img
+            src={resizedImageUrl}
+            alt={item?.title || ""}
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            loading="eager"
+          />
+        </div>
       )}
 
       {/* Fallback title shown only if no image URL is available */}

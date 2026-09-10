@@ -22,6 +22,7 @@ import { mapBatchAssetAccess, useBatchAssetAccess } from "@/features/content/hoo
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { extractDominantAmbientColor } from "@/lib/utils/colorExtractor";
 import { useAmbientTintStore } from "@/store/useAmbientTintStore";
+import { preloadImageUrl, preloadRailItems } from "./utils/imagePreloader";
 
 interface ContentRailListProps {
   items: ContentRailItem[];
@@ -63,7 +64,6 @@ function renderSpotlightRailItem(
   config: RailCardDesignConfig,
   leadFocusKey: string,
   railActive: boolean,
-  cycleDirection: "left" | "right",
   onCycle: (direction: "left" | "right") => void,
   onArrowUpDown?: (direction: "up" | "down") => boolean | void
 ) {
@@ -221,26 +221,53 @@ export function ContentRailList({
   const isSpotlightRail = !isHeroVariant && !isExpanded && Boolean(isFirstContentRail) && config?.variant !== RailCardVariant.GENRE && type !== ContentRailType.GENRE;
   const leadFocusKey = "spotlight-lead-fixed";
   const [spotlightIndex, setSpotlightIndex] = useState(0);
-  const [cycleDirection, setCycleDirection] = useState<"left" | "right">("right");
 
   const handleCycle = useCallback((direction: "left" | "right") => {
     if (!items?.length) return;
-    setCycleDirection(direction);
     setSpotlightIndex((prev) => {
       const next = direction === "right" ? prev + 1 : prev - 1;
       return ((next % items.length) + items.length) % items.length;
     });
   }, [items]);
 
-  useEffect(() => {
+  // Reset spotlightIndex synchronously when the rail's items change (e.g. switching
+  // rails on ArrowUp/Down). Using React's documented "adjust state during render"
+  // pattern here — not an effect — so the very first paint after the switch already
+  // shows card 0 instead of flashing the previous rail's stale index for one frame.
+  const [prevLeadItemId, setPrevLeadItemId] = useState(items?.[0]?.id);
+  if (items?.[0]?.id !== prevLeadItemId) {
+    setPrevLeadItemId(items?.[0]?.id);
     setSpotlightIndex(0);
-  }, [items?.[0]?.id]);
+  }
 
   useEffect(() => {
     if (isSpotlightRail && listRef?.current) {
       listRef.current.scrollLeft = 0;
     }
   }, [isSpotlightRail, spotlightIndex, listRef]);
+
+  // Eagerly preload all rail items on mount so navigating left/right is instant (0ms delay)
+  useEffect(() => {
+    if (!isSpotlightRail || !items?.length) return;
+    preloadRailItems(items, 12);
+  }, [isSpotlightRail, items]);
+
+  // When cycling cards in spotlight rail, ensure adjacent items are preloaded immediately
+  useEffect(() => {
+    if (!isSpotlightRail || !items?.length) return;
+    const si = spotlightIndex;
+    const nextIdx = (si + 1) % items.length;
+    const nextIdx2 = (si + 2) % items.length;
+    const prevIdx = (si - 1 + items.length) % items.length;
+    [nextIdx, nextIdx2, prevIdx].forEach((idx) => {
+      const it = items[idx];
+      if (it) {
+        preloadImageUrl(it.posterImage || it.heroImage || it.landscapeImage || it.image || it.portraitImage, { width: 871, height: 490 });
+        preloadImageUrl(it.title_image);
+        preloadImageUrl(it.portraitImage || it.image, { width: 326, height: 490 });
+      }
+    });
+  }, [isSpotlightRail, items, spotlightIndex]);
 
 
   const { ref: railBoundaryRef, focusKey: railBoundaryFocusKey, hasFocusedChild: railActive } = useFocusable({
@@ -519,7 +546,11 @@ export function ContentRailList({
     },
   };
 
-  const cardElements = items?.map((originalItem, index) => {
+  // For spotlight rail, only render the 6 visible slots that fit on a 1920px TV screen.
+  // Offscreen slots (items 6+) never scroll into view and re-rendering 20 cards on every keypress causes TV CPU lag.
+  const visibleItems = isSpotlightRail && items?.length > 6 ? items.slice(0, 6) : (items || []);
+
+  const cardElements = visibleItems.map((originalItem, index) => {
     const effectiveItem = isSpotlightRail && items?.length
       ? items[(spotlightIndex + index) % items.length]
       : originalItem;
@@ -543,7 +574,6 @@ export function ContentRailList({
             config,
             leadFocusKey,
             railActive,
-            cycleDirection,
             handleCycle,
             onArrowUpDown
           );
@@ -580,7 +610,6 @@ export function ContentRailList({
             config,
             leadFocusKey,
             railActive,
-            cycleDirection,
             handleCycle,
             onArrowUpDown
           );
@@ -607,7 +636,6 @@ export function ContentRailList({
             config,
             leadFocusKey,
             railActive,
-            cycleDirection,
             handleCycle,
             onArrowUpDown
           );

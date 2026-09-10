@@ -27,6 +27,7 @@ import { socketClient } from "@/lib/socket/socket.client";
 import { getQueryClient } from "@/lib/react-query/queryClient";
 import { getAssetPricing } from "@/features/content/api/getAssetPricing";
 import { restorePageFocus } from "@/src/navigation/focusUtils";
+import { preloadRailItems } from "@/components/content-rail/utils/imagePreloader";
 
 // Global module-level cache to track route-to-subnav_id mapping for instant frame 1 loads on popstate / routing
 const routeSubnavMap: Record<string, number> = {};
@@ -300,7 +301,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   const activeRail = contentRails[safeActiveRailIndex];
   const upcomingRails = contentRails.slice(safeActiveRailIndex + 1, safeActiveRailIndex + 5);
 
-  // TV remote vertical navigation: ArrowDown / ArrowUp updates the active rail in place
+  // TV remote vertical navigation: ArrowDown / ArrowUp updates the active rail in place instantly
   const handleArrowUpDown = useCallback((direction: "up" | "down") => {
     if (direction === "down") {
       setActiveRailIndex((prev) => {
@@ -309,21 +310,13 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
         }
         return prev;
       });
-      setTimeout(() => {
-        const lead = document.querySelector('[data-focuskey="spotlight-lead-fixed"]') as HTMLElement | null;
-        lead?.focus({ preventScroll: true });
-        try { setFocus("spotlight-lead-fixed"); } catch {}
-      }, 50);
+      try { setFocus("spotlight-lead-fixed"); } catch {}
       return true;
     }
     if (direction === "up") {
       if (activeRailIndexRef.current > 0) {
         setActiveRailIndex((prev) => Math.max(0, prev - 1));
-        setTimeout(() => {
-          const lead = document.querySelector('[data-focuskey="spotlight-lead-fixed"]') as HTMLElement | null;
-          lead?.focus({ preventScroll: true });
-          try { setFocus("spotlight-lead-fixed"); } catch {}
-        }, 50);
+        try { setFocus("spotlight-lead-fixed"); } catch {}
         return true;
       }
       if (isFirstHero) {
@@ -344,6 +337,17 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
       fetchNextPage();
     }
   }, [hasNextPage, isFetchingNextPage, safeActiveRailIndex, contentRails.length, fetchNextPage]);
+
+  // Ahead-of-time preloading of upcoming rails' lead card images, logos, and side portrait cards
+  // Ensures 0ms latency and instant data filling with zero delay on ArrowDown
+  // Dep: safeActiveRailIndex (not upcomingRails which is a new .slice() every render)
+  useEffect(() => {
+    const upcoming = contentRails.slice(safeActiveRailIndex + 1, safeActiveRailIndex + 4);
+    if (!upcoming.length) return;
+    upcoming.forEach((rail) => {
+      preloadRailItems(rail?.items, 6);
+    });
+  }, [safeActiveRailIndex, contentRails]);
 
   // ── Initial load: TV Hero Slider skeleton matching 75vh layout ──
   const showSkeleton = isLoading || (isFetching && !data);
