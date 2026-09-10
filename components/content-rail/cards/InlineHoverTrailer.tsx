@@ -26,10 +26,10 @@ export function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: In
   }, [item]);
 
   const landscapeImageUrl =
-    item?.landscapeImage ||
+    item?.posterImage ||
     item?.heroImage ||
-    item?.image ||
-    item?.posterImage;
+    item?.landscapeImage ||
+    item?.image;
 
   const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
 

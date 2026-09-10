@@ -53,10 +53,11 @@ export const LandscapeCard = React.memo(function LandscapeCard({
   }
 
   const isMixedSeries = Boolean((config as any)?.isMixedSeries);
+  // At focus time / spotlight lead card, prefer clean posterImage/heroImage (clean background for title_image and trailer)
   const imageUrl =
-    item.landscapeImage ||
-    item.heroImage ||
-    item.posterImage ||
+    (railActive || isMixedSeries
+      ? item.posterImage || item.heroImage || item.landscapeImage
+      : item.landscapeImage || item.posterImage || item.heroImage) ||
     item.image ||
     item.portraitImage ||
     "";

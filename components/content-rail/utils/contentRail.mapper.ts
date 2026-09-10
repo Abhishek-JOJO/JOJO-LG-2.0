@@ -174,7 +174,9 @@ export function mapApiRailItem(
       const rawPortraitArr = Array.isArray(asset?.portrait) ? asset.portrait : undefined;
       const rawLandscapeArr = Array.isArray(asset?.landscape) ? asset.landscape : undefined;
 
+      const heroPosterUrl = rawPosterArr?.find((img: any) => Number(img?.ratio_id) === 1)?.url;
       posterImage =
+        heroPosterUrl ||
         getPosterImage(rawPosterArr, displayType) ||
         // Try picking any URL directly from the poster array (ratio_id agnostic)
         (rawPosterArr?.[0]?.url) ||
@@ -187,7 +189,7 @@ export function mapApiRailItem(
         (typeof asset?.poster_image === "string" ? asset.poster_image : undefined) ||
         (typeof asset?.poster === "string" ? asset.poster : undefined);
 
-      heroImage = getHeroPosterImage(rawPosterArr || rawLandscapeArr);
+      heroImage = heroPosterUrl || getHeroPosterImage(rawPosterArr || rawLandscapeArr);
 
       image =
         portraitImage ||
