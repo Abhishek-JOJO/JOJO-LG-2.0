@@ -36,10 +36,13 @@ export function restorePageFocus() {
       return;
     }
 
-    // 1. Check if an element on screen ALREADY has visual spatial navigation focus
-    const activeFocused = document.querySelector(
-      "[data-focuskey].ring-\\[4px\\], [data-focuskey].ring-white"
-    );
+    // 1. Check if an element on screen ALREADY has visual spatial navigation focus.
+    // Checked via document.activeElement rather than a focus-ring class name, since
+    // the ring styling is a presentation detail that can change independently of
+    // which element actually holds focus.
+    const activeFocused = document.activeElement?.hasAttribute("data-focuskey")
+      ? document.activeElement
+      : null;
     if (activeFocused) {
       clearInterval(interval);
       return;
