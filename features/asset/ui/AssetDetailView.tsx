@@ -1686,36 +1686,38 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             <div className="flex flex-col gap-6">
               {/* Tabs Selector Bar */}
               <div className="flex items-center gap-3 sm:gap-4 pb-0.5">
-                {hasEpisodesTab && (
-                  <FocusableTabButton
-                    label={t("episodes")}
-                    isActive={effectiveTab === "episodes"}
-                    onClick={() => setActiveTab("episodes")}
-                    focusKeyPrefix="tab-episodes"
-                    assetId={assetId}
-                    downTargetFocusKey={firstEpisodeFocusKey}
-                  />
-                )}
-                {hasCastTab && (
-                  <FocusableTabButton
-                    label={t("cast_crew")}
-                    isActive={effectiveTab === "cast"}
-                    onClick={() => setActiveTab("cast")}
-                    focusKeyPrefix="tab-cast"
-                    assetId={assetId}
-                    downTargetFocusKey={firstCastFocusKey}
-                  />
-                )}
-                {hasTrailersTab && (
-                  <FocusableTabButton
-                    label={t("trailers")}
-                    isActive={effectiveTab === "trailers"}
-                    onClick={() => setActiveTab("trailers")}
-                    focusKeyPrefix="tab-trailers"
-                    assetId={assetId}
-                    downTargetFocusKey={null}
-                  />
-                )}
+                <div className="inline-flex items-center bg-white/10 rounded-full p-1.5 sm:p-2 gap-1">
+                  {hasEpisodesTab && (
+                    <FocusableTabButton
+                      label={t("episodes")}
+                      isActive={effectiveTab === "episodes"}
+                      onClick={() => setActiveTab("episodes")}
+                      focusKeyPrefix="tab-episodes"
+                      assetId={assetId}
+                      downTargetFocusKey={firstEpisodeFocusKey}
+                    />
+                  )}
+                  {hasCastTab && (
+                    <FocusableTabButton
+                      label={t("cast_crew")}
+                      isActive={effectiveTab === "cast"}
+                      onClick={() => setActiveTab("cast")}
+                      focusKeyPrefix="tab-cast"
+                      assetId={assetId}
+                      downTargetFocusKey={firstCastFocusKey}
+                    />
+                  )}
+                  {hasTrailersTab && (
+                    <FocusableTabButton
+                      label={t("trailers")}
+                      isActive={effectiveTab === "trailers"}
+                      onClick={() => setActiveTab("trailers")}
+                      focusKeyPrefix="tab-trailers"
+                      assetId={assetId}
+                      downTargetFocusKey={null}
+                    />
+                  )}
+                </div>
 
                 {/* Season Dropdown Selector - positioned on the right */}
                 {effectiveTab === "episodes" && seasonsOption.length > 0 && (
@@ -1785,21 +1787,21 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                             selectedSeasonIndex={selectedSeasonIndex}
                             t={t}
                             onWatch={() => handleWatch(ep.assetId)}
+                            hasMore={hasMore}
+                            isLoadingMore={episodesLoading}
+                            onLoadMore={loadMoreEpisodes}
                           />
                         );
                       })}
 
-                      {/* Infinite Load More button */}
-                      {hasMore && (
-                        <FocusableLoadMoreButton
-                          onClick={(e: any) => {
-                            e.stopPropagation();
-                            loadMoreEpisodes();
-                          }}
-                          disabled={episodesLoading}
-                          label={episodesLoading ? null : t("load_more_episodes")}
-                          lastEpisodeId={displayedEpisodes[displayedEpisodes.length - 1]?.assetId}
-                        />
+                      {/* Infinite scroll: FocusableEpisodeItem quietly triggers
+                          loadMoreEpisodes() as focus nears the end of the list —
+                          this is just the passive "more is on the way" indicator,
+                          not a focusable/actionable control. */}
+                      {episodesLoading && hasMore && (
+                        <div className="flex items-center justify-center py-6">
+                          <Loader size="sm" />
+                        </div>
                       )}
                     </div>
                   ) : (
@@ -2003,7 +2005,16 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
 // ── Subcomponents for Focusable Items ────────────────────────────────────────
 
-function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex, t, onWatch }: any) {
+function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex, t, onWatch, hasMore, isLoadingMore, onLoadMore }: any) {
+  // Infinite scroll: once focus is within the last few loaded episodes, quietly
+  // kick off the next page so it's (usually) already there by the time the
+  // user presses Down enough times to reach it — no "Load More" button needed.
+  const maybeLoadMore = () => {
+    if (hasMore && !isLoadingMore && index >= episodes.length - 3) {
+      onLoadMore?.();
+    }
+  };
+
   const { ref, focused } = useFocusable({
     focusKey: `episode-${ep.assetId}`,
     onEnterPress: onWatch,
@@ -2023,12 +2034,20 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
           const nextEp = episodes[index + 1];
           setFocus(`episode-${nextEp.assetId}`);
           return false;
+        } else if (hasMore) {
+          // Last loaded episode but more exist on the server — make sure the
+          // fetch is (still) in flight; once it lands, the newly appended
+          // episodes just extend this same list and a subsequent Down works
+          // normally, matching how loading is only ever triggered by focus,
+          // not mount, above.
+          onLoadMore?.();
         }
       }
       return true;
     },
     onFocus: () => {
       ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      maybeLoadMore();
     }
   });
 
@@ -2240,8 +2259,10 @@ function FocusableTabButton({ label, isActive, onClick, focusKeyPrefix, assetId,
       ref={ref as any}
       onClick={handleActivate}
       className={`scroll-mt-10 sm:scroll-mt-14 px-5 py-2.5 sm:px-7 sm:py-3.5 rounded-full text-sm sm:text-base lg:text-lg font-bold transition-all outline-none shrink-0 ${isActive
-        ? "bg-theme_13_samecolour text-black shadow-lg"
-        : "bg-white/10 text-neutral-300 hover:bg-white/20 hover:text-theme_1"
+        ? "bg-theme_13_samecolour text-white shadow-lg"
+        : focused
+          ? "bg-white/25 text-white"
+          : "bg-transparent text-neutral-300 hover:text-theme_1"
         } ${focused ? "ring-4 ring-white scale-105 shadow-2xl" : ""}`}
     >
       {label}
@@ -2296,43 +2317,6 @@ function FocusableSeasonDropdownItem({ idx, isSelected, label, onClick }: any) {
   );
 }
 
-function FocusableLoadMoreButton({ onClick, disabled, label, lastEpisodeId }: any) {
-  const { ref, focused } = useFocusable({
-    focusKey: "load-more-episodes-btn",
-    onEnterPress: () => {
-      if (!disabled) onClick({ stopPropagation: () => {} });
-    },
-    onArrowPress: (direction) => {
-      if (direction === "up" && lastEpisodeId) {
-        setFocus(`episode-${lastEpisodeId}`);
-        return false;
-      }
-      return true;
-    },
-    onFocus: () => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  });
-
-  useEffect(() => {
-    return () => {
-      if (lastEpisodeId) {
-        setTimeout(() => setFocus(`episode-${lastEpisodeId}`), 60);
-      }
-    };
-  }, [lastEpisodeId]);
-  return (
-    <button
-      ref={ref as any}
-      onClick={onClick}
-      disabled={disabled}
-      className={`mt-2 w-full py-2.5 bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-xs sm:text-sm font-bold text-neutral-300 hover:text-theme_1 rounded-lg border flex items-center justify-center gap-2 transition-all outline-none ${focused ? "ring-2 ring-white border-white bg-neutral-800 scale-[1.01]" : "border-neutral-850"}`}
-    >
-      {!label ? <Loader size="sm" /> : label}
-    </button>
-  );
-}
-
 function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback, isStandalone, router, openAssetDetail, assetId, upTargetFocusKey }: any) {
   const handleClick = () => {
     if (isFallback || !id) return;
@@ -2370,7 +2354,8 @@ function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback
     <div
       ref={ref as any}
       onClick={handleClick}
-      className={`relative w-[220px] sm:w-[280px] lg:w-[326px] aspect-[2/3] rounded-2xl overflow-hidden group cursor-pointer bg-neutral-900 transition-all duration-300 shrink-0 ${focused ? "ring-4 ring-white ring-offset-4 ring-offset-[#191919] scale-105 shadow-2xl" : "hover:scale-105"}`}
+      className={`relative w-[220px] sm:w-[280px] lg:w-[326px] aspect-[2/3] rounded-2xl overflow-hidden group cursor-pointer bg-neutral-900 transition-all duration-300 shrink-0 ${focused ? "z-30 shadow-2xl" : "hover:scale-105"}`}
+      style={{ zIndex: focused ? 30 : undefined }}
     >
       {img ? (
         <JOJOCommonImage
@@ -2388,6 +2373,16 @@ function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback
       <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent transition-opacity duration-300 flex items-end p-4 ${focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
         <span className={`text-sm sm:text-base font-semibold truncate w-full ${focused ? "text-theme_13_samecolour" : "text-white"}`}>{title}</span>
       </div>
+      {/* TV Focus Ring: clean solid white border on top of the image, matching
+          the home page rail cards (BaseContentCard) — a ring/ring-offset here
+          gets clipped by the horizontal-scroll container and occluded by
+          neighboring cards, so it must be a plain border, not a box-shadow ring. */}
+      {focused && (
+        <div
+          className="absolute inset-0 rounded-2xl pointer-events-none z-50"
+          style={{ border: "3px solid #ffffff" }}
+        />
+      )}
     </div>
   );
 }
