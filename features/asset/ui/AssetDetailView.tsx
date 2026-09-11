@@ -55,7 +55,29 @@ import { AnimatePresence } from "framer-motion";
 import { analyticsService } from "@/shared/analytics";
 import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
 import { buildPlanDetailAnalytics } from "@/features/asset/utils/buildPlanDetailAnalytics";
-import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+
+// This page's hero preview video fires onTimeUpdate ~4x/sec, which re-renders
+// the whole AssetDetailView tree (and every Focusable* child) on the same
+// cadence. norigin-spatial-navigation's setFocus/addFocusable/removeFocusable
+// share a single-slot scheduler ("a new task replaces the pending next task"),
+// so a single setFocus call made right after a tab switch (which itself mounts
+// a batch of new focusable items) can easily get clobbered by that churn and
+// silently do nothing. Retry a few times over a short window instead of
+// hoping one attempt lands.
+function retrySetFocus(focusKey: string, attempts = 6, intervalMs = 90) {
+  let tries = 0;
+  const attempt = () => {
+    tries += 1;
+    if (doesFocusableExist(focusKey)) {
+      setFocus(focusKey);
+    }
+    if (tries < attempts) {
+      setTimeout(attempt, intervalMs);
+    }
+  };
+  setTimeout(attempt, intervalMs);
+}
 
 const resolveImage = (asset: any): string => {
   const pick = (arr: any[]) => {
@@ -103,7 +125,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const castListRef = useRef<HTMLDivElement>(null);
   const { isDragging: isCastDragging } = useDragScroll(castListRef);
 
-  const [activeTab, setActiveTab] = useState<"episodes" | "trailers">("episodes");
+  const [activeTab, setActiveTab] = useState<"episodes" | "trailers" | "cast">("episodes");
   const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false);
   const [canCastScrollLeft, setCanCastScrollLeft] = useState(false);
   const [canCastScrollRight, setCanCastScrollRight] = useState(false);
@@ -835,13 +857,13 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const navigateDownFromActions = () => {
     const state = listsRef.current;
     if (state.isShowAsset) {
-      setFocus('tab-episodes');
+      retrySetFocus('tab-episodes');
     } else if (state.hasCast && state.firstCastId) {
-      setFocus(`cast-${state.firstCastId}`);
+      retrySetFocus('tab-cast');
     } else if (state.hasRelated && state.firstRelatedId) {
-      setFocus(`related-item-${state.firstRelatedId}`);
+      retrySetFocus(`related-item-${state.firstRelatedId}`);
     } else {
-      setFocus(`asset-watch-now-${assetId}`);
+      retrySetFocus(`asset-watch-now-${assetId}`);
     }
   };
 
@@ -1187,6 +1209,34 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const isShow = asset.assetType === "SHOW" || asset.seasons?.length > 0;
   const isMovie = !isShow;
 
+  // ── Tab availability (Episodes / Cast & Crew / Trailers) ───────────────────
+  const hasEpisodesTab = Boolean(isShow && asset.seasons && asset.seasons.length > 0);
+  const hasCastTab = Boolean(castList && castList.length > 0);
+  const hasTrailersTab = Boolean(asset.trailers && asset.trailers.length > 0);
+  const hasAnyTab = hasEpisodesTab || hasCastTab || hasTrailersTab;
+  // Derived tab: falls back to the first available tab if the stored selection
+  // (e.g. "episodes", the default) isn't actually available for this asset —
+  // avoids a corrective useEffect / extra render just to pick a valid default.
+  const effectiveTab: "episodes" | "trailers" | "cast" =
+    (activeTab === "episodes" && hasEpisodesTab) ? "episodes"
+      : (activeTab === "trailers" && hasTrailersTab) ? "trailers"
+        : (activeTab === "cast" && hasCastTab) ? "cast"
+          : hasEpisodesTab ? "episodes"
+            : hasCastTab ? "cast"
+              : "trailers";
+
+  const firstEpisodeFocusKey = displayedEpisodes?.[0]?.assetId ? `episode-${displayedEpisodes[0].assetId}` : null;
+  const firstCastFocusKey = castList?.[0]?.id ? `cast-${castList[0].id}` : null;
+  // Where "Up" from the first Related item should land: back into whatever is
+  // currently showing in the tab content, falling back to the tab bar itself.
+  const relatedUpTargetFocusKey =
+    effectiveTab === "episodes" && firstEpisodeFocusKey ? firstEpisodeFocusKey
+      : effectiveTab === "cast" && firstCastFocusKey ? firstCastFocusKey
+        : hasEpisodesTab ? "tab-episodes"
+          : hasCastTab ? "tab-cast"
+            : hasTrailersTab ? "tab-trailers"
+              : null;
+
   // ── Coming Soon logic ──────────────────────────────────────────────────────
   // An asset is "Coming Soon" when both conditions are true:
   //   1. is_upcoming_scheduled === true  (API field mapped as isUpcomingScheduled)
@@ -1197,6 +1247,41 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     asset.asset_tags.some((tag) => tag.toLowerCase().includes("coming soon"));
 
   const bgPosterUrl = activePreview?.poster || asset.poster?.url || asset.landscape?.url || "";
+
+  const titleBlock = (
+    <div
+      className="pointer-events-none transition-transform duration-700 ease-out origin-bottom-left"
+      style={{
+        transform: isTitleShrunk ? (isStandalone ? "scale(0.85)" : "scale(0.60)") : "scale(1)",
+      }}
+    >
+      {/* Logo image or Title text */}
+      {asset.titleImage ? (
+        <>
+          <h1 className="sr-only">{asset.title}</h1>
+          <div className={
+            isStandalone
+              ? "relative w-[280px] h-[94px] sm:w-[420px] sm:h-[140px] lg:w-[600px] lg:h-[200px]"
+              : "relative w-[150px] h-[50px] sm:w-[260px] sm:h-[90px]"
+          }>
+            <JOJOCommonImage
+              src={asset.titleImage}
+              alt={asset.title}
+              fill
+              contentMode="contain"
+              position="left"
+              optimizeRequestURL={false}
+              wrapperClassName="w-full h-full"
+            />
+          </div>
+        </>
+      ) : (
+        <h1 className={isStandalone ? "text-3xl sm:text-5xl md:text-6xl font-black drop-shadow-lg tracking-tight" : "text-2xl sm:text-4xl md:text-5xl font-black drop-shadow-lg tracking-tight"}>
+          {asset.title}
+        </h1>
+      )}
+    </div>
+  );
 
   return (
     <div
@@ -1217,8 +1302,8 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       <div
         className={
           isStandalone
-            ? "relative w-full h-[400px] sm:h-[550px] md:h-[650px] lg:h-[75vh] overflow-hidden group"
-            : "relative w-full h-[280px] sm:h-[450px] overflow-hidden group"
+            ? "relative w-full h-screen overflow-hidden group"
+            : "relative w-full h-[230px] sm:h-[320px] overflow-hidden group"
         }
       >
         {/* Background preview video playing after static poster delay */}
@@ -1259,46 +1344,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           className="absolute inset-x-0 -bottom-px h-[50%] z-10 pointer-events-none"
           style={{ background: "linear-gradient(to top, var(--theme_10, #191919) 0%, var(--theme_10_50, rgba(25, 25, 25, 0.5)) 20%, transparent 100%)" }}
         />
-        <div
-          className={
-            isStandalone
-              ? "absolute bottom-6 sm:bottom-8 lg:bottom-12 left-4 sm:left-6 lg:left-14 z-20 max-w-[70%]"
-              : "absolute bottom-8 sm:bottom-10 left-6 z-20 max-w-[70%]"
-          }
-        >
-          <div
-            className="pointer-events-none transition-transform duration-700 ease-out origin-bottom-left"
-            style={{
-              transform: isTitleShrunk ? "scale(0.60)" : "scale(1)",
-            }}
-          >
-            {/* Logo image or Title text */}
-            {asset.titleImage ? (
-              <>
-                <h1 className="sr-only">{asset.title}</h1>
-                <div className={
-                  isStandalone
-                    ? "relative w-[180px] h-[60px] sm:w-[320px] sm:h-[110px] lg:w-[450px] lg:h-[150px]"
-                    : "relative w-[150px] h-[50px] sm:w-[260px] sm:h-[90px]"
-                }>
-                  <JOJOCommonImage
-                    src={asset.titleImage}
-                    alt={asset.title}
-                    fill
-                    contentMode="contain"
-                    position="left"
-                    optimizeRequestURL={false}
-                    wrapperClassName="w-full h-full"
-                  />
-                </div>
-              </>
-            ) : (
-              <h1 className="text-2xl sm:text-4xl md:text-5xl font-black drop-shadow-lg tracking-tight">
-                {asset.title}
-              </h1>
-            )}
+        {!isStandalone && (
+          <div className="absolute bottom-8 sm:bottom-10 left-6 z-20 max-w-[70%]">
+            {titleBlock}
           </div>
-        </div>
+        )}
 
         {/* Slider Controls / Indicators - bottom right of image */}
         {previewsList?.length > 1 && (
@@ -1352,9 +1402,42 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             <FocusablePreviewNextButton onClick={handleNextSlide} />
           </div>
         )}
+
+        {/* "More below" hint — the hero fills the whole screen (100vh), so without
+            this the user has no way to know Episodes/Cast & Crew tabs exist below
+            until they press Down. Purely informational (not focusable): it shows
+            exactly the tabs that exist for this asset (1 chip for a movie with
+            only cast, 2 for a show with episodes + cast, etc). */}
+        {isStandalone && hasAnyTab && (
+          <div className="absolute inset-x-0 bottom-5 sm:bottom-7 z-20 flex flex-col items-center gap-2 pointer-events-none">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              {hasEpisodesTab && (
+                <span className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wide">
+                  {t("episodes")}
+                </span>
+              )}
+              {hasCastTab && (
+                <span className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wide">
+                  {t("cast_crew")}
+                </span>
+              )}
+              {hasTrailersTab && (
+                <span className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wide">
+                  {t("trailers")}
+                </span>
+              )}
+            </div>
+            <ChevronDown size={20} className="text-white/70 animate-bounce" />
+          </div>
+        )}
       </div>
 
-      <div className={isStandalone ? "relative z-20 -mt-px px-4 sm:px-6 lg:px-14 pt-6 sm:pt-8 pb-12 sm:pb-16 bg-theme_10 flex flex-col gap-4 w-full" : "relative z-20 -mt-px px-6 pt-5 sm:pt-6 pb-10 sm:pb-12 bg-theme_10 flex flex-col gap-5"}>
+      <div className={isStandalone ? "absolute inset-x-0 top-[50vh] -translate-y-1/2 z-20 px-4 sm:px-6 lg:px-14 flex flex-col gap-4 sm:gap-5 max-w-[900px]" : "relative z-20 -mt-px px-6 pt-5 sm:pt-6 pb-10 sm:pb-12 bg-theme_10 flex flex-col gap-5"}>
+        {isStandalone && (
+          <div className="max-w-[85%] sm:max-w-[80%] lg:max-w-[700px] mb-1">
+            {titleBlock}
+          </div>
+        )}
         {asset?.assetCategoryCode === ASSET_CATEGORY_CODE.TVOD && (
           <div className="flex items-center gap-2 px-1 overflow-hidden">
             <TvodIcon
@@ -1598,36 +1681,44 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       </div>
 
       {
-        isShow && asset.seasons && asset.seasons.length > 0 && (
-          <div className={isStandalone ? "bg-theme_10 px-4 sm:px-6 lg:px-14 pt-4 pb-2 w-full" : "bg-theme_10 px-6 pt-4 pb-2 w-full"}>
+        hasAnyTab && (
+          <div className={isStandalone ? "bg-theme_10 px-4 sm:px-6 lg:px-14 pt-7 sm:pt-9 pb-2 w-full" : "bg-theme_10 px-6 pt-7 pb-2 w-full"}>
             <div className="flex flex-col gap-6">
               {/* Tabs Selector Bar */}
-              <div className="flex items-center gap-6 pb-0.5">
-                <FocusableTabButton
-                  label={t("episodes")}
-                  isActive={activeTab === "episodes"}
-                  onClick={() => setActiveTab("episodes")}
-                  focusKeyPrefix="tab-episodes"
-                  assetId={assetId}
-                  firstEpId={displayedEpisodes?.[0]?.assetId}
-                  firstCastId={castList?.[0]?.id}
-                  firstRelatedId={displayRelated?.[0] ? resolveId(displayRelated[0]) : null}
-                />
-                {asset.trailers && asset.trailers.length > 0 && (
+              <div className="flex items-center gap-3 sm:gap-4 pb-0.5">
+                {hasEpisodesTab && (
+                  <FocusableTabButton
+                    label={t("episodes")}
+                    isActive={effectiveTab === "episodes"}
+                    onClick={() => setActiveTab("episodes")}
+                    focusKeyPrefix="tab-episodes"
+                    assetId={assetId}
+                    downTargetFocusKey={firstEpisodeFocusKey}
+                  />
+                )}
+                {hasCastTab && (
+                  <FocusableTabButton
+                    label={t("cast_crew")}
+                    isActive={effectiveTab === "cast"}
+                    onClick={() => setActiveTab("cast")}
+                    focusKeyPrefix="tab-cast"
+                    assetId={assetId}
+                    downTargetFocusKey={firstCastFocusKey}
+                  />
+                )}
+                {hasTrailersTab && (
                   <FocusableTabButton
                     label={t("trailers")}
-                    isActive={activeTab === "trailers"}
+                    isActive={effectiveTab === "trailers"}
                     onClick={() => setActiveTab("trailers")}
                     focusKeyPrefix="tab-trailers"
                     assetId={assetId}
-                    firstEpId={displayedEpisodes?.[0]?.assetId}
-                    firstCastId={castList?.[0]?.id}
-                    firstRelatedId={displayRelated?.[0] ? resolveId(displayRelated[0]) : null}
+                    downTargetFocusKey={null}
                   />
                 )}
 
                 {/* Season Dropdown Selector - positioned on the right */}
-                {activeTab === "episodes" && seasonsOption.length > 0 && (
+                {effectiveTab === "episodes" && seasonsOption.length > 0 && (
                   <div className="relative ml-auto">
                     {seasonsOption.length > 1 ? (
                       <>
@@ -1638,7 +1729,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                         />
 
                         {seasonDropdownOpen && (
-                          <div className="absolute right-0 mt-2 z-50 min-w-[130px] rounded bg-neutral-900 border border-neutral-800 shadow-xl overflow-hidden py-1">
+                          <div className="absolute right-0 mt-2 z-50 min-w-[200px] rounded-2xl bg-neutral-900 border border-neutral-800 shadow-xl overflow-hidden py-2">
                             {seasonsOption.map((s, idx) => (
                               <FocusableSeasonDropdownItem
                                 key={s.assetId || idx}
@@ -1657,7 +1748,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                         )}
                       </>
                     ) : (
-                      <div className="px-4 py-1.5 bg-neutral-900 text-xs sm:text-sm font-semibold text-neutral-300 rounded border border-neutral-800 select-none">
+                      <div className="px-5 py-2.5 sm:px-6 sm:py-3 bg-white/10 text-sm sm:text-base font-bold text-neutral-300 rounded-full border border-white/10 select-none">
                         {t("season", { number: 1 })}
                       </div>
                     )}
@@ -1665,7 +1756,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 )}
               </div>
 
-              {activeTab === "episodes" ? (
+              {effectiveTab === "episodes" ? (
                 <div className="flex flex-col gap-4 pb-4">
                   {activeSeason && (
                     <div className="flex items-center gap-2 text-xs text-neutral-400 font-semibold mb-2">
@@ -1717,6 +1808,57 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                     </div>
                   )}
                 </div>
+              ) : effectiveTab === "cast" ? (
+                <div className="pb-4">
+                  <div className="relative group/cast-rail w-full">
+                    {canCastScrollLeft && (
+                      <button
+                        onClick={() => {
+                          if (castListRef.current) {
+                            castListRef.current.scrollBy({ left: -400, behavior: "smooth" });
+                          }
+                        }}
+                        className="absolute left-2 top-[68px] sm:top-[84px] -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-theme_1 flex items-center justify-center border border-theme_1/10 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/cast-rail:opacity-100 shadow-md"
+                        aria-label="Scroll left"
+                      >
+                        <ChevronLeft size={24} />
+                      </button>
+                    )}
+
+                    {canCastScrollRight && (
+                      <button
+                        onClick={() => {
+                          if (castListRef.current) {
+                            castListRef.current.scrollBy({ left: 400, behavior: "smooth" });
+                          }
+                        }}
+                        className="absolute right-2 top-[68px] sm:top-[84px] -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-theme_1 flex items-center justify-center border border-theme_1/10 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/cast-rail:opacity-100 shadow-md"
+                        aria-label="Scroll right"
+                      >
+                        <ChevronRight size={24} />
+                      </button>
+                    )}
+
+                    <div
+                      ref={castListRef}
+                      onScroll={checkCastScroll}
+                      className={`flex gap-6 sm:gap-8 overflow-x-auto pt-4 pb-6 scrollbar-none ${isCastDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"
+                        }`}
+                    >
+                      {castList.map((castItem, idx) => (
+                        <FocusableCastItem
+                          key={idx}
+                          castItem={castItem}
+                          idx={idx}
+                          asset={asset}
+                          assetId={assetId}
+                          setSelectedProfessionalId={setSelectedProfessionalId}
+                          firstRelatedId={displayRelated?.[0] ? resolveId(displayRelated[0]) : null}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <div className="text-center py-12 text-neutral-500 text-sm border border-neutral-900 rounded-xl mb-4">
                   {t("no_trailers_found")}
@@ -1730,66 +1872,10 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       <div
         className={
           isStandalone
-            ? "bg-gradient-to-b from-theme_10 to-black px-4 sm:px-6 lg:px-14 pt-8 pb-24 flex flex-col gap-8 w-full"
+            ? "bg-theme_10 px-4 sm:px-6 lg:px-14 pt-8 pb-24 flex flex-col gap-8 w-full"
             : "bg-theme_10 px-6 py-8 flex flex-col gap-8"
         }
       >
-        {castList.length > 0 && (
-          <div>
-            <h3 className="text-base sm:text-lg font-bold text-theme_1 mb-4 pb-2">
-              {t("cast_crew")}
-            </h3>
-            <div className="relative group/cast-rail w-full">
-              {canCastScrollLeft && (
-                <button
-                  onClick={() => {
-                    if (castListRef.current) {
-                      castListRef.current.scrollBy({ left: -280, behavior: "smooth" });
-                    }
-                  }}
-                  className="absolute left-2 top-[32px] sm:top-[38px] -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-theme_1 flex items-center justify-center border border-theme_1/10 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/cast-rail:opacity-100 shadow-md"
-                  aria-label="Scroll left"
-                >
-                  <ChevronLeft size={24} />
-                </button>
-              )}
-
-              {canCastScrollRight && (
-                <button
-                  onClick={() => {
-                    if (castListRef.current) {
-                      castListRef.current.scrollBy({ left: 280, behavior: "smooth" });
-                    }
-                  }}
-                  className="absolute right-2 top-[32px] sm:top-[38px] -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-theme_1 flex items-center justify-center border border-theme_1/10 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/cast-rail:opacity-100 shadow-md"
-                  aria-label="Scroll right"
-                >
-                  <ChevronRight size={24} />
-                </button>
-              )}
-
-              <div
-                ref={castListRef}
-                onScroll={checkCastScroll}
-                className={`flex gap-4 sm:gap-6 overflow-x-auto pt-4 pb-6 scrollbar-none ${isCastDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"
-                  }`}
-              >
-                {castList.map((castItem, idx) => (
-                    <FocusableCastItem
-                      key={idx}
-                      castItem={castItem}
-                      idx={idx}
-                      asset={asset}
-                      assetId={assetId}
-                      setSelectedProfessionalId={setSelectedProfessionalId}
-                      firstRelatedId={displayRelated?.[0] ? resolveId(displayRelated[0]) : null}
-                    />
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Related Content Grid */}
         {(railsLoading || displayRelated.length > 0) && (
           <div>
@@ -1802,7 +1888,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 <button
                   onClick={() => {
                     if (relatedListRef.current) {
-                      relatedListRef.current.scrollBy({ left: -320, behavior: "smooth" });
+                      relatedListRef.current.scrollBy({ left: -360, behavior: "smooth" });
                     }
                   }}
                   className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-theme_1 flex items-center justify-center border border-theme_1/10 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/related-rail:opacity-100 shadow-md"
@@ -1817,7 +1903,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 <button
                   onClick={() => {
                     if (relatedListRef.current) {
-                      relatedListRef.current.scrollBy({ left: 320, behavior: "smooth" });
+                      relatedListRef.current.scrollBy({ left: 360, behavior: "smooth" });
                     }
                   }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-theme_1 flex items-center justify-center border border-theme_1/10 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/related-rail:opacity-100 shadow-md"
@@ -1835,7 +1921,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
               >
                 {railsLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="relative w-[130px] sm:w-[160px] aspect-[2/3] rounded-lg overflow-hidden bg-neutral-900 animate-pulse shrink-0" />
+                    <div key={i} className="relative w-[220px] sm:w-[280px] lg:w-[326px] aspect-[2/3] rounded-2xl overflow-hidden bg-neutral-900 animate-pulse shrink-0" />
                   ))
                 ) : (
                   displayRelated.map((item: any, idx: number) => {
@@ -1859,7 +1945,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                         router={router}
                         openAssetDetail={openAssetDetail}
                         assetId={assetId}
-                        firstCastId={castList?.[0]?.id}
+                        upTargetFocusKey={relatedUpTargetFocusKey}
                       />
                     );
                   })
@@ -1928,7 +2014,7 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
           setFocus(`episode-${prevEp.assetId}`);
           return false;
         } else {
-          setFocus("tab-episodes");
+          retrySetFocus("tab-episodes");
           return false;
         }
       }
@@ -1952,9 +2038,9 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
     <div
       ref={ref as any}
       onClick={onWatch}
-      className={`group flex flex-col sm:flex-row gap-4 p-3 bg-neutral-900/20 hover:bg-neutral-900/60 border rounded-xl cursor-pointer transition-all duration-300 ${focused ? "border-white ring-2 ring-white/50 bg-neutral-900/80 scale-[1.02]" : "border-transparent hover:border-neutral-800/40"}`}
+      className={`group flex flex-col sm:flex-row gap-4 sm:gap-5 p-3 sm:p-4 bg-neutral-900/20 hover:bg-neutral-900/60 border rounded-xl cursor-pointer transition-all duration-300 ${focused ? "border-white ring-2 ring-white/50 bg-neutral-900/80 scale-[1.02]" : "border-transparent hover:border-neutral-800/40"}`}
     >
-      <div className="relative w-full sm:w-[190px] aspect-video rounded-lg overflow-hidden shrink-0 bg-neutral-900">
+      <div className="relative w-full sm:w-[260px] lg:w-[320px] aspect-video rounded-lg overflow-hidden shrink-0 bg-neutral-900">
         {epPosterUrl ? (
           <JOJOCommonImage
             src={epPosterUrl}
@@ -1967,24 +2053,24 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
           <div className="w-full h-full bg-neutral-800" />
         )}
         <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-          <div className="w-10 h-10 rounded-full bg-theme_13_samecolour/90 text-theme_1 flex items-center justify-center">
-            <Play size={18} fill="currentColor" className="ml-0.5" />
+          <div className="w-12 h-12 rounded-full bg-theme_13_samecolour/90 text-theme_1 flex items-center justify-center">
+            <Play size={20} fill="currentColor" className="ml-0.5" />
           </div>
         </div>
       </div>
 
       <div className="flex flex-col flex-1 justify-center">
         <div className="flex items-start justify-between gap-2 mb-1.5">
-          <h4 className={`text-sm sm:text-base font-bold transition-colors line-clamp-1 ${focused ? "text-theme_13_samecolour" : "text-theme_1 group-hover:text-theme_13_samecolour"}`}>
+          <h4 className={`text-base sm:text-lg font-bold transition-colors line-clamp-1 ${focused ? "text-theme_13_samecolour" : "text-theme_1 group-hover:text-theme_13_samecolour"}`}>
             S{selectedSeasonIndex + 1} EP{ep.episodeNumber || index + 1} {ep.title}
           </h4>
           {ep.durationSeconds && (
-            <span className="text-xs text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded-full shrink-0">
+            <span className="text-xs sm:text-sm text-neutral-400 bg-neutral-900 px-2.5 py-1 rounded-full shrink-0">
               {Math.round(ep.durationSeconds / 60)} min
             </span>
           )}
         </div>
-        <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed line-clamp-3">
+        <p className="text-sm sm:text-base text-neutral-400 leading-relaxed line-clamp-2 sm:line-clamp-3">
           {stripHtml(ep.description) || t("no_description_episode")}
         </p>
       </div>
@@ -2009,16 +2095,17 @@ function FocusableCastItem({ castItem, idx, asset, assetId, setSelectedProfessio
     }
   };
 
+  const castFocusKey = `cast-${cast.id || idx}`;
   const { ref, focused } = useFocusable({
-    focusKey: `cast-${cast.id || idx}`,
+    focusKey: castFocusKey,
     onEnterPress: handleCastClick,
     onArrowPress: (direction) => {
       if (direction === "up") {
-        setFocus(`asset-watch-now-${assetId}`);
+        retrySetFocus("tab-cast");
         return false;
       }
       if (direction === "down" && firstRelatedId) {
-        setFocus(`related-item-${firstRelatedId}`);
+        retrySetFocus(`related-item-${firstRelatedId}`);
         return false;
       }
       return true;
@@ -2029,10 +2116,10 @@ function FocusableCastItem({ castItem, idx, asset, assetId, setSelectedProfessio
     <div
       ref={ref as any}
       onClick={handleCastClick}
-      className={`flex flex-col items-center shrink-0 w-[80px] sm:w-[96px] text-center cursor-pointer group transition-transform ${focused ? "scale-110" : ""}`}
+      className={`flex flex-col items-center shrink-0 w-[130px] sm:w-[160px] text-center cursor-pointer group transition-transform ${focused ? "scale-110" : ""}`}
     >
       {/* Circle Avatar wrapper */}
-      <div className={`w-[64px] h-[64px] sm:w-[76px] sm:h-[76px] rounded-full overflow-hidden mb-2 flex items-center justify-center bg-neutral-900 shrink-0 transition-all ${focused ? "ring-[3px] ring-white ring-offset-[4px] ring-offset-[#191919] shadow-xl" : ""}`}>
+      <div className={`w-[110px] h-[110px] sm:w-[140px] sm:h-[140px] rounded-full overflow-hidden mb-3 flex items-center justify-center bg-neutral-900 shrink-0 transition-all ${focused ? "ring-4 ring-white ring-offset-4 ring-offset-[#191919] shadow-xl" : ""}`}>
         {avatarUrl ? (
           <JOJOCommonImage
             src={avatarUrl}
@@ -2042,17 +2129,17 @@ function FocusableCastItem({ castItem, idx, asset, assetId, setSelectedProfessio
             wrapperClassName="w-full h-full"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-neutral-400 font-bold text-lg select-none">
+          <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-neutral-400 font-bold text-3xl select-none">
             {cast.name ? cast.name.charAt(0) : "?"}
           </div>
         )}
       </div>
       {/* Name */}
-      <span className={`text-[11px] sm:text-xs font-semibold line-clamp-1 leading-tight w-full transition-colors ${focused ? "text-theme_13_samecolour" : "text-neutral-300 group-hover:text-theme_13_samecolour"}`}>
+      <span className={`text-sm sm:text-base font-semibold line-clamp-1 leading-tight w-full transition-colors ${focused ? "text-theme_13_samecolour" : "text-neutral-300 group-hover:text-theme_13_samecolour"}`}>
         {cast.name}
       </span>
       {/* Role */}
-      <span className="text-[10px] sm:text-[11px] text-neutral-500 line-clamp-1 leading-tight w-full">
+      <span className="text-xs sm:text-sm text-neutral-500 line-clamp-1 leading-tight w-full">
         {cast.role}
       </span>
     </div>
@@ -2118,41 +2205,44 @@ function FocusablePreviewNextButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function FocusableTabButton({ label, isActive, onClick, focusKeyPrefix, assetId, firstEpId, firstCastId, firstRelatedId }: any) {
+function FocusableTabButton({ label, isActive, onClick, focusKeyPrefix, assetId, downTargetFocusKey }: any) {
+  const handleActivate = () => {
+    onClick();
+    // Switching tabs unmounts the old tab's content and mounts the new one in
+    // the same commit, which can drop norigin's focus pointer entirely (see
+    // retrySetFocus above) — reassert focus on this same tab button.
+    retrySetFocus(focusKeyPrefix);
+  };
   const { ref, focused } = useFocusable({
     focusKey: focusKeyPrefix,
-    onEnterPress: onClick,
+    onEnterPress: handleActivate,
     onArrowPress: (direction) => {
       if (direction === "up" && assetId) {
         setFocus(`asset-watch-now-${assetId}`);
         return false;
       }
-      if (direction === "down") {
-        if (firstEpId) {
-          setFocus(`episode-${firstEpId}`);
-          return false;
-        } else if (firstCastId) {
-          setFocus(`cast-${firstCastId}`);
-          return false;
-        } else if (firstRelatedId) {
-          setFocus(`related-item-${firstRelatedId}`);
-          return false;
-        }
+      if (direction === "down" && downTargetFocusKey) {
+        retrySetFocus(downTargetFocusKey);
+        return false;
       }
       return true;
     },
     onFocus: () => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // The hero above is exactly 100vh — align this tab bar's top edge with
+      // the viewport top (instead of centering it) so arriving here from the
+      // hero reads as a clean full-screen "page 2" swap, not a half-hero/
+      // half-content hybrid scroll.
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   });
   return (
     <button
       ref={ref as any}
-      onClick={onClick}
-      className={`pb-3 text-sm sm:text-base font-bold transition-all relative outline-none ${isActive
-        ? "text-theme_13_samecolour border-b-2 border-theme_13_samecolour"
-        : "text-neutral-400 hover:text-theme_1"
-        } ${focused ? "ring-2 ring-white/50 rounded scale-105 px-2 bg-neutral-800" : ""}`}
+      onClick={handleActivate}
+      className={`scroll-mt-10 sm:scroll-mt-14 px-5 py-2.5 sm:px-7 sm:py-3.5 rounded-full text-sm sm:text-base lg:text-lg font-bold transition-all outline-none shrink-0 ${isActive
+        ? "bg-theme_13_samecolour text-black shadow-lg"
+        : "bg-white/10 text-neutral-300 hover:bg-white/20 hover:text-theme_1"
+        } ${focused ? "ring-4 ring-white scale-105 shadow-2xl" : ""}`}
     >
       {label}
     </button>
@@ -2171,10 +2261,10 @@ function FocusableSeasonButton({ label, isOpen, onClick }: any) {
     <button
       ref={ref as any}
       onClick={onClick}
-      className={`px-4 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-xs sm:text-sm font-semibold rounded flex items-center gap-2 border transition-all cursor-pointer outline-none ${focused ? "ring-2 ring-white border-white bg-neutral-800 scale-105" : "border-neutral-800"}`}
+      className={`px-5 py-2.5 sm:px-6 sm:py-3 bg-white/10 hover:bg-white/20 text-sm sm:text-base font-bold rounded-full flex items-center gap-2 border transition-all cursor-pointer outline-none ${focused ? "ring-4 ring-white border-white bg-white/20 scale-105" : "border-white/10"}`}
     >
       {label}
-      <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+      <ChevronDown size={18} className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
     </button>
   );
 }
@@ -2187,7 +2277,7 @@ function FocusableSeasonDropdownItem({ idx, isSelected, label, onClick }: any) {
       ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   });
-  
+
   useEffect(() => {
     // Auto focus the selected item when dropdown opens
     if (isSelected) {
@@ -2199,7 +2289,7 @@ function FocusableSeasonDropdownItem({ idx, isSelected, label, onClick }: any) {
     <button
       ref={ref as any}
       onClick={onClick}
-      className={`w-full px-4 py-2 text-left text-xs sm:text-sm hover:bg-neutral-800 transition-colors cursor-pointer outline-none ${isSelected ? "text-theme_13_samecolour font-bold" : "text-neutral-300"} ${focused ? "bg-neutral-700 ring-2 ring-inset ring-white" : ""}`}
+      className={`w-full px-5 py-3 text-left text-sm sm:text-base hover:bg-neutral-800 transition-colors cursor-pointer outline-none ${isSelected ? "text-theme_13_samecolour font-bold" : "text-neutral-300"} ${focused ? "bg-neutral-700 ring-2 ring-inset ring-white" : ""}`}
     >
       {label}
     </button>
@@ -2243,7 +2333,7 @@ function FocusableLoadMoreButton({ onClick, disabled, label, lastEpisodeId }: an
   );
 }
 
-function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback, isStandalone, router, openAssetDetail, assetId, firstCastId }: any) {
+function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback, isStandalone, router, openAssetDetail, assetId, upTargetFocusKey }: any) {
   const handleClick = () => {
     if (isFallback || !id) return;
     if (isStandalone) {
@@ -2261,11 +2351,11 @@ function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback
     onEnterPress: handleClick,
     onArrowPress: (direction) => {
       if (direction === "up") {
-        if (firstCastId) {
-          setFocus(`cast-${firstCastId}`);
+        if (upTargetFocusKey && doesFocusableExist(upTargetFocusKey)) {
+          retrySetFocus(upTargetFocusKey);
           return false;
         } else if (assetId) {
-          setFocus(`asset-watch-now-${assetId}`);
+          retrySetFocus(`asset-watch-now-${assetId}`);
           return false;
         }
       }
@@ -2280,7 +2370,7 @@ function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback
     <div
       ref={ref as any}
       onClick={handleClick}
-      className={`relative w-[130px] sm:w-[160px] aspect-[2/3] rounded-lg overflow-hidden group cursor-pointer bg-neutral-900 transition-all duration-300 shrink-0 ${focused ? "ring-[3px] ring-white ring-offset-[3px] ring-offset-[#191919] scale-105 shadow-2xl" : "hover:scale-105"}`}
+      className={`relative w-[220px] sm:w-[280px] lg:w-[326px] aspect-[2/3] rounded-2xl overflow-hidden group cursor-pointer bg-neutral-900 transition-all duration-300 shrink-0 ${focused ? "ring-4 ring-white ring-offset-4 ring-offset-[#191919] scale-105 shadow-2xl" : "hover:scale-105"}`}
     >
       {img ? (
         <JOJOCommonImage
@@ -2291,12 +2381,12 @@ function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback
           wrapperClassName="w-full h-full"
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center p-2 text-center text-xs text-neutral-500 bg-neutral-900">
+        <div className="w-full h-full flex items-center justify-center p-2 text-center text-sm text-neutral-500 bg-neutral-900">
           {title}
         </div>
       )}
-      <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent transition-opacity duration-300 flex items-end p-3 ${focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-        <span className={`text-xs font-semibold truncate w-full ${focused ? "text-theme_13_samecolour" : "text-white"}`}>{title}</span>
+      <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent transition-opacity duration-300 flex items-end p-4 ${focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+        <span className={`text-sm sm:text-base font-semibold truncate w-full ${focused ? "text-theme_13_samecolour" : "text-white"}`}>{title}</span>
       </div>
     </div>
   );
