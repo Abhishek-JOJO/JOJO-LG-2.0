@@ -220,6 +220,16 @@ export function ContentRailList({
   // that cost while looking identical.
   const HERO_CROSSFADE_MS = 900;
   const [renderedHeroIndices, setRenderedHeroIndices] = useState<Set<number>>(() => new Set([activeIndex]));
+  // A CSS opacity transition only animates when a property changes on an
+  // element the browser has already painted at least once — an element
+  // mounted straight into "opacity-100" has no prior frame to transition
+  // from, so it just pops in instantly instead of fading in. Since the
+  // incoming slide only gets mounted the moment it becomes active, it needs
+  // to be painted once at opacity-0 first; revealedHeroIndex is what's
+  // actually used for the opacity class, and only catches up to activeIndex
+  // a frame later (after that opacity-0 frame has genuinely been painted),
+  // so the fade-in is a real transition instead of a snap.
+  const [revealedHeroIndex, setRevealedHeroIndex] = useState(activeIndex);
   const prevHeroIndexRef = useRef(activeIndex);
   useEffect(() => {
     if (!isHeroVariant) return;
@@ -227,10 +237,21 @@ export function ContentRailList({
     const prev = prevHeroIndexRef.current;
     prevHeroIndexRef.current = activeIndex;
     setRenderedHeroIndices(new Set([prev, activeIndex]));
+    const raf = requestAnimationFrame(() => {
+      setRevealedHeroIndex(activeIndex);
+    });
+    // A little past the CSS transition's own duration — unmounting the
+    // outgoing slide exactly when the transition is nominally "done" risks a
+    // race against the browser's own paint timing that can yank it out a
+    // frame before the fade has actually finished, reading as a hard cut
+    // instead of a smooth finish.
     const timer = setTimeout(() => {
       setRenderedHeroIndices(new Set([activeIndex]));
-    }, HERO_CROSSFADE_MS);
-    return () => clearTimeout(timer);
+    }, HERO_CROSSFADE_MS + 150);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
   }, [activeIndex, isHeroVariant]);
 
   useEffect(() => {
@@ -472,7 +493,7 @@ export function ContentRailList({
         <div className="relative h-full w-full">
           {items.map((item, index) => {
             if (!renderedHeroIndices.has(index)) return null;
-            const isActive = index === activeIndex;
+            const isActive = index === revealedHeroIndex;
             const targetAssetId = item.assetId || item.id;
             const batchPricing = mapBatchAssetAccess(batchAccessData, targetAssetId);
 

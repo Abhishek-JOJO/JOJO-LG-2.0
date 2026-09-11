@@ -314,12 +314,13 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
       )}
 
-      {/* TOP 10 Badge */}
+      {/* Top 10 rank badge — shows the item's actual rank (1, 2, 3…), not a
+          fixed "10" for every card, matching how real OTT Top 10 rows work. */}
       {config?.variant !== RailCardVariant?.TOP_TEN && item?.isTop10 && (
         <div
           className={`absolute top-0 left-0 z-30 flex font-bold flex-col items-center leading-none text-theme_1 ${isLandscapeCard
-            ? "px-3.5 pt-2.5 pb-2 rounded-br-2xl shadow-xl"
-            : "px-1.5 pt-1 rounded-br-md"
+            ? "px-4 pt-3 pb-2.5 rounded-br-2xl shadow-xl"
+            : "px-3.5 pt-2.5 pb-2 rounded-br-xl shadow-lg"
             }`}
           style={{ background: "var(--theme_13_samecolour)" }}
         >
@@ -327,7 +328,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
             className={
               isLandscapeCard
                 ? "text-sm sm:text-base font-bold tracking-wider"
-                : "text-xs sm:text-xs"
+                : "text-sm sm:text-base font-bold tracking-wider"
             }
           >
             {t("top")}
@@ -335,11 +336,11 @@ export const BaseContentCard = React.memo(function BaseContentCard({
           <span
             className={
               isLandscapeCard
-                ? "text-2xl sm:text-3xl font-black -mt-0.5"
-                : "text-lg sm:text-lg -mt-1"
+                ? "text-4xl sm:text-5xl font-black -mt-1"
+                : "text-5xl sm:text-6xl font-black -mt-2"
             }
           >
-            {t("ten")}
+            {item?.rank ?? item?.numberintop10 ?? 10}
           </span>
         </div>
       )}
