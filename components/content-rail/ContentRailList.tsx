@@ -35,6 +35,8 @@ interface ContentRailListProps {
   isLoadingMore?: boolean;
   isFirstContentRail?: boolean;
   onArrowUpDown?: (direction: "up" | "down") => boolean | void;
+  /** Makes standard (non-spotlight) cards D-pad focusable — used for rails rendered inside a modal (e.g. search) that aren't the home page's disabled preview rows. Defaults to false, preserving existing behavior everywhere else. */
+  forceFocusable?: boolean;
   /** Whether this rail has more pages left to fetch from the API — used to prefetch page N+1 ahead of the user reaching the end via remote navigation. */
   hasMore?: boolean;
   /** Fetches the next page of this rail's items; safe to call repeatedly (no-ops while a fetch is already in flight). */
@@ -196,6 +198,7 @@ export function ContentRailList({
   onArrowUpDown,
   hasMore = false,
   loadNextPage,
+  forceFocusable = false,
 }: ContentRailListProps) {
   const [virtualIndex, setVirtualIndex] = useState(0);
   const activeIndex = items?.length ? ((virtualIndex % items.length) + items.length) % items.length : 0;
@@ -598,7 +601,7 @@ export function ContentRailList({
             key={originalItem?.id || index}
             {...commonProps}
             config={standardCardConfig}
-            focusable={false}
+            focusable={forceFocusable}
           />
         );
 
@@ -634,7 +637,7 @@ export function ContentRailList({
             key={originalItem?.id || index}
             {...commonProps}
             config={standardCardConfig}
-            focusable={false}
+            focusable={forceFocusable}
           />
         );
 
@@ -660,7 +663,7 @@ export function ContentRailList({
             key={originalItem?.id || index}
             {...commonProps}
             config={standardCardConfig}
-            focusable={false}
+            focusable={forceFocusable}
           />
         );
 
@@ -671,7 +674,7 @@ export function ContentRailList({
             key={originalItem?.id || index}
             {...commonProps}
             config={standardCardConfig}
-            focusable={false}
+            focusable={forceFocusable}
           />
         );
     }

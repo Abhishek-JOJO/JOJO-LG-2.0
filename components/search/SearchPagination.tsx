@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
 
 export interface SearchPaginationProps {
     currentPage: number;
@@ -8,6 +9,49 @@ export interface SearchPaginationProps {
     totalRecords: number;
     isLoading?: boolean;
     onPageChange: (page: number) => void;
+}
+
+function PageButton({
+    disabled,
+    onClick,
+    className,
+    children,
+    ariaLabel,
+    ariaCurrent,
+}: {
+    disabled?: boolean;
+    onClick: () => void;
+    className: string;
+    children: React.ReactNode;
+    ariaLabel?: string;
+    ariaCurrent?: "page";
+}) {
+    const { ref, focused, focusKey } = useFocusable({
+        onEnterPress: () => {
+            if (!disabled) onClick();
+        },
+    });
+
+    // The search modal scrolls its own internal container, not the window,
+    // so pagination controls at the bottom need to scroll themselves into view.
+    useEffect(() => {
+        if (focused) {
+            ref.current?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+        }
+    }, [focused, ref]);
+
+    return (
+        <div
+            ref={ref as any}
+            data-focuskey={focusKey}
+            onClick={disabled ? undefined : onClick}
+            aria-label={ariaLabel}
+            aria-current={ariaCurrent}
+            className={`${className} ${focused && !disabled ? "!text-black !bg-white scale-105" : ""}`}
+        >
+            {children}
+        </div>
+    );
 }
 
 export function SearchPagination({
@@ -55,13 +99,14 @@ export function SearchPagination({
                     {t("pagination_info", { totalRecords, page: currentPage, totalPages })}
                 </p>
                 <div className="flex items-center gap-1">
-                    <div
+                    <PageButton
+                        disabled={currentPage === 1 || isLoading}
                         onClick={() => onPageChange(currentPage - 1)}
-                        aria-label={t("previous")}
                         className={iconBtn(currentPage === 1 || isLoading)}
+                        ariaLabel={t("previous")}
                     >
                         <ChevronLeft className="w-4 h-4" />
-                    </div>
+                    </PageButton>
                     {pages?.map((p, i) =>
                         p === "…" ? (
                             <span
@@ -71,25 +116,27 @@ export function SearchPagination({
                                 …
                             </span>
                         ) : (
-                            <div
+                            <PageButton
                                 key={p}
+                                disabled={isLoading}
                                 onClick={() => onPageChange(p as number)}
-                                aria-label={t("page_info", { page: p, totalPages })}
-                                aria-current={p === currentPage ? "page" : undefined}
                                 className={`${base} ${p === currentPage ? activeCls : isLoading ? disabledCls : idleCls
                                     }`}
+                                ariaLabel={t("page_info", { page: p, totalPages })}
+                                ariaCurrent={p === currentPage ? "page" : undefined}
                             >
                                 {p}
-                            </div>
+                            </PageButton>
                         )
                     )}
-                    <div
+                    <PageButton
+                        disabled={currentPage === totalPages || isLoading}
                         onClick={() => onPageChange(currentPage + 1)}
-                        aria-label={t("next")}
                         className={iconBtn(currentPage === totalPages || isLoading)}
+                        ariaLabel={t("next")}
                     >
                         <ChevronRight className="w-4 h-4" />
-                    </div>
+                    </PageButton>
                 </div>
             </div>
         </div>

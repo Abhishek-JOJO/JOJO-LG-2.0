@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { analyticsService, buildContentClickedProperties } from "@/shared/analytics";
 import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
+import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 
 import { PortraitCard } from "@/components/content-rail/cards/PortraitCard";
 import { CONTENT_RAIL_DESIGN_CONFIG } from "@/components/content-rail/config/contentRail.config";
@@ -18,6 +19,8 @@ import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDet
 import { useContentRails } from "@/features/content-rail/hooks/useContentRails";
 import { useAppNavigation } from "@/features/navigation/hooks/useAppNavigation";
 import { ROUTES } from "@/lib/constants/routes";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { restorePageFocus } from "@/src/navigation/focusUtils";
 
 export function GenreListingSkeleton() {
   return (
@@ -60,6 +63,14 @@ export default function GenreListingClient() {
   }
 
   const selectedGenre = isOpen ? (lastSelectedGenreRef.current || selectedGenreFromParams) : selectedGenreFromParams;
+
+  // Give the D-pad something to land on the moment this page loads — a plain
+  // full-page navigation (not a modal) doesn't get any automatic initial focus,
+  // so without this the remote does nothing until the user happens to trigger
+  // norigin's own fallback behavior.
+  useEffect(() => {
+    restorePageFocus();
+  }, []);
 
   const { data: navItems } = useAppNavigation(isAppReady);
   const homeSubnavId = useMemo(
@@ -164,7 +175,7 @@ export default function GenreListingClient() {
     } catch (e) {}
 
     if (item?.redirectUrl) {
-      router.push(item.redirectUrl);
+      safeNavigate(router, item.redirectUrl);
     } else if (item?.id) {
       openAssetDetail(
         item.id,
@@ -178,9 +189,14 @@ export default function GenreListingClient() {
     if (typeof window !== "undefined" && window.history.length > 1) {
       router.back();
     } else {
-      router.push(ROUTES.HOME);
+      safeNavigate(router, ROUTES.HOME);
     }
   }, [router]);
+
+  const { ref: backBtnRef, focused: backBtnFocused } = useFocusable({
+    focusKey: "genre-back-btn",
+    onEnterPress: handleBack,
+  });
 
   if ((!isAppReady || !sessionId || isLoading) && !data) {
     return <GenreListingSkeleton />;
@@ -212,8 +228,13 @@ export default function GenreListingClient() {
       <div className="w-full px-4 sm:px-6 lg:px-14 pt-28">
         <div className="flex items-center gap-4 mt-4 sm:mt-6 lg:mt-8 mb-8">
           <JOJOCustomButton
+            ref={backBtnRef as any}
+            data-focuskey="genre-back-btn"
             onClick={handleBack}
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 active:scale-95 text-theme_1 transition-all cursor-pointer border-none outline-none"
+            className={`w-10 h-10 rounded-full flex items-center justify-center active:scale-95 text-theme_1 transition-all cursor-pointer outline-none ${
+              backBtnFocused ? "scale-110" : "bg-white/5 hover:bg-white/10 border-none"
+            }`}
+            style={backBtnFocused ? { border: "3px solid #ffffff" } : undefined}
             aria-label={t("back")}
           >
             <ChevronLeft size={24} />

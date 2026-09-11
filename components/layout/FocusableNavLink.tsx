@@ -4,6 +4,7 @@ import React, { useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { motion } from "framer-motion";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 interface FocusableNavLinkProps {
   item: any;
@@ -56,7 +57,7 @@ export const FocusableNavLink = React.memo(({
   }, [index, totalNavItems, isGold, isAuthenticated]);
 
   const handleEnterPress = useCallback(() => {
-    router.push(targetUrl);
+    safeNavigate(router, targetUrl);
   }, [router, targetUrl]);
 
   const { ref, focused } = useFocusable({
@@ -75,7 +76,7 @@ export const FocusableNavLink = React.memo(({
   }, [isItemActive, index]);
 
   const handleClick = useCallback(() => {
-    router.push(targetUrl);
+    safeNavigate(router, targetUrl);
   }, [router, targetUrl]);
 
   return (

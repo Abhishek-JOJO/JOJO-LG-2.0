@@ -5,6 +5,9 @@ import { Loader2, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocaleStore } from "@/store/useLocaleStore";
+import { useFocusable, FocusContext, setFocus, getCurrentFocusKey } from "@noriginmedia/norigin-spatial-navigation";
+import { restorePageFocus } from "@/src/navigation/focusUtils";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 import { ContentRailSection } from "@/components/content-rail/ContentRailSection";
 import { RailCardVariant } from "@/components/content-rail/config/contentRail.types";
@@ -63,6 +66,19 @@ function resolveId(item: any): string {
   return String(asset?.id || asset?.asset_id || item?.item_id || item?.id || "");
 }
 
+/**
+ * Keeps a D-pad-focused element visible inside the search modal's own scroll
+ * container. The modal scrolls internally (fixed panel, overflow-y-auto) rather
+ * than the window, so nothing else in the app follows focus into it automatically.
+ */
+function useScrollIntoViewOnFocus(ref: React.RefObject<HTMLElement | null>, focused: boolean) {
+  useEffect(() => {
+    if (focused) {
+      ref.current?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    }
+  }, [focused, ref]);
+}
+
 // ─── PosterCard ───────────────────────────────────────────────────────────────
 
 function PosterCard({ item, onClick }: { item: any; onClick: () => void }) {
@@ -70,10 +86,17 @@ function PosterCard({ item, onClick }: { item: any; onClick: () => void }) {
   const title = resolveTitle(item);
   const img = item?.genre ? item.genre.image || "" : resolveImage(asset);
 
+  const { ref, focused, focusKey } = useFocusable({
+    onEnterPress: onClick,
+  });
+  useScrollIntoViewOnFocus(ref, focused);
+
   return (
     <div
+      ref={ref as any}
+      data-focuskey={focusKey}
       onClick={onClick}
-      className="aspect-[2/3] relative rounded-lg overflow-hidden cursor-pointer group transition-transform duration-300 hover:scale-105"
+      className={`aspect-[2/3] relative rounded-lg overflow-hidden cursor-pointer group transition-transform duration-200 hover:scale-105 ${focused ? "scale-105 z-10" : ""}`}
     >
       {img ? (
         <JOJOCommonImage
@@ -88,6 +111,71 @@ function PosterCard({ item, onClick }: { item: any; onClick: () => void }) {
           {title}
         </div>
       )}
+      {focused && (
+        <div
+          className="absolute inset-0 pointer-events-none rounded-lg"
+          style={{ border: "3px solid #ffffff" }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Recent search chip ────────────────────────────────────────────────────────
+
+function RecentChip({
+  term,
+  onSelect,
+  onRemove,
+}: {
+  term: string;
+  onSelect: () => void;
+  onRemove: () => void;
+}) {
+  const { ref, focused, focusKey } = useFocusable({
+    onEnterPress: onSelect,
+  });
+  useScrollIntoViewOnFocus(ref, focused);
+
+  return (
+    <div
+      ref={ref as any}
+      data-focuskey={focusKey}
+      onClick={onSelect}
+      className="flex items-center gap-2 bg-theme_9 rounded-full px-3 py-1.5 cursor-pointer transition-colors duration-150"
+      style={focused ? { border: "2px solid #ffffff" } : { border: "2px solid transparent" }}
+    >
+      <div
+        role="button"
+        aria-label={`Remove ${term}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        className="text-theme_5 hover:text-theme_1 transition-colors cursor-pointer"
+      >
+        <X className="w-4 h-4" />
+      </div>
+      <span className="body-xs-regular text-theme_6">{term}</span>
+    </div>
+  );
+}
+
+function ClearAllButton({ onClick, label }: { onClick: () => void; label: string }) {
+  const { ref, focused, focusKey } = useFocusable({
+    onEnterPress: onClick,
+  });
+  useScrollIntoViewOnFocus(ref, focused);
+
+  return (
+    <div
+      ref={ref as any}
+      data-focuskey={focusKey}
+      role="button"
+      onClick={onClick}
+      className={`caption-xs-regular rounded-full px-2 py-1 transition-colors cursor-pointer ${focused ? "bg-white text-black" : "text-theme_5 hover:text-theme_1"}`}
+    >
+      {label}
     </div>
   );
 }
@@ -154,6 +242,29 @@ function PosterGridSkeleton({ count = 10 }: { count?: number }) {
   );
 }
 
+/**
+ * Matches the shape of the idle-state browse content it stands in for: rails render
+ * as a titled, horizontally-scrolling row (ContentRailSection), not a static grid —
+ * so the loading placeholder needs to be shaped the same way, or the swap from
+ * skeleton to real content reads as a layout jump instead of a fill-in.
+ */
+function RailSkeletonRow() {
+  return (
+    <div className="px-5 sm:px-6 lg:px-8 mb-6">
+      <JOJOSkeleton variant="title" className="w-40 mb-3" />
+      <div className="flex gap-3 overflow-hidden">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <JOJOSkeleton
+            key={i}
+            variant="image"
+            className="shrink-0 w-[180px] sm:w-[220px] aspect-[16/9] rounded-xl"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface SearchModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -203,6 +314,56 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
   const hasTrackedCloseRef = useRef<boolean>(false);
 
   const { recents, addRecent, removeRecent, clearAll } = useRecentSearches();
+
+  // Trap D-pad navigation inside the modal (isFocusBoundary) so Up/Down/Left/Right
+  // never leaks through to the home page underneath — same pattern as AssetDetailModal.
+  //
+  // preferredChildFocusKey points at the close button specifically because it's the
+  // only thing in this modal that renders unconditionally and immediately. Recent-search
+  // chips (localStorage) and browse rails (network) can take longer than any fixed delay
+  // to register on TV hardware — if setFocus("MODAL_SEARCH") is called before either has
+  // a single child registered, it has nothing to descend into and settles on the empty
+  // boundary node itself. isFocusBoundary only constrains navigation trying to leave a
+  // boundary from a child inside it — it does not protect the boundary node itself from
+  // being navigated away from by the tree outside it — so a focus emptily parked on
+  // MODAL_SEARCH is not actually trapped at all, and D-pad presses can walk straight back
+  // onto the home page behind it. Always having a real, immediately-available target to
+  // land on removes that gap entirely.
+  const { ref: modalFocusRef, focusKey: modalFocusKey } = useFocusable({
+    focusKey: "MODAL_SEARCH",
+    isFocusBoundary: true,
+    preferredChildFocusKey: "search-close-btn",
+  });
+
+  // Keep re-asserting focus into the modal until it actually lands on a real child
+  // (a chip/card/button), not the empty boundary itself. Recent-search chips load
+  // from localStorage and the browse rails load over the network — on TV hardware
+  // neither is guaranteed to be registered within a single fixed delay, so a single
+  // setFocus() call can land on nothing focusable yet. Polling (same pattern as
+  // restorePageFocus) covers that instead of guessing one delay.
+  useEffect(() => {
+    if (!isOpen) {
+      restorePageFocus();
+      return;
+    }
+
+    let attempts = 0;
+    const maxAttempts = 15; // ~1.5s at 100ms steps
+    const interval = setInterval(() => {
+      attempts++;
+      setFocus("MODAL_SEARCH");
+      if (getCurrentFocusKey() !== "MODAL_SEARCH" || attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isOpen]);
+
+  const { ref: closeBtnRef, focused: closeBtnFocused } = useFocusable({
+    focusKey: "search-close-btn",
+    onEnterPress: () => onClose(),
+  });
 
   const {
     data: railsData,
@@ -309,7 +470,9 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      // e.keyCode 461 is the LG webOS remote's physical Back key.
+      if (e.key === "Escape" || e.keyCode === 461) {
+        e.preventDefault();
         onClose();
         return;
       }
@@ -501,7 +664,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
             source: 'search_modal',
           });
         } catch (e) { }
-        router.push(`${ROUTES.GENRE}?genre=${slug}`);
+        safeNavigate(router, `${ROUTES.GENRE}?genre=${slug}`);
         return;
       }
 
@@ -515,7 +678,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
         item?.genre?.redirectUrl;
 
       if (redirectUrl) {
-        router.push(redirectUrl);
+        safeNavigate(router, redirectUrl);
         return;
       }
 
@@ -578,8 +741,11 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
             className="fixed inset-0 z-[10000] bg-black/60"
             style={{ WebkitBackdropFilter: "blur(6px)", backdropFilter: "blur(6px)" }}
           />
+          <FocusContext.Provider value={modalFocusKey}>
           <motion.div
             key="panel"
+            ref={modalFocusRef as any}
+            data-focuskey={modalFocusKey}
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
@@ -633,10 +799,12 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                   <Loader2 className="w-4 h-4 text-theme_13_samecolour animate-spin" />
                 )}
                 <div
+                  ref={closeBtnRef as any}
+                  data-focuskey="search-close-btn"
                   role="button"
                   aria-label={t("close")}
                   onClick={onClose}
-                  className="text-theme_5 hover:text-theme_1 transition-colors cursor-pointer"
+                  className={`p-1.5 rounded-full transition-colors cursor-pointer ${closeBtnFocused ? "bg-white text-black" : "text-theme_5 hover:text-theme_1"}`}
                 >
                   <X className="w-5 h-5" />
                 </div>
@@ -662,49 +830,31 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                         <h3 className="title-xs-semibold text-theme_1">
                           {t("recent_searches")}
                         </h3>
-                        <div
-                          role="button"
-                          onClick={clearAll}
-                          className="caption-xs-regular text-theme_5 hover:text-theme_1 transition-colors cursor-pointer"
-                        >
-                          {t("clear_all")}
-                        </div>
+                        <ClearAllButton onClick={clearAll} label={t("clear_all")} />
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {recents.map((term) => (
-                          <div
+                          <RecentChip
                             key={term}
-                            className="flex items-center gap-2 bg-theme_9 rounded-full px-3 py-1.5"
-                          >
-                            <div
-                              role="button"
-                              aria-label={`Remove ${term}`}
-                              onClick={() => removeRecent(term)}
-                              className="text-theme_5 hover:text-theme_1 transition-colors cursor-pointer"
-                            >
-                              <X className="w-4 h-4" />
-                            </div>
-                            <div
-                              role="button"
-                              onClick={() => {
-                                setInputValue(term);
-                                inputRef.current?.focus();
-                              }}
-                              className="body-xs-regular text-theme_6 hover:text-theme_1 transition-colors cursor-pointer"
-                            >
-                              {term}
-                            </div>
-                          </div>
+                            term={term}
+                            onRemove={() => removeRecent(term)}
+                            onSelect={() => {
+                              setInputValue(term);
+                              inputRef.current?.focus();
+                            }}
+                          />
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Skeleton while rails load */}
+                  {/* Skeleton while rails load — mirrors the real rails: several
+                      titled, horizontally-scrolling rows, not a single static grid */}
                   {railsBusy && (
-                    <div className="px-5 space-y-3">
-                      <JOJOSkeleton variant="title" className="w-40" />
-                      <PosterGridSkeleton count={10} />
+                    <div className="py-2">
+                      <RailSkeletonRow />
+                      <RailSkeletonRow />
+                      <RailSkeletonRow />
                     </div>
                   )}
 
@@ -731,6 +881,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                           railId={rail.id}
                           totalPages={rail.totalPages}
                           disableHover={true}
+                          forceFocusable={true}
                           onViewAllClick={() => {
                             // NOTE: Do NOT call onClose() here — same race condition as handleCardClick.
                             // router.push below will navigate away from /search naturally.
@@ -738,7 +889,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                                const titleSlug = slugify(rail.title);
                                useBrowseHiddenStore.getState().setHiddenParams(rail.id, 1);
                                const targetUrl = titleSlug ? `/browse?slug=${titleSlug}` : "/browse";
-                               router.push(targetUrl);
+                               safeNavigate(router, targetUrl);
                              }
                            }}
                           button_name={rail?.button_name}
@@ -823,6 +974,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
               )}
             </div>
           </motion.div>
+          </FocusContext.Provider>
         </>
       )}
     </AnimatePresence>

@@ -9,6 +9,7 @@ import { RailCardDesignConfig } from "../config/contentRail.config";
 import { getGenreBackground } from "@/lib/utils";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { ROUTES } from "@/lib/constants/routes";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 interface GenreCardProps {
   item: ContentRailItem;
@@ -42,7 +43,11 @@ export function GenreCard({
     focusable,
     onFocus: () => {
       if (cardRef.current) {
-        const currentSection = cardRef.current.closest("section");
+        // Cross-rail section jumping/dimming below is a home-page-only concept — skip it
+        // entirely when this card is rendered inside a modal (search, asset detail), where
+        // there's no such section list and no home-page rail to dim.
+        const insideModal = cardRef.current.closest('[data-focuskey="MODAL_SEARCH"], [data-focuskey="MODAL_ASSET_DETAIL"]');
+        const currentSection = insideModal ? null : cardRef.current.closest("section");
         if (currentSection) {
           const sIndex = currentSection.getAttribute("data-section-index");
           if (sIndex !== null) {
@@ -60,6 +65,12 @@ export function GenreCard({
       }
     },
     onArrowPress: (direction) => {
+      // Same home-page-only guard as onFocus above — document.querySelectorAll("section")
+      // below would otherwise find (and jump focus onto) sections on the home page behind
+      // an open modal, escaping the modal's focus boundary entirely.
+      if (cardRef.current?.closest('[data-focuskey="MODAL_SEARCH"], [data-focuskey="MODAL_ASSET_DETAIL"]')) {
+        return true;
+      }
       if (direction === "up") {
         const currentSection = cardRef.current?.closest("section");
         if (currentSection) {
@@ -129,7 +140,7 @@ export function GenreCard({
         onClick();
       } else if ((item as any)?.slug || item?.title) {
         const slug = (item as any)?.slug || item?.title;
-        router.push(`${ROUTES.GENRE}?genre=${slug.toLowerCase().trim()}`);
+        safeNavigate(router, `${ROUTES.GENRE}?genre=${slug.toLowerCase().trim()}`);
       }
     },
   });
@@ -153,7 +164,7 @@ export function GenreCard({
     } else {
       const slug = (item as any)?.slug || item?.title;
       if (slug) {
-        router.push(`${ROUTES.GENRE}?genre=${slug.toLowerCase().trim()}`);
+        safeNavigate(router, `${ROUTES.GENRE}?genre=${slug.toLowerCase().trim()}`);
       }
     }
   };

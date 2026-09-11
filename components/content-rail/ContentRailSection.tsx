@@ -18,6 +18,7 @@ import { logger } from "@/lib/logger/logger";
 import { useTranslations } from "next-intl";
 import { useBrowseHiddenStore } from "@/store/useBrowseHiddenStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 interface ContentRailSectionProps {
   cr_title: string;
@@ -36,6 +37,8 @@ interface ContentRailSectionProps {
   index: number;
   isFirstContentRail?: boolean;
   onArrowUpDown?: (direction: "up" | "down") => boolean | void;
+  /** Makes this rail's cards D-pad focusable even though it isn't the spotlight rail — used inside modals (e.g. search) rather than the home page's disabled preview rows. */
+  forceFocusable?: boolean;
 }
 
 export function ContentRailSection({
@@ -55,6 +58,7 @@ export function ContentRailSection({
   index,
   isFirstContentRail = false,
   onArrowUpDown,
+  forceFocusable = false,
 }: ContentRailSectionProps) {
   const t = useTranslations("contentRails");
   const router = useRouter();
@@ -105,7 +109,7 @@ export function ContentRailSection({
         if (onGenreClick) {
           onGenreClick(genreName.toLowerCase());
         }
-        router.push(`${ROUTES.GENRE}?genre=${slug}`);
+        safeNavigate(router, `${ROUTES.GENRE}?genre=${slug}`);
         return;
       }
     }
@@ -234,6 +238,7 @@ export function ContentRailSection({
           onArrowUpDown={onArrowUpDown}
           hasMore={hasMore}
           loadNextPage={loadNextPage}
+          forceFocusable={forceFocusable}
         />
       </div>
     </section>

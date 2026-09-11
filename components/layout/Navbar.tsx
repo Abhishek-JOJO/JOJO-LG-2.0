@@ -5,6 +5,7 @@ import { LogoutButton } from "@/features/auth/ui/LogoutButton";
 import { appConfig } from "@/lib/config/app.config";
 import { LOGOS } from "@/lib/constants/assets";
 import { ROUTES } from "@/lib/constants/routes";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 import { themeColors } from "@/tailwind.config";
 import { Search } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -20,6 +21,7 @@ import { useNavbar } from "./hooks/useNavbar";
 import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { usePlayerStore } from "@/store/usePlayerStore";
 
 function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: number; isAuthenticated: boolean }) {
   const router = useRouter();
@@ -50,13 +52,13 @@ function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: n
   const { ref, focused } = useFocusable({
     focusKey: 'navbar-get-gold',
     onArrowPress: handleArrowPress,
-    onEnterPress: () => router.push(ROUTES.SUBSCRIPTION),
+    onEnterPress: () => safeNavigate(router, ROUTES.SUBSCRIPTION),
   });
 
   return (
     <div
       ref={ref as any}
-      onClick={() => router.push(ROUTES.SUBSCRIPTION)}
+      onClick={() => safeNavigate(router, ROUTES.SUBSCRIPTION)}
       className={`cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 text-base sm:text-lg font-bold whitespace-nowrap rounded-full transition-all duration-200 shrink-0 ${focused
           ? "scale-105 ring-2 ring-white text-black bg-gradient-to-r from-[#FAAF3F] via-[#FFD691] to-[#FAAF3F]"
           : "text-[#FAAF3F] hover:text-[#FFD691] hover:bg-amber-500/10"
@@ -68,7 +70,7 @@ function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: n
 }
 
 function FocusableSearch({ totalNavItems }: { totalNavItems: number }) {
-  const router = useRouter();
+  const setSearchOpen = usePlayerStore((s) => s.setSearchOpen);
 
   const handleArrowPress = (direction: string) => {
     if (direction === 'up') return false;
@@ -93,13 +95,13 @@ function FocusableSearch({ totalNavItems }: { totalNavItems: number }) {
   const { ref, focused } = useFocusable({
     focusKey: 'navbar-search',
     onArrowPress: handleArrowPress,
-    onEnterPress: () => router.push(`${ROUTES.SEARCH}?from=app`),
+    onEnterPress: () => setSearchOpen(true),
   });
 
   return (
     <div
       ref={ref as any}
-      onClick={() => router.push(`${ROUTES.SEARCH}?from=app`)}
+      onClick={() => setSearchOpen(true)}
       className={`p-2.5 rounded-full cursor-pointer flex items-center justify-center transition-all duration-200 shrink-0 ${focused
           ? "bg-white text-black scale-110 ring-2 ring-white"
           : "text-white/90 hover:text-white hover:bg-white/10"
@@ -136,7 +138,7 @@ function FocusableLoginButton({ t, router, totalNavItems, isGold }: { t: any; ro
   const { ref, focused } = useFocusable({
     focusKey: 'navbar-login',
     onArrowPress: handleArrowPress,
-    onEnterPress: () => router.push(ROUTES.LOGIN),
+    onEnterPress: () => safeNavigate(router, ROUTES.LOGIN),
   });
 
   return (
@@ -145,7 +147,7 @@ function FocusableLoginButton({ t, router, totalNavItems, isGold }: { t: any; ro
         size={JOJOButton.Size.M}
         hoverColor={themeColors.theme_13_samecolour}
         state={JOJOButton.State.ACTIVE}
-        onClick={() => router.push(ROUTES.LOGIN)}
+        onClick={() => safeNavigate(router, ROUTES.LOGIN)}
         className="rounded-[100px] body-xs-medium sm:body-sm-medium h-8 sm:h-10 px-4 ml-1 cursor-pointer"
       >
         {t("login")}
@@ -157,6 +159,7 @@ function FocusableLoginButton({ t, router, totalNavItems, isGold }: { t: any; ro
 export function Navbar() {
   const t = useTranslations("loginPage");
   const { showLanguageDropdown, isShowLanguageDropdown } = appConfig?.flags;
+  const setSearchOpen = usePlayerStore((s) => s.setSearchOpen);
 
   const {
     pathname,
@@ -302,7 +305,7 @@ export function Navbar() {
                       size={JOJOButton.Size.L}
                       hoverColor={themeColors.theme_13_samecolour}
                       state={JOJOButton.State.ACTIVE}
-                      onClick={() => router.push(ROUTES.LOGIN)}
+                      onClick={() => safeNavigate(router, ROUTES.LOGIN)}
                       className="rounded-[100px] body-xs-medium sm:body-sm-medium h-9 sm:h-12 px-5 sm:px-5 z-10 cursor-pointer"
                     >
                       {t("login")}
@@ -336,7 +339,7 @@ export function Navbar() {
       {isBrowsingMode && (
         <BottomNav
           navItems={navItems}
-          onSearchClick={() => router.push(`${ROUTES.SEARCH}?from=app`)}
+          onSearchClick={() => setSearchOpen(true)}
           onMenuClick={() => setIsMobileMenuOpen(true)}
         />
       )}

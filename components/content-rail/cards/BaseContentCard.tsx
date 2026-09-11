@@ -83,7 +83,11 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         if (handled !== false) return false;
       }
       if (direction === 'up' || direction === 'down') {
-        if (cardRef.current) {
+        // Cross-rail section jumping (and the hero-carousel escape hatch above it) is a
+        // home-page-only concept — skip it inside a modal (search, asset detail), where
+        // there's no such section list and jumping to the home page's hero would escape
+        // the modal's focus boundary entirely.
+        if (cardRef.current && !cardRef.current.closest('[data-focuskey="MODAL_SEARCH"], [data-focuskey="MODAL_ASSET_DETAIL"]')) {
           const currentSection = cardRef.current.closest('section');
           if (currentSection && currentSection.parentElement) {
             const allSections = Array.from(currentSection.parentElement.querySelectorAll('section'));
@@ -148,7 +152,11 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     },
     onFocus: () => {
       if (cardRef.current) {
-        const currentSection = cardRef.current.closest('section');
+        // activeSectionIndex is a home-page-only concept (drives row dimming there) —
+        // writing to it from inside a modal would use the modal's own local section
+        // indices and corrupt the home page's dimming state once the modal closes.
+        const insideModal = cardRef.current.closest('[data-focuskey="MODAL_SEARCH"], [data-focuskey="MODAL_ASSET_DETAIL"]');
+        const currentSection = insideModal ? null : cardRef.current.closest('section');
         if (currentSection) {
           const sIndex = currentSection.getAttribute('data-section-index');
           const sectionIdx = sIndex !== null ? Number(sIndex) : -1;

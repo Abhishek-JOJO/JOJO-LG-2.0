@@ -11,7 +11,11 @@ import { GuestLoginPopup } from "@/features/auth/ui/GuestLoginPopup";
 import { SessionExpiredModal } from "@/features/auth/ui/SessionExpiredModal";
 import { StatusLine } from "@/components/common/StatusLine";
 import { AmbientBackground } from "@/components/common/AmbientBackground";
+import { SearchModal } from "@/components/search/SearchModal";
+import { usePlayerStore } from "@/store/usePlayerStore";
 export function LayoutClientWrapper({ children }: { children: React.ReactNode }) {
+  const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
+  const setSearchOpen = usePlayerStore((s) => s.setSearchOpen);
   const { showNavbar, showFooter } = appConfig?.flags;
   const pathname = useActivePathname();
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
@@ -58,6 +62,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
       </main>
       <CookieBanner />
       <AssetDetailModal />
+      <SearchModal isOpen={isSearchOpen} onClose={() => setSearchOpen(false)} />
       <GuestLoginPopup />
       <SessionExpiredModal />
       {showFooter && !hideHeaderFooter && <Footer />}
