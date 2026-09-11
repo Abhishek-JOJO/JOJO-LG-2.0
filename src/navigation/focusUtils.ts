@@ -1,6 +1,8 @@
 "use client";
 
 import { setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+import { usePlayerStore } from "@/store/usePlayerStore";
+import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 
 const MAX_ATTEMPTS = 20; // ~2s of retrying at 100ms — generous for slow TV hardware
 const POLL_INTERVAL_MS = 100;
@@ -32,6 +34,16 @@ export function restorePageFocus() {
   const interval = setInterval(() => {
     attempts++;
     if (attempts > MAX_ATTEMPTS) {
+      clearInterval(interval);
+      return;
+    }
+
+    // A full-screen modal (search, asset detail) owns its own focus while it's open.
+    // If one is currently open, this call must have been triggered by something
+    // unrelated to it — e.g. the home page behind it refetching its rails data and
+    // re-running its own restorePageFocus() effect — and proceeding would silently
+    // steal focus away from the modal's content without any visible cause.
+    if (usePlayerStore.getState().isSearchOpen || useAssetDetailStore.getState().isOpen) {
       clearInterval(interval);
       return;
     }

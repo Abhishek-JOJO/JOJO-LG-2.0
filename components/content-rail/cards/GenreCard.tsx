@@ -65,18 +65,27 @@ export function GenreCard({
       }
     },
     onArrowPress: (direction) => {
-      // Same home-page-only guard as onFocus above — document.querySelectorAll("section")
-      // below would otherwise find (and jump focus onto) sections on the home page behind
-      // an open modal, escaping the modal's focus boundary entirely.
-      if (cardRef.current?.closest('[data-focuskey="MODAL_SEARCH"], [data-focuskey="MODAL_ASSET_DETAIL"]')) {
-        return true;
-      }
+      // Rail-to-rail vertical jumping needs to work inside a modal (search, asset
+      // detail) too — those rails are wrapped in the exact same <section
+      // data-section-index> structure as the home page. The only modal-specific
+      // concern is document.querySelectorAll("section") finding the home page's
+      // OWN sections behind the modal and escaping the focus boundary — so scope
+      // the query to the modal root instead of skipping the logic altogether.
+      const modalRoot = cardRef.current?.closest(
+        '[data-focuskey="MODAL_SEARCH"], [data-focuskey="MODAL_ASSET_DETAIL"]'
+      ) as ParentNode | null;
+      const sectionQueryRoot: ParentNode = modalRoot || document;
       if (direction === "up") {
         const currentSection = cardRef.current?.closest("section");
         if (currentSection) {
-          const allSections = Array.from(document.querySelectorAll("section"));
+          const allSections = Array.from(sectionQueryRoot.querySelectorAll("section"));
           const currentIndex = allSections.indexOf(currentSection);
           if (currentIndex <= 1) {
+            // The hero-carousel escape hatch is a home-page-only concept — jumping
+            // to it from inside a modal would escape the modal's focus boundary.
+            if (modalRoot) {
+              return true;
+            }
             window.scrollTo({ top: 0, behavior: "auto" });
             const hero = document.getElementById("hero-carousel-container");
             hero?.focus({ preventScroll: true });
@@ -90,8 +99,10 @@ export function GenreCard({
             ) as HTMLElement | null;
             if (targetCard) {
               const targetKey = targetCard.getAttribute("data-focuskey");
-              const sIndex = prevSection.getAttribute("data-section-index");
-              useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex - 1);
+              if (!modalRoot) {
+                const sIndex = prevSection.getAttribute("data-section-index");
+                useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex - 1);
+              }
               const sectionRect = prevSection.getBoundingClientRect();
               window.scrollTo({
                 top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105),
@@ -108,7 +119,7 @@ export function GenreCard({
       } else if (direction === "down") {
         const currentSection = cardRef.current?.closest("section");
         if (currentSection) {
-          const allSections = Array.from(document.querySelectorAll("section"));
+          const allSections = Array.from(sectionQueryRoot.querySelectorAll("section"));
           const currentIndex = allSections.indexOf(currentSection);
           if (currentIndex < allSections.length - 1) {
             const nextSection = allSections[currentIndex + 1];
@@ -117,8 +128,13 @@ export function GenreCard({
             ) as HTMLElement | null;
             if (targetCard) {
               const targetKey = targetCard.getAttribute("data-focuskey");
-              const sIndex = nextSection.getAttribute("data-section-index");
-              useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex + 1);
+              // activeSectionIndex drives the home page's own row-dimming — it's a
+              // home-page-only concept, so don't write it from inside a modal (the
+              // home page stays mounted behind the modal and would visibly react).
+              if (!modalRoot) {
+                const sIndex = nextSection.getAttribute("data-section-index");
+                useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex + 1);
+              }
               const sectionRect = nextSection.getBoundingClientRect();
               window.scrollTo({
                 top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105),

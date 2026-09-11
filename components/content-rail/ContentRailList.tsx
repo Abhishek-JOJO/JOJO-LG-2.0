@@ -714,7 +714,18 @@ export function ContentRailList({
           </div>
         </FocusContext.Provider>
       ) : (
-        cardElements
+        // railBoundaryRef's useFocusable() call above runs unconditionally, registering
+        // itself in norigin's focus tree regardless of isSpotlightRail — but without a DOM
+        // node to attach the ref to here, that registration is a "ghost" entry with no
+        // measurable layout. That went unnoticed while these rails had no focusable cards
+        // of their own to navigate between, but now that forceFocusable rails do, a sibling
+        // with no bounding rect can break coordinate-based navigation for the real cards
+        // next to it. display:contents keeps this invisible to layout (children still
+        // participate in the parent flex row exactly as before) while giving the ref a
+        // real node to attach to.
+        <div ref={railBoundaryRef as any} style={{ display: "contents" }}>
+          {cardElements}
+        </div>
       )}
       {skeletonElement}
     </div>

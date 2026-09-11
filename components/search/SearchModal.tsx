@@ -5,7 +5,7 @@ import { Loader2, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocaleStore } from "@/store/useLocaleStore";
-import { useFocusable, FocusContext, setFocus, getCurrentFocusKey } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { restorePageFocus } from "@/src/navigation/focusUtils";
 import { safeNavigate } from "@/lib/webos/safeNavigate";
 
@@ -157,6 +157,35 @@ function RecentChip({
         <X className="w-4 h-4" />
       </div>
       <span className="body-xs-regular text-theme_6">{term}</span>
+    </div>
+  );
+}
+
+/**
+ * Deliberately its own component, not an inline useFocusable() call inside SearchModal
+ * itself: a component's hook calls read FocusContext from its OWN position in the tree
+ * (i.e. wherever SearchModal itself sits), never from a <FocusContext.Provider> that same
+ * component later renders in its own returned JSX — a provider only reaches descendant
+ * components, not the component's own hooks. Keeping this inline previously registered it
+ * under the app root instead of under MODAL_SEARCH, which broke preferredChildFocusKey
+ * (nothing to descend into) and left focus stuck on the empty boundary node.
+ */
+function SearchCloseButton({ onClose, label }: { onClose: () => void; label: string }) {
+  const { ref, focused, focusKey } = useFocusable({
+    focusKey: "search-close-btn",
+    onEnterPress: onClose,
+  });
+
+  return (
+    <div
+      ref={ref as any}
+      data-focuskey={focusKey}
+      role="button"
+      aria-label={label}
+      onClick={onClose}
+      className={`p-1.5 rounded-full transition-colors cursor-pointer ${focused ? "bg-white text-black" : "text-theme_5 hover:text-theme_1"}`}
+    >
+      <X className="w-5 h-5" />
     </div>
   );
 }
@@ -335,35 +364,50 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
     preferredChildFocusKey: "search-close-btn",
   });
 
-  // Keep re-asserting focus into the modal until it actually lands on a real child
-  // (a chip/card/button), not the empty boundary itself. Recent-search chips load
-  // from localStorage and the browse rails load over the network — on TV hardware
-  // neither is guaranteed to be registered within a single fixed delay, so a single
-  // setFocus() call can land on nothing focusable yet. Polling (same pattern as
-  // restorePageFocus) covers that instead of guessing one delay.
+  // Focus the close button directly (by its own key) rather than through
+  // preferredChildFocusKey resolution on the boundary — going through the boundary's
+  // container key proved unreliable in practice. Calling setFocus at most once (the
+  // moment the close button first exists) also means it can never re-fire later and
+  // fight the user's own navigation once they've moved elsewhere.
+  //
+  // Watches the DOM directly (MutationObserver) rather than polling on a timer: in
+  // theory the close button's own useFocusable() registration effect always completes
+  // before this effect runs (child effects commit before parent effects in the same
+  // render), so a synchronous check right here should always succeed immediately — but
+  // that didn't hold reliably in practice, and no fixed poll interval proved
+  // consistently fast enough either. Reacting to the actual DOM mutation removes the
+  // guesswork: it fires the instant the element genuinely appears, whatever the cause
+  // of the variable timing turns out to be.
   useEffect(() => {
     if (!isOpen) {
       restorePageFocus();
       return;
     }
 
-    let attempts = 0;
-    const maxAttempts = 15; // ~1.5s at 100ms steps
-    const interval = setInterval(() => {
-      attempts++;
-      setFocus("MODAL_SEARCH");
-      if (getCurrentFocusKey() !== "MODAL_SEARCH" || attempts >= maxAttempts) {
-        clearInterval(interval);
+    const tryFocusCloseButton = () => {
+      if (doesFocusableExist("search-close-btn")) {
+        setFocus("search-close-btn");
+        return true;
       }
-    }, 100);
+      return false;
+    };
 
-    return () => clearInterval(interval);
+    if (tryFocusCloseButton()) return;
+
+    const observer = new MutationObserver(() => {
+      if (tryFocusCloseButton()) {
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    const timeoutId = setTimeout(() => observer.disconnect(), 5000);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(timeoutId);
+    };
   }, [isOpen]);
-
-  const { ref: closeBtnRef, focused: closeBtnFocused } = useFocusable({
-    focusKey: "search-close-btn",
-    onEnterPress: () => onClose(),
-  });
 
   const {
     data: railsData,
@@ -798,16 +842,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                 {showSpinner && hasQuery && (
                   <Loader2 className="w-4 h-4 text-theme_13_samecolour animate-spin" />
                 )}
-                <div
-                  ref={closeBtnRef as any}
-                  data-focuskey="search-close-btn"
-                  role="button"
-                  aria-label={t("close")}
-                  onClick={onClose}
-                  className={`p-1.5 rounded-full transition-colors cursor-pointer ${closeBtnFocused ? "bg-white text-black" : "text-theme_5 hover:text-theme_1"}`}
-                >
-                  <X className="w-5 h-5" />
-                </div>
+                <SearchCloseButton onClose={onClose} label={t("close")} />
               </div>
             </div>
 

@@ -83,11 +83,14 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         if (handled !== false) return false;
       }
       if (direction === 'up' || direction === 'down') {
-        // Cross-rail section jumping (and the hero-carousel escape hatch above it) is a
-        // home-page-only concept — skip it inside a modal (search, asset detail), where
-        // there's no such section list and jumping to the home page's hero would escape
-        // the modal's focus boundary entirely.
-        if (cardRef.current && !cardRef.current.closest('[data-focuskey="MODAL_SEARCH"], [data-focuskey="MODAL_ASSET_DETAIL"]')) {
+        // Cross-rail section jumping needs to work inside a modal (search, asset detail)
+        // too — those rails are wrapped in the exact same <section data-section-index>
+        // structure as the home page, so scoping the query to the section's own parent
+        // (already done below, not document-wide) means it can never pick up the home
+        // page's sections. The one truly home-page-only piece is the hero-carousel
+        // escape hatch at the very top of the list — that's guarded separately below.
+        const modalRoot = cardRef.current?.closest('[data-focuskey="MODAL_SEARCH"], [data-focuskey="MODAL_ASSET_DETAIL"]');
+        if (cardRef.current) {
           const currentSection = cardRef.current.closest('section');
           if (currentSection && currentSection.parentElement) {
             const allSections = Array.from(currentSection.parentElement.querySelectorAll('section'));
@@ -95,21 +98,29 @@ export const BaseContentCard = React.memo(function BaseContentCard({
 
             if (direction === 'up') {
               if (currentIndex <= 1) {
-                const hero = document.getElementById('hero-carousel-container');
-                if (hero) {
-                  useActiveRailStore.getState().setActiveSectionIndex(0);
-                  window.scrollTo({ top: 0, behavior: 'auto' });
-                  hero.focus({ preventScroll: true });
-                  try { setFocus('hero-carousel'); } catch { }
-                  return false;
+                // Jumping to the home page's hero would escape the modal's focus
+                // boundary — only do this when there's no modal in the way.
+                if (!modalRoot) {
+                  const hero = document.getElementById('hero-carousel-container');
+                  if (hero) {
+                    useActiveRailStore.getState().setActiveSectionIndex(0);
+                    window.scrollTo({ top: 0, behavior: 'auto' });
+                    hero.focus({ preventScroll: true });
+                    try { setFocus('hero-carousel'); } catch { }
+                    return false;
+                  }
                 }
               } else {
                 const prevSection = allSections[currentIndex - 1];
                 const targetCard = prevSection?.querySelector('[data-focuskey*="spotlight-lead"], [data-focuskey]') as HTMLElement | null;
                 if (targetCard) {
                   const targetKey = targetCard.getAttribute('data-focuskey');
-                  const sIndex = prevSection.getAttribute('data-section-index');
-                  useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex - 1);
+                  // activeSectionIndex drives the home page's own row-dimming — a
+                  // home-page-only concept the still-mounted home page would react to.
+                  if (!modalRoot) {
+                    const sIndex = prevSection.getAttribute('data-section-index');
+                    useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex - 1);
+                  }
                   const sectionRect = prevSection.getBoundingClientRect();
                   const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105);
                   window.scrollTo({
@@ -129,8 +140,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
                 const targetCard = nextSection?.querySelector('[data-focuskey*="spotlight-lead"], [data-focuskey]') as HTMLElement | null;
                 if (targetCard) {
                   const targetKey = targetCard.getAttribute('data-focuskey');
-                  const sIndex = nextSection.getAttribute('data-section-index');
-                  useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex + 1);
+                  if (!modalRoot) {
+                    const sIndex = nextSection.getAttribute('data-section-index');
+                    useActiveRailStore.getState().setActiveSectionIndex(sIndex !== null ? Number(sIndex) : currentIndex + 1);
+                  }
                   const sectionRect = nextSection.getBoundingClientRect();
                   const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105);
                   window.scrollTo({
