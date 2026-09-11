@@ -20,7 +20,7 @@ interface ContinueWatchingStore {
   fetchItems: () => void;
   removeItem: (assetId: string) => void;
   clearItems: () => void;
-  handleSocketResponse: (rawResponse: any) => void;
+  handleSocketResponse: (rawResponse: any) => Promise<void>;
 }
 
 export const useContinueWatchingStore = create<ContinueWatchingStore>((set, get) => ({
@@ -74,9 +74,9 @@ export const useContinueWatchingStore = create<ContinueWatchingStore>((set, get)
     set({ items: [], isLoading: false, isError: false });
   },
 
-  handleSocketResponse: (rawResponse) => {
+  handleSocketResponse: async (rawResponse) => {
     try {
-      const response = decryptSocketData(rawResponse);
+      const response = await decryptSocketData(rawResponse);
       if (!response) return;
 
       const metaData = response["meta-data"] || response.metadata || response.meta || {};

@@ -146,7 +146,7 @@ async function performFetch(): Promise<RuntimeConfig> {
                 logger.info("[Config] Encrypted data type:", typeof encryptedData);
                 logger.info("[Config] Encrypted data preview:", typeof encryptedData === 'string' ? encryptedData.substring(0, 100) + '...' : encryptedData);
 
-                const decrypted = decryptConfig(encryptedData);
+                const decrypted = await decryptConfig(encryptedData);
                 logger.info("[Config] Decryption successful, decrypted config:", decrypted);
                 return decrypted;
             } catch (decryptError) {
@@ -191,9 +191,9 @@ async function performFetch(): Promise<RuntimeConfig> {
 /**
  * Decrypts config response using AES with keys from env
  */
-function decryptConfig(encrypted: string): RuntimeConfig {
+async function decryptConfig(encrypted: string): Promise<RuntimeConfig> {
     try {
-        const decrypted = decrypt(encrypted, true);
+        const decrypted = await decrypt(encrypted, true);
         const parsed = JSON.parse(decrypted);
 
         logger.info("[Config] Decryption successful, decrypted config:", parsed);

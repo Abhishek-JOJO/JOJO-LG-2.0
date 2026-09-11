@@ -14,7 +14,7 @@
 import { decrypt } from "@/lib/crypto/decrypt";
 import { logger } from "@lib/logger/logger";
 
-export function decryptSocketData(response: any): any {
+export async function decryptSocketData(response: any): Promise<any> {
   if (!response) return null;
 
   // Find the deepest encrypted string in the nested data structure
@@ -35,7 +35,7 @@ export function decryptSocketData(response: any): any {
       logger.info('[Socket] Decrypting socket response payload', { 
         length: encryptedPayload.length 
       });
-      const decrypted = decrypt(encryptedPayload, true);
+      const decrypted = await decrypt(encryptedPayload, true);
       if (decrypted) {
         const parsed = JSON.parse(decrypted);
         logger.info('[Socket] Successfully decrypted socket response', { 

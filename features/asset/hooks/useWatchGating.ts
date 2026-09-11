@@ -30,6 +30,7 @@ import { appConfig } from "@/lib/config/app.config";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 import { useGuestPopupStore } from "@/store/useGuestPopupStore";
 import { transformTVODToPaymentPlan } from "@/lib/utils/tvodPaymentTransformer";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 // ── Gate result types ──────────────────────────────────────────────────────────
 
@@ -151,7 +152,7 @@ export function useWatchGating({
       // Priority 2: Overseas gating — non-IN users must be subscribed (except for TVOD assets)
       if (isOverseas && !isSubscribed && !isTvodAsset) {
         useAssetDetailStore.getState().resetAssetDetailModal();
-        router.push(ROUTES.SUBSCRIPTION);
+        safeNavigate(router, ROUTES.SUBSCRIPTION);
         return;
       }
 
@@ -161,7 +162,7 @@ export function useWatchGating({
         !isSubscribed
       ) {
         useAssetDetailStore.getState().resetAssetDetailModal();
-        router.push(ROUTES.SUBSCRIPTION);
+        safeNavigate(router, ROUTES.SUBSCRIPTION);
         return;
       }
 
@@ -172,7 +173,7 @@ export function useWatchGating({
         if (tvodPlan) {
           sessionStorage.setItem("selected_payment_plan", JSON.stringify(tvodPlan));
           useAssetDetailStore.getState().resetAssetDetailModal();
-          router.push(`/payment?assetId=${asset?.assetId}`);
+          safeNavigate(router, `/payment?assetId=${asset?.assetId}`);
         }
         return;
       }
@@ -274,11 +275,11 @@ export function useWatchGating({
         targetAssetId,
       });
       setGateResult({ gate: "none", message: "" });
-      // Instead of resetting the modal immediately, we only call router.push.
+      // Instead of resetting the modal immediately, we only navigate.
       // The AssetDetailModal will detect the pathname change and automatically call resetAssetDetailModal.
       // This prevents the underlying layout from flashing (showing the background page) while
       // the watch page is fetching data during client-side navigation.
-      router.push(ROUTES.WATCH(targetAssetId));
+      safeNavigate(router, ROUTES.WATCH(targetAssetId));
     },
     [
       isMobile,

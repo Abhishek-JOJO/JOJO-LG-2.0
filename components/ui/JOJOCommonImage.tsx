@@ -520,6 +520,14 @@ export default function JOJOCommonImage({
     objectFit: resolvedContentMode as CSSProperties["objectFit"],
     objectPosition: resolvedPosition as CSSProperties["objectPosition"],
     borderRadius: customBorderRadius,
+    // Belt-and-suspenders alongside the sibling placeholder div below: an <img>
+    // tag with no frame decoded yet paints its native default background (white
+    // on this TV's Chromium) — same class of issue as background videos. Skipped
+    // for "contain" mode specifically: that's used for logos/icons, which are
+    // usually transparent PNGs letterboxed inside their box, so a solid
+    // background there paints a visible box behind/around the artwork instead
+    // of staying invisible the way it does behind an opaque "cover" photo.
+    backgroundColor: resolvedContentMode === "contain" ? undefined : "#171717",
     ...(shouldUseFill ? { width: "100%", height: "100%" } : {}),
     ...style,
   };

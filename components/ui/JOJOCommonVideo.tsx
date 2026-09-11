@@ -155,6 +155,19 @@ export interface JOJOCommonVideoProps
   wrapperStyle?: CSSProperties;
 
   onError?: ReactEventHandler<HTMLVideoElement>;
+
+  // Picks a low HLS quality level (and caps it there) instead of always
+  // jumping straight to the highest resolution available. Off by default —
+  // existing callers that want the sharpest possible picture (a real player)
+  // keep today's behavior; opt in only where full resolution isn't the point.
+  preferConservativeQuality?: boolean;
+
+  // Routes HLS playback through the platform's own native HLS support
+  // (`video.src = url`) instead of always preferring hls.js + MediaSource
+  // whenever MediaSource is available. Off by default, since hls.js is the
+  // better-tested path in general; opt in only to work around an MSE-specific
+  // platform issue.
+  preferNativeHls?: boolean;
 }
 
 function cn(...classes: Array<string | false | null | undefined>) {
@@ -189,6 +202,8 @@ export const JOJOCommonVideo = forwardRef<HTMLVideoElement, JOJOCommonVideoProps
       style,
       wrapperStyle,
       onError,
+      preferConservativeQuality = false,
+      preferNativeHls = false,
       ...rest
     },
     ref
@@ -245,8 +260,8 @@ export const JOJOCommonVideo = forwardRef<HTMLVideoElement, JOJOCommonVideoProps
       const isHls = isHlsUrl(src);
       const nativeHls = video.canPlayType(VIDEO_CONSTANTS.HLS_MIME_TYPE);
       const supportsMSE = typeof window !== "undefined" && (window.MediaSource || (window as any).WebKitMediaSource);
-      setShouldPassSrcNatively(!isHls || (!supportsMSE && !!nativeHls));
-    }, [src]);
+      setShouldPassSrcNatively(!isHls || (!supportsMSE && !!nativeHls) || (preferNativeHls && !!nativeHls));
+    }, [src, preferNativeHls]);
 
     useEffect(() => {
       const video = localVideoRef.current;
@@ -267,9 +282,10 @@ export const JOJOCommonVideo = forwardRef<HTMLVideoElement, JOJOCommonVideoProps
       const isHls = isHlsUrl(src);
       const nativeHls = video.canPlayType(VIDEO_CONSTANTS.HLS_MIME_TYPE);
       const supportsMSE = typeof window !== "undefined" && (window.MediaSource || (window as any).WebKitMediaSource);
+      const useNativeHls = isHls && nativeHls && preferNativeHls;
       let hlsInstance: any = null;
 
-      if (isHls && (supportsMSE || !nativeHls)) {
+      if (isHls && !useNativeHls && (supportsMSE || !nativeHls)) {
         import("hls.js").then(({ default: Hls }) => {
           if (!localVideoRef.current) return;
           if (!Hls.isSupported()) {
@@ -291,8 +307,15 @@ export const JOJOCommonVideo = forwardRef<HTMLVideoElement, JOJOCommonVideoProps
           hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
             try {
               if (hlsInstance.levels && hlsInstance.levels.length > 0) {
-                // Set initial quality directly to highest level for instant HD preview
-                hlsInstance.startLevel = hlsInstance.levels.length - 1;
+                if (preferConservativeQuality) {
+                  // Lowest level, capped there so ABR can't climb back up to a
+                  // resolution that isn't safe to render here.
+                  hlsInstance.startLevel = 0;
+                  hlsInstance.autoLevelCapping = 0;
+                } else {
+                  // Set initial quality directly to highest level for instant HD preview
+                  hlsInstance.startLevel = hlsInstance.levels.length - 1;
+                }
               }
             } catch (err) {
               console.warn("[JOJOCommonVideo] Failed to set startLevel", err);
@@ -325,7 +348,7 @@ export const JOJOCommonVideo = forwardRef<HTMLVideoElement, JOJOCommonVideoProps
           hlsInstance = null;
         }
       };
-    }, [src, rest.autoPlay]);
+    }, [src, rest.autoPlay, preferConservativeQuality, preferNativeHls]);
 
     const shouldUseFill = fill || Boolean(normalizedAspectRatio);
 
@@ -344,6 +367,12 @@ export const JOJOCommonVideo = forwardRef<HTMLVideoElement, JOJOCommonVideoProps
       objectFit: resolvedContentMode as CSSProperties["objectFit"],
       objectPosition: resolvedPosition as CSSProperties["objectPosition"],
       borderRadius: customBorderRadius,
+      // A <video> element with no decoded frame yet (buffering, seeking, a src
+      // swap on slide change) paints its native default background — on this
+      // webOS Chromium build that's white, which flashes through over dark UI
+      // any time playback isn't instantly ready. Force it dark unconditionally
+      // so a stalled/loading video is invisible against the page instead.
+      backgroundColor: "#000",
       ...(shouldUseFill ? { width: "100%", height: "100%" } : {}),
       ...style,
     };

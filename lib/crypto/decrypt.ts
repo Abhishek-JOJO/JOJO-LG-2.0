@@ -1,23 +1,23 @@
-import CryptoJS from "crypto-js";
 import { env } from "@lib/config/env";
 import { logger } from "@lib/logger/logger";
+import { getAesCbcKey, hexToBytes } from "./webCryptoKey";
 
 /**
- * Decrypts a value using AES decryption
- * Used ONLY in API client for response decryption and config decryption
+ * Decrypts a value using AES-CBC decryption via the native Web Crypto API.
+ * Used ONLY in API client for response decryption and config decryption.
  *
  * Flow:
- * 1. Secret Key: base64 → WordArray
- * 2. IV: hex → WordArray
- * 3. Ciphertext: hex → WordArray
- * 4. Decrypt using AES-CBC with PKCS7 padding
- * 5. Convert to UTF-8 string
+ * 1. Secret Key: base64 → raw bytes → imported CryptoKey (cached)
+ * 2. IV: hex → raw bytes
+ * 3. Ciphertext: hex → raw bytes
+ * 4. Decrypt using AES-CBC (PKCS#7 padding, SubtleCrypto's default)
+ * 5. Convert result to UTF-8 string
  *
  * @param value - Encrypted string (hex format)
  * @param enabled - Whether decryption is enabled
  * @returns Decrypted string or original value if disabled
  */
-export function decrypt(value: string, enabled: boolean = false): string {
+export async function decrypt(value: string, enabled: boolean = false): Promise<string> {
   if (!enabled) return value;
 
   try {
@@ -26,38 +26,24 @@ export function decrypt(value: string, enabled: boolean = false): string {
       inputLength: value?.length,
       inputPreview: value?.substring(0, 100)
     });
-    
-    // Convert base64 secret key to WordArray
-    const keyWordArray = CryptoJS.enc.Base64.parse(env.secretKey);
-    logger.debug("[Crypto] Key WordArray size", { size: keyWordArray.sigBytes });
-    
-    // Convert hex IV to WordArray
-    const ivWordArray = CryptoJS.enc.Hex.parse(env.ivKey);
-    logger.debug("[Crypto] IV WordArray size", { size: ivWordArray.sigBytes });
-    
-    // Convert hex ciphertext to WordArray
-    const ciphertextWordArray = CryptoJS.enc.Hex.parse(value);
-    logger.debug("[Crypto] Ciphertext WordArray size", { size: ciphertextWordArray.sigBytes });
-    
-    // Create CipherParams object for decryption
-    const cipherParams = CryptoJS.lib.CipherParams.create({
-      ciphertext: ciphertextWordArray,
-    });
 
-    // AES decryption using CBC mode with PKCS7 padding
-    const decrypted = CryptoJS.AES.decrypt(cipherParams, keyWordArray, {
-      iv: ivWordArray,
-      mode: CryptoJS.mode.CBC,
-      padding: CryptoJS.pad.Pkcs7,
-    });
+    const key = await getAesCbcKey();
+    const iv = hexToBytes(env.ivKey);
+    const ciphertext = hexToBytes(value);
 
-    const result = decrypted.toString(CryptoJS.enc.Utf8);
+    const decryptedBuffer = await crypto.subtle.decrypt(
+      { name: "AES-CBC", iv: iv as BufferSource },
+      key,
+      ciphertext as BufferSource
+    );
+
+    const result = new TextDecoder("utf-8").decode(decryptedBuffer);
 
     if (!result) {
       logger.error("[Crypto] Decryption produced empty result");
       throw new Error("Decryption produced empty result - likely wrong key or corrupted data");
     }
-    
+
     logger.debug("[Crypto] Decryption successful", {
       resultLength: result.length,
       resultPreview: result.substring(0, 100)

@@ -7,7 +7,7 @@ import { appConfig } from "@/lib/config/app.config";
 import { minSwipeDistance, THUMB_CONFIG } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import React, { memo, useEffect, useState, useCallback, useId } from "react";
+import React, { memo, useEffect, useState, useCallback, useId, useRef } from "react";
 import { FocusContext, useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { HeroCarouselCard } from "./cards/HeroCarouselCard";
 import { LandscapeCard } from "./cards/LandscapeCard";
@@ -209,6 +209,30 @@ export function ContentRailList({
 
   const isHeroVariant = config?.variant === RailCardVariant.HERO || type === ContentRailType.HERO_CAROUSEL;
 
+  // Only the active hero slide and, briefly while crossfading, the previously
+  // active one are ever mounted — not every slide at once. All slides sit at
+  // the exact same on-screen position (only opacity tells them apart), so the
+  // browser can't spatially cull the off-screen ones the way it could when
+  // they were physically laid out side by side for the old translateX slide —
+  // keeping every slide as a live, full-screen composited layer the whole
+  // time was the actual source of the jank on this TV's GPU, not the
+  // crossfade itself. Capping it at the two genuinely transitioning removes
+  // that cost while looking identical.
+  const HERO_CROSSFADE_MS = 900;
+  const [renderedHeroIndices, setRenderedHeroIndices] = useState<Set<number>>(() => new Set([activeIndex]));
+  const prevHeroIndexRef = useRef(activeIndex);
+  useEffect(() => {
+    if (!isHeroVariant) return;
+    if (prevHeroIndexRef.current === activeIndex) return;
+    const prev = prevHeroIndexRef.current;
+    prevHeroIndexRef.current = activeIndex;
+    setRenderedHeroIndices(new Set([prev, activeIndex]));
+    const timer = setTimeout(() => {
+      setRenderedHeroIndices(new Set([activeIndex]));
+    }, HERO_CROSSFADE_MS);
+    return () => clearTimeout(timer);
+  }, [activeIndex, isHeroVariant]);
+
   useEffect(() => {
     if (!isHeroVariant || !items?.length) return;
     const activeItem = items[activeIndex];
@@ -348,8 +372,6 @@ export function ContentRailList({
     : [];
   const { data: batchAccessData } = useBatchAssetAccess(heroAssetIds, isHeroVariant && heroAssetIds.length > 0);
 
-  const extendedItems = items?.length > 1 ? [items[items.length - 1], ...items, items[0]] : (items || []);
-
   const { ref: focusKeyRef, focusKey, focused } = useFocusable({
     focusKey: isHeroVariant ? "hero-carousel" : undefined,
     focusable: isHeroVariant,
@@ -413,7 +435,7 @@ export function ContentRailList({
     },
     onEnterPress: () => {
       if (isHeroVariant && items?.length) {
-        onItemClick?.(extendedItems[items.length > 1 ? activeIndex + 1 : activeIndex]);
+        onItemClick?.(items[activeIndex]);
       }
     },
     onFocus: () => {
@@ -435,39 +457,40 @@ export function ContentRailList({
         ref={focusKeyRef}
         data-focuskey={focusKey}
         tabIndex={0}
-        className={`relative overflow-hidden w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)] lg:w-[calc(100%-8rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] shadow-[0_20px_50px_rgba(0,0,0,0.95)] transition-all duration-300 ${focused ? "z-[99] border-white" : "border-white/10"}`}
+        className={`relative overflow-hidden w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)] lg:w-[calc(100%-8rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] bg-neutral-950 transition-all duration-300 ${focused ? "z-[99]" : ""}`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        <div
-          className="flex h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]"
-          style={{ transform: `translateX(calc(-${(items?.length > 1 ? activeIndex + 1 : activeIndex) * 100}%))` }}
-        >
-          {extendedItems.map((item, index) => {
-            const isActive = items?.length > 1 ? index === activeIndex + 1 : index === activeIndex;
+        {/* Slides are stacked and crossfaded (opacity only) rather than physically
+            slid sideways — the OTT-style transition the hero should have. Each
+            HeroCarouselCard already stages its own title/badges/genres in with a
+            slight rise + stagger once it's active; crossfading the whole card in
+            underneath that gives the same layered "background dissolves, content
+            cascades in" feel Netflix/Hotstar-style heroes use, instead of the
+            whole banner sliding across like a generic carousel. */}
+        <div className="relative h-full w-full">
+          {items.map((item, index) => {
+            if (!renderedHeroIndices.has(index)) return null;
+            const isActive = index === activeIndex;
             const targetAssetId = item.assetId || item.id;
             const batchPricing = mapBatchAssetAccess(batchAccessData, targetAssetId);
 
             return (
               <div
                 key={`${item.id}-${index}`}
-                className="w-full shrink-0 h-full relative"
+                className={`absolute inset-0 h-full w-full transition-opacity duration-[900ms] ease-in-out ${isActive ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"}`}
               >
-                <div
-                  className={`relative w-full h-full transition-all duration-700 ease-out ${isActive ? "" : "pointer-events-none"}`}
-                >
-                  <HeroCarouselCard
-                    item={item}
-                    index={index}
-                    isActive={isActive}
-                    config={config}
-                    onClick={() => onItemClick?.(item)}
-                    onHoverChange={setIsAutoplayPaused}
-                    onVideoPlayChange={setIsVideoPlaying}
-                    batchPricing={batchPricing}
-                  />
-                </div>
+                <HeroCarouselCard
+                  item={item}
+                  index={index}
+                  isActive={isActive}
+                  config={config}
+                  onClick={() => onItemClick?.(item)}
+                  onHoverChange={setIsAutoplayPaused}
+                  onVideoPlayChange={setIsVideoPlaying}
+                  batchPricing={batchPricing}
+                />
               </div>
             );
           })}

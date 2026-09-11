@@ -178,7 +178,7 @@ const SKELETON_RAILS = [
 
 export function HeroSliderSkeleton() {
   return (
-    <div className="relative overflow-hidden w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)] lg:w-[calc(100%-8rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] border-white/10 bg-neutral-900 shadow-[0_20px_50px_rgba(0,0,0,0.95)]">
+    <div className="relative overflow-hidden w-[calc(100%-3rem)] sm:w-[calc(100%-6rem)] lg:w-[calc(100%-8rem)] mx-auto select-none h-[75vh] mt-2 sm:mt-3 rounded-[32px] border-[1.5px] border-white/10 bg-neutral-900">
       {/* Hotstar Left Gradient */}
       <div className="absolute inset-y-0 left-0 w-full sm:w-[50%] md:w-[45%] lg:w-[40%] xl:w-[35%] bg-gradient-to-r from-black/80 via-black/40 to-transparent z-10 pointer-events-none" />
 

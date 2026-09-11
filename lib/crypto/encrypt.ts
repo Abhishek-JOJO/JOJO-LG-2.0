@@ -1,33 +1,30 @@
-import CryptoJS from "crypto-js";
 import { env } from "@lib/config/env";
 import { logger } from "@lib/logger/logger";
+import { getAesCbcKey, hexToBytes, bytesToHex } from "./webCryptoKey";
 
-export function encrypt(value: string, enabled: boolean = false): string {
+/**
+ * Encrypts a value using AES-CBC encryption via the native Web Crypto API.
+ * See decrypt.ts for why this uses SubtleCrypto instead of CryptoJS.
+ */
+export async function encrypt(value: string, enabled: boolean = false): Promise<string> {
   if (!enabled) return value;
 
   try {
     logger.debug("[Crypto] Attempting encryption", { inputLength: value?.length });
-    
-    // Convert base64 secret key to WordArray
-    const keyWordArray = CryptoJS.enc.Base64.parse(env.secretKey);
-    
-    // Convert hex IV to WordArray
-    const ivWordArray = CryptoJS.enc.Hex.parse(env.ivKey);
-    
-    // AES encryption using CBC mode with PKCS7 padding
-    const encrypted = CryptoJS.AES.encrypt(
-      value,
-      keyWordArray,
-      {
-        iv: ivWordArray,
-        mode: CryptoJS.mode.CBC,
-        padding: CryptoJS.pad.Pkcs7,
-      }
+
+    const key = await getAesCbcKey();
+    const iv = hexToBytes(env.ivKey);
+    const data = new TextEncoder().encode(value);
+
+    const encryptedBuffer = await crypto.subtle.encrypt(
+      { name: "AES-CBC", iv: iv as BufferSource },
+      key,
+      data as BufferSource
     );
 
     // Convert to hex string (matching server expectation)
-    const hexOutput = encrypted.ciphertext.toString(CryptoJS.enc.Hex);
-    
+    const hexOutput = bytesToHex(new Uint8Array(encryptedBuffer));
+
     logger.debug("[Crypto] Encryption successful", { outputLength: hexOutput.length });
     return hexOutput;
   } catch (error) {

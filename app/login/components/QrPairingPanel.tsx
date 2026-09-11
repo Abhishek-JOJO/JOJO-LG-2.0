@@ -26,7 +26,7 @@ export function QrPairingPanel() {
   const [expired, setExpired] = useState(false);
   const generationRef = useRef(0);
 
-  const generateCode = () => {
+  const generateCode = async () => {
     const myGeneration = ++generationRef.current;
     const nextCode = generatePairingCode();
     setExpired(false);
@@ -34,8 +34,9 @@ export function QrPairingPanel() {
     setQrDataUrl(null);
 
     if (typeof window === "undefined") return;
-    const qrUrl = deepLinkManager.generatePairingQrUrl(nextCode, window.location.origin);
+    const qrUrl = await deepLinkManager.generatePairingQrUrl(nextCode, window.location.origin);
     if (!qrUrl) return;
+    if (generationRef.current !== myGeneration) return;
 
     QRCode.toDataURL(qrUrl, { width: 380, margin: 1, color: { dark: "#f97316", light: "#ffffff" } })
       .then((dataUrl) => {

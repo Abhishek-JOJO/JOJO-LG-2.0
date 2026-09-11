@@ -77,7 +77,19 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   });
 
   const subnavId = propSubnavId ?? routeSubnavMap[pathname] ?? matchedItem?.subnav_id ?? 1;
-  const isNavReady = !!propSubnavId || !!routeSubnavMap[pathname] || !!apiNavItems || !!cachedNavItems;
+  // The home route's subnav_id is always 1 by convention (same fallback used
+  // throughout the app, e.g. SearchModal's homeSubnavId), so on "/" there's no
+  // ambiguity to wait on — starting the rails fetch (which carries the hero) only
+  // once nav items have already loaded was serializing two full network round
+  // trips in front of the hero skeleton for a value we already know. Every other
+  // route keeps the existing safety gate, since a wrong subnavId there really
+  // would fetch (and briefly flash) the wrong page's content.
+  const isNavReady =
+    pathname === ROUTES.HOME ||
+    !!propSubnavId ||
+    !!routeSubnavMap[pathname] ||
+    !!apiNavItems ||
+    !!cachedNavItems;
 
   const {
     data,

@@ -13,6 +13,7 @@ import { X, Smartphone, Lock, Crown, ShoppingCart } from "lucide-react";
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
 import { ROUTES } from "@/lib/constants/routes";
 import { useRouter } from "next/navigation";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 import type { WatchGateReason } from "../hooks/useWatchGating";
 import { useEffect } from "react";
 import { analyticsService } from "@/shared/analytics";
@@ -81,7 +82,7 @@ export function GatePopup({ gate, message, onClose, pricingLabel, onAction }: Ga
     if (onAction) {
       onAction();
     } else if (config.actionRoute) {
-      router.push(config.actionRoute);
+      safeNavigate(router, config.actionRoute);
     }
     onClose();
   };

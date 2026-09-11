@@ -31,6 +31,7 @@ import { decryptSocketData } from "@/lib/socket/decryptResponse";
 import { logger } from "@/lib/logger/logger";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const stripHtml = (html: string) => {
@@ -197,8 +198,8 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
     let timer: NodeJS.Timeout;
 
-    const handleInteractionResponse = (rawResponse: any) => {
-      const response = decryptSocketData(rawResponse);
+    const handleInteractionResponse = async (rawResponse: any) => {
+      const response = await decryptSocketData(rawResponse);
       if (!response) return;
 
       const metaData = response['meta-data'] || response.metadata || response.meta || {};
@@ -912,9 +913,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       }
       return true;
     },
-    onEnterPress: () => {
+    onEnterPress: async () => {
       if (typeof window !== "undefined") {
-        const shareUrl = deepLinkManager.generateEncryptedShareUrl(
+        const shareUrl = await deepLinkManager.generateEncryptedShareUrl(
           String(asset?.assetId ?? assetId),
           String(asset?.assetTypeCode || "MOVIE"),
           asset?.title || "",
@@ -1229,7 +1230,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             playsInline
             onTimeUpdate={handleTimeUpdate}
             onEnded={handleVideoEnded}
-            className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-1000 ${videoReady ? "opacity-100" : "opacity-0"
+            className={`absolute inset-0 w-full h-full bg-black object-cover object-top transition-opacity duration-1000 ${videoReady ? "opacity-100" : "opacity-0"
               }`}
             onCanPlay={() => setVideoReady(true)}
             onError={() => setVideoError(true)}
@@ -1261,8 +1262,8 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         <div
           className={
             isStandalone
-              ? "absolute bottom-2 left-4 sm:left-6 lg:left-14 z-20 max-w-[70%]"
-              : "absolute bottom-6 left-6 z-20 max-w-[70%]"
+              ? "absolute bottom-6 sm:bottom-8 lg:bottom-12 left-4 sm:left-6 lg:left-14 z-20 max-w-[70%]"
+              : "absolute bottom-8 sm:bottom-10 left-6 z-20 max-w-[70%]"
           }
         >
           <div
@@ -1353,7 +1354,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         )}
       </div>
 
-      <div className={isStandalone ? "relative z-20 -mt-px px-4 sm:px-6 lg:px-14 pt-4 pb-8 bg-theme_10 flex flex-col gap-4 w-full" : "relative z-20 -mt-px px-6 pt-3 pb-6 bg-theme_10 flex flex-col gap-5"}>
+      <div className={isStandalone ? "relative z-20 -mt-px px-4 sm:px-6 lg:px-14 pt-6 sm:pt-8 pb-12 sm:pb-16 bg-theme_10 flex flex-col gap-4 w-full" : "relative z-20 -mt-px px-6 pt-5 sm:pt-6 pb-10 sm:pb-12 bg-theme_10 flex flex-col gap-5"}>
         {asset?.assetCategoryCode === ASSET_CATEGORY_CODE.TVOD && (
           <div className="flex items-center gap-2 px-1 overflow-hidden">
             <TvodIcon
@@ -1461,9 +1462,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             <div className="relative shrink-0">
               <button
                 ref={shareRef as any}
-                onClick={() => {
+                onClick={async () => {
                   if (typeof window !== "undefined") {
-                    const shareUrl = deepLinkManager.generateEncryptedShareUrl(
+                    const shareUrl = await deepLinkManager.generateEncryptedShareUrl(
                       String(asset?.assetId ?? assetId),
                       String(asset?.assetTypeCode || "MOVIE"),
                       asset?.title || "",
@@ -1891,7 +1892,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   } catch (e) { }
 
                   sessionStorage.setItem("selected_payment_plan", JSON.stringify(tvodPlan));
-                  router.push(`/payment?assetId=${asset?.assetId ?? assetId}`);
+                  safeNavigate(router, `/payment?assetId=${asset?.assetId ?? assetId}`);
                 }
               }
             }}
@@ -2249,7 +2250,7 @@ function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback
       const typeSlug = getAssetTypeSlug(assetType);
       const titleSlug = slugify(title);
       const targetUrl = titleSlug ? `/${typeSlug}/${titleSlug}/${id}` : `/${typeSlug}/${id}`;
-      router.push(targetUrl);
+      safeNavigate(router, targetUrl);
     } else {
       openAssetDetail(id, assetType || "movies", title);
     }

@@ -37,7 +37,7 @@ interface WatchlistStore {
   fetchWatchlist: (page?: number) => void;
   toggleWatchlist: (assetId: number, inWatchlist: boolean, assetPayload?: any) => void;
   clearWatchlist: () => void;
-  handleSocketResponse: (rawResponse: any) => void;
+  handleSocketResponse: (rawResponse: any) => Promise<void>;
 }
 
 export const useWatchlistStore = create<WatchlistStore>((set, get) => ({
@@ -159,9 +159,9 @@ export const useWatchlistStore = create<WatchlistStore>((set, get) => ({
     });
   },
 
-  handleSocketResponse: (rawResponse) => {
+  handleSocketResponse: async (rawResponse) => {
     try {
-      const response = decryptSocketData(rawResponse);
+      const response = await decryptSocketData(rawResponse);
       if (!response) {
         logger.warn('[WatchlistStore] Decryption returned null — ignoring');
         return;

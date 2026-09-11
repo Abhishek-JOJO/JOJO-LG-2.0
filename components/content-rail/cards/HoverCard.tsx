@@ -268,9 +268,9 @@ export function HoverCard({
   const [copied, setCopied] = useState(false);
   const user = useAuthStore((s) => s.user);
 
-  const handleShare = () => {
+  const handleShare = async () => {
     if (typeof window !== "undefined") {
-      const shareUrl = deepLinkManager.generateEncryptedShareUrl(
+      const shareUrl = await deepLinkManager.generateEncryptedShareUrl(
         item?.id,
         String(item?.assetTypeCode || item?.assetType || "MOVIE"),
         item?.title || "",

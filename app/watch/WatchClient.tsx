@@ -19,6 +19,7 @@ import { useBootstrap } from "@lib/bootstrap/BootstrapContext";
 import { useAssetDetailStore, getAssetTypeSlug, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { logger } from "@/lib/logger/logger";
 import { useWatchPageGating } from "@/features/asset/hooks/useWatchPageGating";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 function WatchContent() {
   const searchParams = useSearchParams();
@@ -49,10 +50,7 @@ function WatchContent() {
 
 
   const handleBack = useCallback(() => {
-    const safeReplace = (url: string) => {
-      window.history.replaceState({}, '', url);
-      router.replace(url);
-    };
+    const safeReplace = (url: string) => safeNavigate(router, url);
 
     if (video?.parentId && rawAsset) {
       const parentId = String(rawAsset.asset_id ?? video.parentId);
@@ -118,9 +116,9 @@ function WatchContent() {
 
       const timer = setTimeout(() => {
         if (status === 403 || errMsg.toLowerCase().includes("subscription")) {
-          router.push(ROUTES.SUBSCRIPTION);
+          safeNavigate(router, ROUTES.SUBSCRIPTION);
         } else {
-          router.push(ROUTES.HOME);
+          safeNavigate(router, ROUTES.HOME);
         }
       }, 1500);
       return () => clearTimeout(timer);
@@ -165,7 +163,7 @@ function WatchContent() {
     // Hide the player IMMEDIATELY before leaving, so that if the user clicks the browser Back button,
     // the restored route cache (bfcache) has the player already hidden!
     setRedirectingToAsset(true);
-    router.push(ROUTES.SUBSCRIPTION);
+    safeNavigate(router, ROUTES.SUBSCRIPTION);
   }, [video, rawAsset, router]);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -194,7 +192,7 @@ function WatchContent() {
           Please select something to watch from the home page.
         </p>
         <div
-          onClick={() => router.push(ROUTES.HOME)}
+          onClick={() => safeNavigate(router, ROUTES.HOME)}
           className="px-6 py-2 bg-theme_13_samecolour text-theme_1 rounded-full text-sm font-medium hover:opacity-90 transition-opacity"
         >
           Go Home
@@ -305,7 +303,7 @@ function WatchContent() {
                 );
               }
             }
-            router.replace(ROUTES.WATCH(targetId));
+            safeNavigate(router, ROUTES.WATCH(targetId));
           }}
         />
       </div>

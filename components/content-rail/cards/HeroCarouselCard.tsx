@@ -38,6 +38,31 @@ interface Props {
   batchPricing?: any;
 }
 
+// The hero's autoplaying background preview video renders as a solid white
+// rectangle on this TV, and it survived every distinct technique tried:
+//   1. opacity:0 on the <video> — no effect.
+//   2. visibility:hidden on the <video> — no effect.
+//   3. the native `poster` attribute — no effect once playback actually starts.
+//   4. translating the video fully outside the hero's clipped, rounded,
+//      overflow:hidden container (not just invisible — geometrically outside
+//      its clip region) — no effect.
+//   5. waiting for the precise `loadeddata` event instead of a guessed delay
+//      before revealing it — confirmed readyState 4 / correct dimensions /
+//      currentTime advancing / genuinely on screen at the moment of reveal —
+//      still white.
+//   6. forcing a low HLS quality level (640x360) instead of 1080p, in case it
+//      was resolution-specific — same result at low res as at full res.
+//   7. forcing native HLS playback (this device's canPlayType reports "maybe")
+//      instead of hls.js + MediaSource, in case it was an MSE-specific decode
+//      issue — same result either way.
+// Every one of those confirms the video is genuinely decoding and playing
+// (correct readyState/dimensions/currentTime throughout) — it simply never
+// paints anything but white to the physical screen in this context, on this
+// device. That's a hardware/display-pipeline limitation below the DOM, not
+// something any CSS/JS/HLS-path change from here can reach. Left disabled;
+// the static poster crossfade (unaffected, glitch-free) carries the feature.
+const ENABLE_HERO_BACKGROUND_VIDEO = false;
+
 export function HeroCarouselCard({ item, config, index, isActive, onClick, onHoverChange, onVideoPlayChange, batchPricing }: Props) {
   const t = useTranslations("contentRails");
   const heroImageUrl = item?.heroImage || item?.landscapeImage || item?.posterImage || item?.image;
@@ -154,6 +179,47 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
   const containerRef = useRef<HTMLDivElement>(null);
   const [isIntersecting, setIsIntersecting] = useState(false);
   const wasActiveRef = useRef(false);
+  // Delay revealing the video past onPlaying by a short buffer: on this TV's
+  // hardware video decode path, onPlaying can fire before a real frame has
+  // actually been composited to screen, so crossfading in immediately exposed
+  // a blank/white decoder surface for a few frames. Giving it a moment first
+  // means we only ever reveal it once real picture is almost certainly there.
+  const revealTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const clearRevealTimeout = () => {
+    if (revealTimeoutRef.current) {
+      clearTimeout(revealTimeoutRef.current);
+      revealTimeoutRef.current = null;
+    }
+  };
+
+  // Don't even attach the video (start hardware decode) until the slide's own
+  // crossfade-in has finished. This card sits inside a parent wrapper whose
+  // opacity animates during a slide change — on this TV, animating opacity
+  // over an element with a live decoding <video> forces the browser to
+  // capture the hardware video plane into a blendable texture every frame,
+  // and that capture briefly produces a blank/white frame. Keeping the video
+  // out of the DOM until the crossfade is fully settled means the crossfade
+  // itself only ever has to blend a plain image — safe — and the video only
+  // starts decoding once nothing is animating around it anymore.
+  const [isSlideSettled, setIsSlideSettled] = useState(isActive);
+  const settleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    if (settleTimeoutRef.current) {
+      clearTimeout(settleTimeoutRef.current);
+      settleTimeoutRef.current = null;
+    }
+    if (isActive) {
+      settleTimeoutRef.current = setTimeout(() => setIsSlideSettled(true), 950);
+    } else {
+      setIsSlideSettled(false);
+    }
+    return () => {
+      if (settleTimeoutRef.current) {
+        clearTimeout(settleTimeoutRef.current);
+        settleTimeoutRef.current = null;
+      }
+    };
+  }, [isActive]);
 
 
   useEffect(() => {
@@ -175,7 +241,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
     };
   }, []);
 
-  const shouldPlay = isActive && isIntersecting && !isAnyCardHovered && !isSearchOpen && !isAssetDetailOpen && !isSessionExpiredVisible;
+  const shouldPlay = ENABLE_HERO_BACKGROUND_VIDEO && isActive && isSlideSettled && isIntersecting && !isAnyCardHovered && !isSearchOpen && !isAssetDetailOpen && !isSessionExpiredVisible;
 
   // Unmute hero carousel by default when mounting
   useEffect(() => {
@@ -193,6 +259,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
       // If slide just became active, reset time and loading state
       if (!wasActiveRef.current) {
         video.currentTime = 0;
+        clearRevealTimeout();
         setIsVideoLoaded(false);
       }
       wasActiveRef.current = true;
@@ -207,6 +274,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
         }
       });
     } else {
+      clearRevealTimeout();
       setIsVideoLoaded(false);
       video.muted = true;
       video.pause();
@@ -214,6 +282,10 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
         wasActiveRef.current = false;
       }
     }
+
+    return () => {
+      clearRevealTimeout();
+    };
   }, [shouldPlay, isMuted, item.previewUrl, setMuted, isActive]);
 
   useEffect(() => {
@@ -227,9 +299,9 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
     };
   }, [isActive, isVideoLoaded, onVideoPlayChange]);
 
-  const handleShare = () => {
+  const handleShare = async () => {
     if (typeof window !== "undefined") {
-      const shareUrl = deepLinkManager.generateEncryptedShareUrl(
+      const shareUrl = await deepLinkManager.generateEncryptedShareUrl(
         item?.id,
         String(item?.assetTypeCode || item?.assetType || "MOVIE"),
         item?.title || "",
@@ -275,31 +347,63 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
         className="absolute inset-0 w-full h-full z-0 pointer-events-none"
       >
         {/* Background preview video — right-aligned, 80% visible, never cropped at any breakpoint */}
-        {item?.previewUrl && (
-          <div className="absolute inset-0 w-full h-full z-0">
+        {ENABLE_HERO_BACKGROUND_VIDEO && item?.previewUrl && (
+          <div
+            className={`absolute inset-0 w-full h-full z-0 transition-none ${isVideoLoaded ? "translate-x-0" : "translate-x-[200%]"}`}
+          >
             <JOJOCommonVideo
               ref={videoRef}
-              src={isActive ? item.previewUrl : undefined}
+              src={isActive && isSlideSettled ? item.previewUrl : undefined}
+              // `poster` is the video element's own content before playback
+              // begins — standard image rendering, not decoder output — so it's
+              // always correct even during the window the wrapper above has it
+              // translated out of the clipped hero area.
+              poster={heroImageUrl}
+              // Even with the video's own state fully healthy (readyState 4,
+              // correct dimensions at both 1080p AND a stepped-down 360p,
+              // genuinely playing, wrapper on screen), the display still
+              // rendered solid white either way — ruling out resolution and
+              // pointing at the hls.js + MediaSource decode path itself on
+              // this TV. This device's canPlayType reports "maybe" for native
+              // HLS, so route through that instead — a completely different,
+              // often TV-vendor-tuned decode pipeline that never gets tried
+              // while MediaSource is available, which it always is here.
+              preferNativeHls
+              preferConservativeQuality
               autoPlay={isActive && isIntersecting && !isAnyCardHovered && !isAssetDetailOpen && !isSessionExpiredVisible}
               muted={!(isActive && isIntersecting && !isAnyCardHovered && !isAssetDetailOpen && !isSessionExpiredVisible) || isMuted}
               loop
               playsInline
-              onPlaying={() => setIsVideoLoaded(true)}
-              onTimeUpdate={(e) => {
-                if (e.currentTarget.currentTime > 0 && !isVideoLoaded) {
+              // onPlaying only means "not paused" — it fires whether or not any
+              // frame has actually decoded yet, and on this TV's HLS/MediaSource
+              // path over a slow CPU, that can genuinely take well over a
+              // second. A live diagnostic caught readyState still at 0 (no data
+              // at all) 1.2s into "playing". onLoadedData is the browser's own
+              // "a frame for the current position is actually available" signal
+              // — only reveal (translate the wrapper back into the clipped
+              // area) once that's genuinely true, instead of guessing a fixed
+              // delay that can fire before the frame exists.
+              onLoadedData={() => {
+                clearRevealTimeout();
+                revealTimeoutRef.current = setTimeout(() => {
                   setIsVideoLoaded(true);
-                }
+                }, 100);
               }}
               fill
-              className={`transition-opacity duration-1000 ${isVideoLoaded ? "opacity-100" : "opacity-0"}`}
+              // No opacity/visibility here — the wrapper's off-screen translate
+              // is what hides this while not ready. The poster (a separate,
+              // ordinary <img> layer on top) fading out over it is what makes
+              // the reveal read as a crossfade once the wrapper snaps into place.
               style={{ objectFit: "cover", objectPosition: "right center" }}
               wrapperClassName="absolute inset-0 w-full h-full"
             />
           </div>
         )}
 
-        {/* Background poster image */}
-        <div className={`absolute inset-0 w-full h-full z-0 transition-opacity duration-1000 ${isVideoLoaded ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+        {/* Background poster image — bg-neutral-900 behind it always, so the browser's
+            default white canvas never flashes through while the image is still
+            downloading (it also swallows the focus border's contrast otherwise). */}
+        <div className={`absolute inset-0 w-full h-full z-0 bg-neutral-900 transition-opacity duration-1000 ${isVideoLoaded ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
           {hasImage ? (
             <JOJOCommonImage
               src={heroImageUrl}

@@ -10,6 +10,7 @@ import { useRef, useEffect, useState } from "react";
 
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useTranslations } from "next-intl";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 interface CastDetailsPopupProps {
   professionalId: string;
@@ -104,7 +105,7 @@ export function CastDetailsPopup({
       const typeSlug = getAssetTypeSlug(assetType);
       const titleSlug = slugify(title);
       const targetUrl = titleSlug ? `/${typeSlug}/${titleSlug}/${id}` : `/${typeSlug}/${id}`;
-      router.push(targetUrl);
+      safeNavigate(router, targetUrl);
     } else {
       openAssetDetail(id, assetType, title);
     }

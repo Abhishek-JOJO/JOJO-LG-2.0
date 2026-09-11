@@ -178,7 +178,7 @@ async function request<T>(
       // Encrypt request body if needed (BFF handles browser encryption server-side)
       let requestBody = body;
       if (body && !isFormData && options?.encrypt) {
-        requestBody = { data: encrypt(JSON.stringify(body), appConfig.flags.enableEncryption) };
+        requestBody = { data: await encrypt(JSON.stringify(body), appConfig.flags.enableEncryption) };
         logger.info(`[API] Encrypted request body for ${endpoint}`);
       }
 
@@ -333,7 +333,7 @@ async function request<T>(
         // Only attempt decryption if data is a string
         if (typeof normalizedData.data === 'string' && normalizedData.data.length > 0) {
           try {
-            const decrypted = decrypt(normalizedData.data, appConfig.flags.enableEncryption);
+            const decrypted = await decrypt(normalizedData.data, appConfig.flags.enableEncryption);
 
             // Validate decrypted data is valid JSON
             if (!decrypted || decrypted.trim().length === 0) {

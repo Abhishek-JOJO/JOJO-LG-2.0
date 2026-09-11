@@ -119,23 +119,23 @@ class SocketClient {
    * @param data - Event data
    * @param enableEncryption - Whether to encrypt (default: true)
    */
-  emitRequest(eventName: string, data: any, enableEncryption: boolean = true) {
+  async emitRequest(eventName: string, data: any, enableEncryption: boolean = true) {
     if (!this.socket?.connected) {
       logger.warn('[Socket] Not connected, queueing request', { eventName });
       this.emitQueue.push({ eventName, data, enableEncryption });
       return;
     }
-    
+
     try {
       // Prepare payload with event name
       const payload = {
         en: eventName,
         ...data,
       };
-      
+
       // Encrypt if enabled
-      const encryptedData = enableEncryption 
-        ? encrypt(JSON.stringify(payload), true)
+      const encryptedData = enableEncryption
+        ? await encrypt(JSON.stringify(payload), true)
         : JSON.stringify(payload);
       
       // Emit using "req" protocol

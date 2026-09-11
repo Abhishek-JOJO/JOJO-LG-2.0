@@ -31,10 +31,10 @@ export const deepLinkManager = {
   /**
    * Decrypts and parses a hex deep link payload
    */
-  parseDeeplink(encryptedHex: string): DeepLinkPayload | null {
+  async parseDeeplink(encryptedHex: string): Promise<DeepLinkPayload | null> {
     if (!encryptedHex) return null;
     try {
-      const decrypted = decrypt(encryptedHex, true);
+      const decrypted = await decrypt(encryptedHex, true);
       if (!decrypted || (typeof decrypted === "string" && !decrypted.trim())) {
         return null;
       }
@@ -47,13 +47,13 @@ export const deepLinkManager = {
   /**
    * Encrypts a sharing payload to hex URL format
    */
-  generateEncryptedShareUrl(
+  async generateEncryptedShareUrl(
     path: string,
     type: string,
     nameAnalytic: string,
     userId: string,
     origin: string
-  ): string {
+  ): Promise<string> {
     const payload: DeepLinkPayload = {
       path,
       type,
@@ -61,7 +61,7 @@ export const deepLinkManager = {
       userId,
     };
     try {
-      const encryptedHex = encrypt(JSON.stringify(payload), true);
+      const encryptedHex = await encrypt(JSON.stringify(payload), true);
       const domain = origin.replace(/https?:\/\/(www\.)?/, "").replace(/\/$/, "");
       return `${origin}/?data=${encryptedHex}&utm_source=web&utm_medium=${domain}&utm_campaign=share`;
     } catch (error) {
@@ -75,10 +75,10 @@ export const deepLinkManager = {
    * (`payload.qr_code`) — scanning this on a phone hands the code straight
    * to that existing pairing flow.
    */
-  generatePairingQrUrl(code: string, origin: string): string {
+  async generatePairingQrUrl(code: string, origin: string): Promise<string> {
     const payload: DeepLinkPayload = { path: "", type: "", qr_code: code };
     try {
-      const encryptedHex = encrypt(JSON.stringify(payload), true);
+      const encryptedHex = await encrypt(JSON.stringify(payload), true);
       return `${origin}/?data=${encryptedHex}`;
     } catch (error) {
       return "";

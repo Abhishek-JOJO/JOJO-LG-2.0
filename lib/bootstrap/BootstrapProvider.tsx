@@ -73,40 +73,40 @@ export function BootstrapProvider({ children }: BootstrapProviderProps) {
           logger.info("[Bootstrap] Existing authenticated session found, proceeding");
         }
 
-        // STEP 2: Geo with cache check
+        // STEP 2: Geo — kicked off but NOT awaited. Nothing on the content-browsing
+        // path (hero, rails) needs geo data; it's only read later, at actual playback
+        // time, by useGeoAvailability() for overseas gating — and that hook already
+        // has its own safe default (isAvailable: true) and listens for the
+        // `geo-cache-updated` event this dispatches once it resolves, so it picks up
+        // the real value reactively whenever it lands. Awaiting it here before
+        // app-ready was serializing an entire extra network round trip in front of
+        // the hero/rails fetch for data nothing on screen yet needs — that's real,
+        // measured time added to every cold launch's skeleton.
         const publicIp = config.publicIp || '';
-
-        // Check cache
         const cachedGeo = getCachedGeo(publicIp);
 
         if (cachedGeo) {
-          // Use cached geo
           logger.info("[Bootstrap] Using cached geo data");
         } else {
-          // Fetch fresh geo data
-          logger.info("[Bootstrap] Fetching fresh geo data...");
-
-          try {
-            const { geoData, isAvailable } = await fetchGeoData(publicIp);
-
-            if (cancelled) return;
-
-            // Cache the result
-            setCachedGeo(geoData, publicIp, isAvailable);
-
-            logger.info("[Bootstrap] Geo data fetched and cached", {
-              country: geoData.country_code,
-              isAvailable
+          logger.info("[Bootstrap] Fetching fresh geo data in background...");
+          fetchGeoData(publicIp)
+            .then(({ geoData, isAvailable }) => {
+              if (cancelled) return;
+              setCachedGeo(geoData, publicIp, isAvailable);
+              logger.info("[Bootstrap] Geo data fetched and cached", {
+                country: geoData.country_code,
+                isAvailable
+              });
+            })
+            .catch((geoError) => {
+              // Geo failure should NOT block app
+              logger.warn("[Bootstrap] Geo fetch failed, using fallback", {
+                error: geoError instanceof Error ? geoError.message : 'Unknown'
+              });
             });
-          } catch (geoError) {
-            // Geo failure should NOT block app
-            logger.warn("[Bootstrap] Geo fetch failed, using fallback", {
-              error: geoError instanceof Error ? geoError.message : 'Unknown'
-            });
-          }
         }
 
-        // STEP 3: Set app ready
+        // STEP 3: Set app ready — no longer waits on geo.
         if (cancelled) return;
 
         setIsAppReady(true);

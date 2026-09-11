@@ -32,13 +32,13 @@ export default function PhoneCollectModal({ onComplete, onClose }: PhoneCollectM
 
   // Load countries from localStorage cache
   useEffect(() => {
-    const loadCountries = () => {
+    const loadCountries = async () => {
       try {
         const encryptedLocalData = localStorage.getItem("countries");
         const dataVersion = localStorage.getItem("countries_version");
 
         if (encryptedLocalData && dataVersion === "v1") {
-          const decryptedStr = decrypt(encryptedLocalData, true);
+          const decryptedStr = await decrypt(encryptedLocalData, true);
           const decryptedObj = JSON.parse(decryptedStr);
           const list = decryptedObj?.data || [];
           if (Array.isArray(list) && list.length > 0) {
