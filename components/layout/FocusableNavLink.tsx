@@ -37,8 +37,18 @@ export const FocusableNavLink = React.memo(({
         setFocus('hero-carousel');
         return false;
       }
+      // Hero-less pages (e.g. account-settings) mark their topmost focusable row
+      // with id="page-focus-entry" + data-focuskey so Down from the navbar lands
+      // there directly instead of falling through to norigin's default
+      // nearest-neighbor search, which has no reliable candidate this far below.
+      const entry = document.getElementById('page-focus-entry');
+      const entryFocusKey = entry?.getAttribute('data-focuskey');
+      if (entryFocusKey) {
+        setFocus(entryFocusKey);
+        return false;
+      }
     }
-    
+
     if (direction === 'left' && index === 0) {
       setFocus('navbar-search');
       return false;

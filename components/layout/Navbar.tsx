@@ -45,6 +45,12 @@ function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: n
         setFocus('hero-carousel');
         return false;
       }
+      const entry = document.getElementById('page-focus-entry');
+      const entryFocusKey = entry?.getAttribute('data-focuskey');
+      if (entryFocusKey) {
+        setFocus(entryFocusKey);
+        return false;
+      }
     }
     return true;
   };
@@ -88,6 +94,12 @@ function FocusableSearch({ totalNavItems }: { totalNavItems: number }) {
         setFocus('hero-carousel');
         return false;
       }
+      const entry = document.getElementById('page-focus-entry');
+      const entryFocusKey = entry?.getAttribute('data-focuskey');
+      if (entryFocusKey) {
+        setFocus(entryFocusKey);
+        return false;
+      }
     }
     return true;
   };
@@ -129,6 +141,12 @@ function FocusableLoginButton({ t, router, totalNavItems, isGold }: { t: any; ro
     if (direction === 'down') {
       if (document.getElementById('hero-carousel-container')) {
         setFocus('hero-carousel');
+        return false;
+      }
+      const entry = document.getElementById('page-focus-entry');
+      const entryFocusKey = entry?.getAttribute('data-focuskey');
+      if (entryFocusKey) {
+        setFocus(entryFocusKey);
         return false;
       }
     }

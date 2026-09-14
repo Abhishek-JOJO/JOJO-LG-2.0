@@ -358,10 +358,17 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
   // MODAL_SEARCH is not actually trapped at all, and D-pad presses can walk straight back
   // onto the home page behind it. Always having a real, immediately-available target to
   // land on removes that gap entirely.
+  // focusable: isOpen — SearchModal is mounted for the app's whole lifetime, but
+  // modalFocusRef only attaches to a real DOM node while isOpen (AnimatePresence below).
+  // Without `focusable: isOpen`, this stays a live, zero-rect candidate in norigin's
+  // focus tree at all times, so any arrow press elsewhere that falls through to the
+  // default nearest-neighbor search (no explicit onArrowPress override) can land here
+  // and lose focus permanently until reload — see the matching fix on MODAL_ASSET_DETAIL.
   const { ref: modalFocusRef, focusKey: modalFocusKey } = useFocusable({
     focusKey: "MODAL_SEARCH",
     isFocusBoundary: true,
     preferredChildFocusKey: "search-close-btn",
+    focusable: isOpen,
   });
 
   // Focus the close button directly (by its own key) rather than through

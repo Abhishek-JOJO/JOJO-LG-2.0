@@ -15,9 +15,17 @@ export function AssetDetailModal() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
+  // focusable: isOpen — this component (and its useFocusable call) is mounted for the
+  // whole app lifetime, but its ref only attaches to a real DOM node while the modal is
+  // actually rendered below (AnimatePresence). Without `focusable: isOpen`, norigin keeps
+  // this a live candidate in the focus tree at all times with no coordinates, so any
+  // arrow press elsewhere in the app that falls through to norigin's default
+  // nearest-neighbor search (no explicit onArrowPress override) can land focus here and
+  // lose it permanently until reload — see the matching fix on MODAL_SEARCH.
   const { ref: focusRef, focusKey } = useFocusable({
     focusKey: 'MODAL_ASSET_DETAIL',
     isFocusBoundary: true,
+    focusable: isOpen,
   });
 
   useEffect(() => {

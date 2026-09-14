@@ -225,6 +225,12 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
           setFocus('hero-carousel');
           return false;
         }
+        const entry = document.getElementById('page-focus-entry');
+        const entryFocusKey = entry?.getAttribute('data-focuskey');
+        if (entryFocusKey) {
+          setFocus(entryFocusKey);
+          return false;
+        }
       }
       return true;
     },

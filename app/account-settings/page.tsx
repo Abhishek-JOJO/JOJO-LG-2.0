@@ -90,11 +90,28 @@ export default function AccountSettingsPage() {
   const locale = useLocaleStore((s) => s.locale);
   const setLocale = useLocaleStore((s) => s.setLocale);
 
+  // Rows on this page, top to bottom: upgrade button (only if !isGold) -> watchlist
+  // row (only if it has items) -> language pills (always) -> logout (always).
+  // Every focusable's onArrowPress below is wired directly to these keys instead of
+  // relying on norigin's default nearest-neighbor search — that default search can
+  // (and on this page, does) land on the always-mounted-but-invisible
+  // MODAL_ASSET_DETAIL/MODAL_SEARCH focusables (zero-rect, no DOM node) the moment
+  // you press Up from the topmost row, which permanently breaks D-pad focus until
+  // reload. Same reasoning as the explicit onArrowPress wiring already used for the
+  // navbar and hero carousel elsewhere in this app.
+  const hasUpgradeBtn = !isGold;
+  const hasWatchlist = watchlistAssets.length > 0;
+  const firstLocale = SUPPORTED_LOCALES[0];
+  const topRowKey = hasUpgradeBtn ? "account-upgrade-btn" : hasWatchlist ? "account-watchlist-0" : `account-lang-${firstLocale}`;
+  const watchlistUpKey = hasUpgradeBtn ? "account-upgrade-btn" : "nav-link-0";
+  const langUpKey = hasWatchlist ? "account-watchlist-0" : hasUpgradeBtn ? "account-upgrade-btn" : "nav-link-0";
+  const langDownKey = "account-logout-btn";
+  const rowAfterUpgradeKey = hasWatchlist ? "account-watchlist-0" : `account-lang-${firstLocale}`;
+
   useEffect(() => {
     analyticsService.track(EVENT_NAMES.PAGE_VIEW, { screen_name: "account_settings" });
     // Land the D-pad somewhere sensible on open.
-    const firstKey = !isGold ? "account-upgrade-btn" : watchlistAssets.length > 0 ? "account-watchlist-0" : "account-lang-en";
-    retrySetFocus(firstKey);
+    retrySetFocus(topRowKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -108,7 +125,15 @@ export default function AccountSettingsPage() {
 
   return (
     <main className="min-h-screen" style={{ background: "var(--theme_12)" }}>
-      <div className="w-full px-4 sm:px-6 lg:px-14 pt-20 sm:pt-28 lg:pt-32 pb-16 flex flex-col gap-10 sm:gap-12 max-w-[1600px] mx-auto">
+      {/* id/data-focuskey read by FocusableNavLink's onArrowPress('down') fallback so
+          pressing Down from the navbar on this (hero-less) page lands deterministically
+          on the topmost real row instead of relying on norigin's default nearest-neighbor
+          search, which has no reliable candidate to find this far below the navbar. */}
+      <div
+        id="page-focus-entry"
+        data-focuskey={topRowKey}
+        className="w-full px-4 sm:px-6 lg:px-14 pt-20 sm:pt-28 lg:pt-32 pb-16 flex flex-col gap-10 sm:gap-12 max-w-[1600px] mx-auto"
+      >
         {/* Upgrade banner */}
         {isGold ? (
           <div
@@ -147,6 +172,8 @@ export default function AccountSettingsPage() {
               focusKey="account-upgrade-btn"
               label={t("upgrade_to_gold_btn")}
               onClick={() => router.push(ROUTES.SUBSCRIPTION)}
+              upKey="nav-link-0"
+              downKey={rowAfterUpgradeKey}
             />
           </div>
         )}
@@ -173,6 +200,9 @@ export default function AccountSettingsPage() {
                     img={railItem.landscapeImage || railItem.image}
                     onSelect={() => openAssetDetail(String(id), "", "")}
                     isFirst={idx === 0}
+                    isLast={idx === watchlistAssets.length - 1}
+                    upKey={watchlistUpKey}
+                    downKey={`account-lang-${firstLocale}`}
                   />
                 );
               })}
@@ -186,13 +216,17 @@ export default function AccountSettingsPage() {
         <div>
           <h2 className="text-lg sm:text-xl font-bold text-theme_1 mb-4">{t("change_language")}</h2>
           <div className="inline-flex items-center bg-white/10 rounded-full p-1.5 sm:p-2 gap-1">
-            {SUPPORTED_LOCALES.map((code) => (
+            {SUPPORTED_LOCALES.map((code, idx) => (
               <FocusableLanguagePill
                 key={code}
                 focusKey={`account-lang-${code}`}
                 label={LOCALE_LABELS[code]}
                 isActive={locale === code}
                 onClick={() => setLocale(code as Locale)}
+                isFirst={idx === 0}
+                isLast={idx === SUPPORTED_LOCALES.length - 1}
+                upKey={langUpKey}
+                downKey={langDownKey}
               />
             ))}
           </div>
@@ -200,7 +234,12 @@ export default function AccountSettingsPage() {
 
         {/* Logout */}
         <div>
-          <FocusableLogoutButton focusKey="account-logout-btn" label={t("logout")} onClick={handleLogout} />
+          <FocusableLogoutButton
+            focusKey="account-logout-btn"
+            label={t("logout")}
+            onClick={handleLogout}
+            upKey={`account-lang-${firstLocale}`}
+          />
         </div>
 
         {process.env.NEXT_PUBLIC_APP_VERSION && (
@@ -213,9 +252,22 @@ export default function AccountSettingsPage() {
   );
 }
 
-function FocusableUpgradeButton({ focusKey, label, onClick }: any) {
+function FocusableUpgradeButton({ focusKey, label, onClick, upKey, downKey }: any) {
+  const handleArrowPress = (direction: string) => {
+    if (direction === "up") {
+      setFocus(upKey);
+      return false;
+    }
+    if (direction === "down") {
+      setFocus(downKey);
+      return false;
+    }
+    return true;
+  };
+
   const { ref, focused } = useFocusable({
     focusKey,
+    onArrowPress: handleArrowPress,
     onEnterPress: onClick,
   });
   return (
@@ -233,9 +285,24 @@ function FocusableUpgradeButton({ focusKey, label, onClick }: any) {
   );
 }
 
-function FocusableWatchlistCard({ focusKey, title, img, onSelect, isFirst }: any) {
+function FocusableWatchlistCard({ focusKey, title, img, onSelect, isFirst, isLast, upKey, downKey }: any) {
+  const handleArrowPress = (direction: string) => {
+    if (direction === "up") {
+      setFocus(upKey);
+      return false;
+    }
+    if (direction === "down") {
+      setFocus(downKey);
+      return false;
+    }
+    if (direction === "left" && isFirst) return false;
+    if (direction === "right" && isLast) return false;
+    return true;
+  };
+
   const { ref, focused } = useFocusable({
     focusKey,
+    onArrowPress: handleArrowPress,
     onEnterPress: onSelect,
     onFocus: () => {
       ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: isFirst ? "start" : "center" });
@@ -273,9 +340,24 @@ function FocusableWatchlistCard({ focusKey, title, img, onSelect, isFirst }: any
   );
 }
 
-function FocusableLanguagePill({ focusKey, label, isActive, onClick }: any) {
+function FocusableLanguagePill({ focusKey, label, isActive, onClick, isFirst, isLast, upKey, downKey }: any) {
+  const handleArrowPress = (direction: string) => {
+    if (direction === "up") {
+      setFocus(upKey);
+      return false;
+    }
+    if (direction === "down") {
+      setFocus(downKey);
+      return false;
+    }
+    if (direction === "left" && isFirst) return false;
+    if (direction === "right" && isLast) return false;
+    return true;
+  };
+
   const { ref, focused } = useFocusable({
     focusKey,
+    onArrowPress: handleArrowPress,
     onEnterPress: onClick,
   });
   return (
@@ -297,9 +379,19 @@ function FocusableLanguagePill({ focusKey, label, isActive, onClick }: any) {
   );
 }
 
-function FocusableLogoutButton({ focusKey, label, onClick }: any) {
+function FocusableLogoutButton({ focusKey, label, onClick, upKey }: any) {
+  const handleArrowPress = (direction: string) => {
+    if (direction === "up") {
+      setFocus(upKey);
+      return false;
+    }
+    if (direction === "down") return false;
+    return true;
+  };
+
   const { ref, focused } = useFocusable({
     focusKey,
+    onArrowPress: handleArrowPress,
     onEnterPress: onClick,
   });
   return (
