@@ -1,6 +1,7 @@
 "use client";
 
-import React, { memo } from 'react';
+import React, { memo, useEffect, useRef } from 'react';
+import { useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import type { AdState } from '../model/types';
 import { PlayerIcon } from './PlayerIcon';
 
@@ -33,6 +34,65 @@ export const AdOverlay = memo(function AdOverlay({
   isFullscreen,
   onAdClick,
 }: AdOverlayProps) {
+  const elapsed = adState.totalSeconds - adState.remainingSeconds;
+  const canSkip =
+    adState.isSkippable &&
+    adState.totalSeconds > 0 &&
+    adState.skipOffsetSeconds >= 0 &&
+    elapsed >= adState.skipOffsetSeconds;
+
+  // The interactive control row below only ever renders once loading/error states
+  // are past — gate every button's focusability on that same condition so norigin
+  // never treats a not-currently-shown button as a live nav candidate (the same
+  // always-mounted-phantom-focusable pitfall fixed elsewhere in this app).
+  const controlsFocusable = adState.isPlaying && !adState.isLoading && !adState.hasError;
+
+  // Hooks must run unconditionally (before the early returns below), so every
+  // Ad control's useFocusable lives here regardless of which state is showing.
+  const { ref: playPauseRef, focused: playPauseFocused } = useFocusable({
+    focusKey: 'ad-play-pause-btn',
+    focusable: controlsFocusable,
+    onEnterPress: onPlayPause,
+  });
+  const { ref: muteRef, focused: muteFocused } = useFocusable({
+    focusKey: 'ad-mute-btn',
+    focusable: controlsFocusable,
+    onEnterPress: onMuteToggle,
+  });
+  const { ref: learnMoreRef, focused: learnMoreFocused } = useFocusable({
+    focusKey: 'ad-learn-more-btn',
+    focusable: controlsFocusable,
+    onEnterPress: onAdClick,
+  });
+  const { ref: goAdFreeRef, focused: goAdFreeFocused } = useFocusable({
+    focusKey: 'ad-go-adfree-btn',
+    focusable: controlsFocusable,
+    onEnterPress: () => (onGoAdsFree ? onGoAdsFree() : window.location.replace('/subscription')),
+  });
+  const { ref: skipRef, focused: skipFocused } = useFocusable({
+    focusKey: 'ad-skip-btn',
+    focusable: controlsFocusable && canSkip,
+    onEnterPress: onSkip,
+  });
+  const { ref: fullscreenRef, focused: fullscreenFocused } = useFocusable({
+    focusKey: 'ad-fullscreen-btn',
+    focusable: controlsFocusable,
+    onEnterPress: onFullscreenToggle,
+  });
+
+  // Land the D-pad on the ad's own controls the moment it actually starts —
+  // otherwise focus stays wherever it was (likely an occluded control behind
+  // the ad), leaving the ad effectively unusable by remote.
+  const wasControlsFocusableRef = useRef(false);
+  useEffect(() => {
+    if (controlsFocusable && !wasControlsFocusableRef.current) {
+      const timer = setTimeout(() => setFocus('ad-play-pause-btn'), 50);
+      wasControlsFocusableRef.current = true;
+      return () => clearTimeout(timer);
+    }
+    wasControlsFocusableRef.current = controlsFocusable;
+  }, [controlsFocusable]);
+
   if (!adState.isPlaying && !adState.isLoading && !adState.hasError) return null;
 
   if (adState.isLoading) {
@@ -56,14 +116,7 @@ export const AdOverlay = memo(function AdOverlay({
 
   const displaySeconds = adState.remainingSeconds > 0 ? adState.remainingSeconds : adState.totalSeconds;
   const roundedSeconds = Math.max(0, Math.ceil(displaySeconds));
-  const elapsed = adState.totalSeconds - adState.remainingSeconds;
   const progressPercent = adState.totalSeconds > 0 ? (elapsed / adState.totalSeconds) * 100 : 0;
-
-  const canSkip =
-    adState.isSkippable &&
-    adState.totalSeconds > 0 &&
-    adState.skipOffsetSeconds >= 0 &&
-    elapsed >= adState.skipOffsetSeconds;
 
   const skipCountdown =
     adState.isSkippable &&
@@ -146,11 +199,14 @@ export const AdOverlay = memo(function AdOverlay({
           <div className="flex items-center gap-2.5 sm:gap-4 md:gap-5 shrink-0">
             {/* Play / Pause */}
             <button
+              ref={playPauseRef}
               onClick={(e) => {
                 e.stopPropagation();
                 onPlayPause();
               }}
-              className="flex items-center justify-center p-1.5 rounded hover:bg-white/10 transition-colors text-white"
+              className={`flex items-center justify-center p-1.5 rounded hover:bg-white/10 transition-all outline-none text-white ${
+                playPauseFocused ? 'ring-[3px] ring-white bg-white/20 scale-[1.15] shadow-2xl' : ''
+              }`}
               title={isAdPaused ? 'Play' : 'Pause'}
             >
               <PlayerIcon name={isAdPaused ? 'play' : 'pause'} size={32} />
@@ -158,11 +214,14 @@ export const AdOverlay = memo(function AdOverlay({
 
             {/* Volume */}
             <button
+              ref={muteRef}
               onClick={(e) => {
                 e.stopPropagation();
                 onMuteToggle();
               }}
-              className="flex items-center justify-center p-1.5 rounded hover:bg-white/10 transition-colors text-white"
+              className={`flex items-center justify-center p-1.5 rounded hover:bg-white/10 transition-all outline-none text-white ${
+                muteFocused ? 'ring-[3px] ring-white bg-white/20 scale-[1.15] shadow-2xl' : ''
+              }`}
               title={isAdMuted ? 'Unmute' : 'Mute'}
             >
               <PlayerIcon name={isAdMuted ? 'mute' : 'unmute'} size={24} />
@@ -184,12 +243,15 @@ export const AdOverlay = memo(function AdOverlay({
 
             {/* Learn More CTA */}
             <button
+              ref={learnMoreRef}
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onAdClick();
               }}
-              className="bg-[#F26E21] hover:bg-[#d4530d] text-white font-sans font-bold text-xs px-4 py-2 rounded-full flex items-center gap-1.5 shadow-xl transition-all active:scale-95 cursor-pointer select-none hidden sm:flex ml-2"
+              className={`bg-[#F26E21] hover:bg-[#d4530d] text-white font-sans font-bold text-xs px-4 py-2 rounded-full items-center gap-1.5 shadow-xl transition-all active:scale-95 cursor-pointer select-none hidden sm:flex ml-2 outline-none ${
+                learnMoreFocused ? 'ring-[3px] ring-white scale-105' : ''
+              }`}
             >
               <span>{ctaText}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white">
@@ -206,6 +268,7 @@ export const AdOverlay = memo(function AdOverlay({
           <div className="flex items-center gap-2.5 sm:gap-4 md:gap-5 shrink-0">
             {/* Go Ad-Free */}
             <button
+              ref={goAdFreeRef}
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
@@ -216,7 +279,9 @@ export const AdOverlay = memo(function AdOverlay({
                 background: 'linear-gradient(44.13deg, rgb(250, 175, 63) 21.63%, rgb(255, 214, 145) 49.52%, rgb(250, 175, 63) 81.68%)',
                 color: 'var(--theme_12)',
               }}
-              className="hover:brightness-110 font-sans font-black text-[11px] sm:text-xs px-4 py-2.5 rounded-full flex items-center gap-1.5 shadow-[0_0_15px_rgba(250,175,63,0.4)] transition-all active:scale-95 cursor-pointer uppercase tracking-wider select-none border border-yellow-200/50"
+              className={`hover:brightness-110 font-sans font-black text-[11px] sm:text-xs px-4 py-2.5 rounded-full flex items-center gap-1.5 shadow-[0_0_15px_rgba(250,175,63,0.4)] transition-all active:scale-95 cursor-pointer uppercase tracking-wider select-none border border-yellow-200/50 outline-none ${
+                goAdFreeFocused ? 'ring-[3px] ring-white scale-105' : ''
+              }`}
               title="Upgrade to watch ad-free"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="shrink-0" style={{ color: 'var(--theme_12)' }}>
@@ -235,11 +300,14 @@ export const AdOverlay = memo(function AdOverlay({
 
               {canSkip && (
                 <button
+                  ref={skipRef}
                   onClick={(e) => {
                     e.stopPropagation();
                     onSkip();
                   }}
-                  className="bg-white text-black hover:bg-gray-100 rounded-full text-xs font-extrabold px-5 py-2.5 cursor-pointer active:scale-95 transition-all shadow-xl flex items-center gap-1.5"
+                  className={`bg-white text-black hover:bg-gray-100 rounded-full text-xs font-extrabold px-5 py-2.5 cursor-pointer active:scale-95 transition-all shadow-xl flex items-center gap-1.5 outline-none ${
+                    skipFocused ? 'ring-[3px] ring-[#F26E21] scale-105' : ''
+                  }`}
                 >
                   <span>Skip Ad</span>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-black">
@@ -252,11 +320,14 @@ export const AdOverlay = memo(function AdOverlay({
 
             {/* Fullscreen Button */}
             <button
+              ref={fullscreenRef}
               onClick={(e) => {
                 e.stopPropagation();
                 onFullscreenToggle();
               }}
-              className="flex items-center justify-center p-1.5 rounded hover:bg-white/10 transition-colors text-white"
+              className={`flex items-center justify-center p-1.5 rounded hover:bg-white/10 transition-all outline-none text-white ${
+                fullscreenFocused ? 'ring-[3px] ring-white bg-white/20 scale-[1.15] shadow-2xl' : ''
+              }`}
               title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
             >
               <PlayerIcon name={isFullscreen ? 'exit-fullscreen' : 'fullscreen'} size={24} />

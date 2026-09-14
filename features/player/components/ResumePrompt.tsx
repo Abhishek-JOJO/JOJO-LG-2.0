@@ -1,6 +1,7 @@
 "use client";
 
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
+import { useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -18,11 +19,46 @@ interface ResumePromptProps {
   onStartOver: () => void;
 }
 
+function ResumeChoiceBtn({
+  focusKey,
+  onClick,
+  variant,
+  children,
+}: {
+  focusKey: string;
+  onClick: () => void;
+  variant: 'primary' | 'secondary';
+  children: React.ReactNode;
+}) {
+  const { ref, focused } = useFocusable({ focusKey, onEnterPress: onClick });
+  return (
+    <button
+      ref={ref}
+      onClick={onClick}
+      className={`flex-1 py-2.5 rounded-full text-sm font-medium transition-all outline-none ${
+        variant === 'primary'
+          ? 'bg-theme_13_samecolour text-theme_1 hover:opacity-90'
+          : 'bg-theme_1/10 text-theme_1 hover:bg-theme_1/20'
+      } ${focused ? 'ring-2 ring-white scale-105 shadow-2xl' : ''}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export const ResumePrompt = memo(function ResumePrompt({
   positionSeconds,
   onResume,
   onStartOver,
 }: ResumePromptProps) {
+  // Mounts fresh whenever shown (parent conditionally renders this), so a
+  // mount-time focus is safe — no risk of the always-mounted phantom-focusable
+  // pattern that broke navigation elsewhere in the app.
+  useEffect(() => {
+    const timer = setTimeout(() => setFocus('resume-btn'), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div
       className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -40,18 +76,12 @@ export const ResumePrompt = memo(function ResumePrompt({
         </p>
 
         <div className="flex gap-3">
-          <button
-            onClick={onResume}
-            className="flex-1 py-2.5 bg-theme_13_samecolour text-theme_1 rounded-full text-sm font-medium hover:opacity-90 transition-opacity"
-          >
+          <ResumeChoiceBtn focusKey="resume-btn" onClick={onResume} variant="primary">
             Resume
-          </button>
-          <button
-            onClick={onStartOver}
-            className="flex-1 py-2.5 bg-theme_1/10 text-theme_1 rounded-full text-sm font-medium hover:bg-theme_1/20 transition-colors"
-          >
+          </ResumeChoiceBtn>
+          <ResumeChoiceBtn focusKey="resume-startover-btn" onClick={onStartOver} variant="secondary">
             Start Over
-          </button>
+          </ResumeChoiceBtn>
         </div>
       </div>
     </div>

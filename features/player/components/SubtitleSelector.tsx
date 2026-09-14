@@ -66,6 +66,129 @@ interface FocusableMenuRowProps {
   onClick: () => void;
 }
 
+function FocusableFontSizeSlider({
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
+  const { ref, focused } = useFocusable({
+    focusKey: 'sub-app-fontsize',
+    onArrowPress: (direction) => {
+      if (direction === 'left') {
+        onChange(Math.max(min, value - step));
+        return false;
+      }
+      if (direction === 'right') {
+        onChange(Math.min(max, value + step));
+        return false;
+      }
+      return true;
+    },
+  });
+
+  return (
+    <div
+      ref={ref}
+      className={`w-full h-1 rounded-lg transition-all ${focused ? 'ring-2 ring-white ring-offset-2 ring-offset-[#141414] rounded-full' : ''}`}
+    >
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        tabIndex={-1}
+        className="w-full accent-theme_13_samecolour cursor-pointer bg-white/20 h-1 rounded-lg appearance-none pointer-events-auto"
+      />
+    </div>
+  );
+}
+
+function FocusableSwatchBtn({
+  focusKey,
+  isSelected,
+  isTransparent,
+  light,
+  label,
+  style,
+  onClick,
+}: {
+  focusKey: string;
+  isSelected: boolean;
+  isTransparent?: boolean;
+  light: boolean;
+  label: string;
+  style: React.CSSProperties;
+  onClick: () => void;
+}) {
+  const { ref, focused } = useFocusable({ focusKey, onEnterPress: onClick });
+  return (
+    <button
+      ref={ref}
+      onClick={onClick}
+      title={label}
+      className={`w-7 h-7 rounded-full border transition-all flex items-center justify-center relative outline-none ${
+        isTransparent ? 'overflow-hidden' : ''
+      } ${
+        isSelected ? 'border-theme_13_samecolour scale-110 shadow-lg' : 'border-white/20 hover:scale-105'
+      } ${focused ? 'ring-2 ring-white scale-125 shadow-2xl' : ''}`}
+      style={style}
+    >
+      {isTransparent && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-full h-0.5 bg-red-500/80 rotate-45" />
+        </div>
+      )}
+      {isSelected && (
+        <span className={light ? 'text-black' : 'text-white'}>
+          <CheckIcon />
+        </span>
+      )}
+    </button>
+  );
+}
+
+function FocusableOpacityBtn({
+  focusKey,
+  isSelected,
+  isDisabled,
+  label,
+  onClick,
+}: {
+  focusKey: string;
+  isSelected: boolean;
+  isDisabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  const { ref, focused } = useFocusable({ focusKey, focusable: !isDisabled, onEnterPress: onClick });
+  return (
+    <button
+      ref={ref}
+      disabled={isDisabled}
+      onClick={onClick}
+      className={`py-1 text-xs rounded transition-colors text-center outline-none ${
+        isDisabled
+          ? 'opacity-30 cursor-not-allowed bg-white/5 text-white/40'
+          : isSelected
+            ? 'bg-theme_13_samecolour text-black font-semibold'
+            : 'bg-white/10 text-white hover:bg-white/20'
+      } ${focused ? 'ring-2 ring-white' : ''}`}
+    >
+      {label}
+    </button>
+  );
+}
+
 function FocusableMenuRow({ label, value, focusKey, isVisible, onClick }: FocusableMenuRowProps) {
   const { ref, focused } = useFocusable({
     focusKey,
@@ -266,14 +389,12 @@ export function SubtitleSelector({
                     <span className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">Text size</span>
                     <span className="text-sm font-medium text-theme_13_samecolour">{captionFontSize}px</span>
                   </div>
-                  <input
-                    type="range"
-                    min="16"
-                    max="40"
-                    step="2"
+                  <FocusableFontSizeSlider
                     value={captionFontSize}
-                    onChange={(e) => onCaptionFontSizeChange(Number(e.target.value))}
-                    className="w-full accent-theme_13_samecolour cursor-pointer bg-white/20 h-1 rounded-lg appearance-none"
+                    min={16}
+                    max={40}
+                    step={2}
+                    onChange={onCaptionFontSizeChange}
                   />
                 </div>
 
@@ -285,21 +406,15 @@ export function SubtitleSelector({
                       const isSelected = captionTextColor === value;
                       const light = isLightColor(value);
                       return (
-                        <button
+                        <FocusableSwatchBtn
                           key={value}
-                          onClick={() => onCaptionTextColorChange(value)}
-                          title={label}
-                          className={`w-7 h-7 rounded-full border transition-all flex items-center justify-center relative ${
-                            isSelected ? 'border-theme_13_samecolour scale-110 shadow-lg' : 'border-white/20 hover:scale-105'
-                          }`}
+                          focusKey={`sub-app-textcolor-${value}`}
+                          isSelected={isSelected}
+                          light={light}
+                          label={label}
                           style={{ backgroundColor: value }}
-                        >
-                          {isSelected && (
-                            <span className={light ? 'text-black' : 'text-white'}>
-                              <CheckIcon />
-                            </span>
-                          )}
-                        </button>
+                          onClick={() => onCaptionTextColorChange(value)}
+                        />
                       );
                     })}
                   </div>
@@ -314,13 +429,13 @@ export function SubtitleSelector({
                       const isTransparent = value === 'transparent';
                       const light = isLightColor(value);
                       return (
-                        <button
+                        <FocusableSwatchBtn
                           key={value}
-                          onClick={() => onCaptionBgColorChange?.(value)}
-                          title={label}
-                          className={`w-7 h-7 rounded-full border transition-all flex items-center justify-center relative overflow-hidden ${
-                            isSelected ? 'border-theme_13_samecolour scale-110 shadow-lg' : 'border-white/20 hover:scale-105'
-                          }`}
+                          focusKey={`sub-app-bgcolor-${value}`}
+                          isSelected={isSelected}
+                          isTransparent={isTransparent}
+                          light={light}
+                          label={label}
                           style={{
                             background: isTransparent
                               ? 'linear-gradient(45deg, #444 25%, transparent 25%), linear-gradient(-45deg, #444 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #444 75%), linear-gradient(-45deg, transparent 75%, #444 75%)'
@@ -329,18 +444,8 @@ export function SubtitleSelector({
                             backgroundPosition: isTransparent ? '0 0, 0 4px, 4px -4px, -4px 0' : 'auto',
                             backgroundColor: isTransparent ? '#222' : 'transparent'
                           }}
-                        >
-                          {isTransparent && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="w-full h-0.5 bg-red-500/80 rotate-45" />
-                            </div>
-                          )}
-                          {isSelected && (
-                            <span className={light ? 'text-black' : 'text-white'}>
-                              <CheckIcon />
-                            </span>
-                          )}
-                        </button>
+                          onClick={() => onCaptionBgColorChange?.(value)}
+                        />
                       );
                     })}
                   </div>
@@ -354,19 +459,14 @@ export function SubtitleSelector({
                       const isSelected = captionBgOpacity === opacity;
                       const isDisabled = captionBgColor === 'transparent';
                       return (
-                        <button
+                        <FocusableOpacityBtn
                           key={opacity}
-                          disabled={isDisabled}
+                          focusKey={`sub-app-opacity-${opacity}`}
+                          isSelected={isSelected}
+                          isDisabled={isDisabled}
+                          label={`${Math.round(opacity * 100)}%`}
                           onClick={() => onCaptionBgOpacityChange?.(opacity)}
-                          className={`py-1 text-xs rounded transition-colors text-center ${
-                            isDisabled ? 'opacity-30 cursor-not-allowed bg-white/5 text-white/40' :
-                            isSelected
-                              ? 'bg-theme_13_samecolour text-black font-semibold'
-                              : 'bg-white/10 text-white hover:bg-white/20'
-                          }`}
-                        >
-                          {Math.round(opacity * 100)}%
-                        </button>
+                        />
                       );
                     })}
                   </div>

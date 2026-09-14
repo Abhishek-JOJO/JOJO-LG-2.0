@@ -1759,6 +1759,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
           !error && (
             <div className="absolute bottom-24 right-6 z-40">
               <NextEpisodeCard
+                focusKey="next-title-card-play-btn"
                 title={nextEpisodeFromList.episode.asset_title}
                 thumbnailUrl={
                   nextEpisodeFromList.episode.poster.find((p) => p.is_default)?.url ??

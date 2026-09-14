@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface NextEpisodeCardProps {
   title: string;
@@ -13,6 +14,8 @@ interface NextEpisodeCardProps {
   countdownTotalSeconds: number;
   onPlayNow: () => void;
   onCancel: () => void;
+  /** Distinguishes the two places this card is rendered (auto-triggered overlay vs. the "next title" marker card) so their focus keys never collide. */
+  focusKey?: string;
 }
 
 const RING_RADIUS = 24;
@@ -27,7 +30,18 @@ export function NextEpisodeCard({
   countdownTotalSeconds,
   onPlayNow,
   onCancel,
+  focusKey = 'next-episode-card-play-btn',
 }: NextEpisodeCardProps) {
+  const { ref: playBtnRef, focused } = useFocusable({ focusKey, onEnterPress: onPlayNow });
+
+  // Mounts fresh whenever this card is shown (parent conditionally renders it) —
+  // safe to focus on mount, no phantom-focusable risk.
+  useEffect(() => {
+    const timer = setTimeout(() => setFocus(focusKey), 50);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusKey]);
+
   const safeTotal = Math.max(1, countdownTotalSeconds);
   const countdownRef = useRef(Math.max(0, countdownSeconds));
   const progressRef = useRef(
@@ -70,9 +84,12 @@ export function NextEpisodeCard({
     >
       {/* Thumbnail */}
       <button
+        ref={playBtnRef}
         type="button"
         onClick={onPlayNow}
-        className="relative block w-full aspect-[16/9] overflow-hidden bg-[#222]"
+        className={`relative block w-full aspect-[16/9] overflow-hidden bg-[#222] outline-none transition-all ${
+          focused ? 'ring-[3px] ring-white ring-inset' : ''
+        }`}
         aria-label="Play next episode"
       >
         {thumbnailUrl ? (

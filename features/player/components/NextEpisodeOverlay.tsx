@@ -62,6 +62,7 @@ export const NextEpisodeOverlay = memo(function NextEpisodeOverlay({
   return (
     <div className="absolute bottom-24 right-6 z-40">
       <NextEpisodeCard
+        focusKey="next-episode-overlay-play-btn"
         title={nextEpisode.title}
         thumbnailUrl={nextEpisode.thumbnailUrl}
         durationLabel={durationLabel}
