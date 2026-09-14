@@ -33,6 +33,14 @@ interface BaseContentCardProps {
   onArrowLeftRight?: (direction: "left" | "right") => void;
   /** When provided, Up/Down presses call this to cycle sections vertically while keeping the 1st landscape card fixed in place. */
   onArrowUpDown?: (direction: "up" | "down") => boolean | void;
+  /**
+   * When true, the card fills its parent (w-full h-full) instead of the
+   * config-driven fixed pixel width/height used by horizontal rails. For
+   * pages that lay cards out in a responsive CSS grid (e.g. /watchlist)
+   * rather than a horizontally-scrolling rail — the grid cell's own size
+   * drives the card, not `config.width`/`config.height`.
+   */
+  fluid?: boolean;
 }
 
 import Link from "next/link";
@@ -64,6 +72,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   focusable = true,
   onArrowLeftRight,
   onArrowUpDown,
+  fluid = false,
 }: BaseContentCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isDomFocused, setIsDomFocused] = useState(false);
@@ -419,15 +428,25 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     mobileHeight = "193px"; // Perfect 3:4 ratio
   }
 
-  const cardStyle = {
-    width: `${desktopWidth}px`,
-    height: `${desktopHeight}px`,
-    "--desktop-width": `${desktopWidth}px`,
-    "--desktop-height": `${desktopHeight}px`,
-    "--mobile-width": mobileWidth,
-    "--mobile-height": mobileHeight,
-    borderRadius: `${config.borderRadius || 16}px`,
-  } as React.CSSProperties;
+  // Fluid cards (grid layouts like /watchlist) size purely from CSS — no pixel
+  // width/height/CSS-vars here at all, so there's nothing for a `className`
+  // override to have to fight (fighting an inline style with `!important`
+  // utility classes is fragile and easy to get wrong).
+  const cardStyle = fluid
+    ? ({ borderRadius: `${config.borderRadius || 16}px` } as React.CSSProperties)
+    : ({
+        width: `${desktopWidth}px`,
+        height: `${desktopHeight}px`,
+        "--desktop-width": `${desktopWidth}px`,
+        "--desktop-height": `${desktopHeight}px`,
+        "--mobile-width": mobileWidth,
+        "--mobile-height": mobileHeight,
+        borderRadius: `${config.borderRadius || 16}px`,
+      } as React.CSSProperties);
+
+  const sizingClassName = fluid
+    ? "w-full h-full"
+    : "w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)]";
 
   const showFocusRing = focused || forceFocusRing || isDomFocused;
 
@@ -478,7 +497,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-all duration-300 ease-out w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)] ${className} ${showFocusRing ? "z-30 shadow-2xl" : "scale-100"}`}
+      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-all duration-300 ease-out ${sizingClassName} ${className} ${showFocusRing ? "z-30 shadow-2xl" : "scale-100"}`}
       style={{
         ...cardStyle,
         zIndex: showFocusRing ? 30 : undefined,

@@ -39,17 +39,16 @@ function FocusableProfileItem({ profile, isSelected, onSwitch }: any) {
       <div className="flex items-center gap-3.5">
         {profile?.avatar && (profile.avatar.startsWith("http") || profile.avatar.startsWith("/")) ? (
           <div className={cn(
-            "w-[30px] h-[30px] rounded-full overflow-hidden shrink-0",
+            "w-[30px] h-[30px] p-[2px] rounded-full overflow-hidden shrink-0 bg-[#1a1a1a]",
             isSelected && "border-theme_13_samecolour"
           )}>
             <JOJOCommonImage
               src={profile?.avatar}
               alt={profile?.profile_name}
               preset={JOJOImagePreset.Avatar}
-              width={30}
-              height={30}
               radius={JOJOImageRadius.Full}
               contentMode={JOJOImageContentMode.Cover}
+              wrapperClassName="w-full h-full"
             />
           </div>
         ) : (
