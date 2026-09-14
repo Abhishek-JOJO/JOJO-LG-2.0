@@ -249,15 +249,14 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
           aria-label="Profile Menu"
         >
           {selectedProfile?.avatar && (selectedProfile.avatar.startsWith("http") || selectedProfile.avatar.startsWith("/")) ? (
-            <div id="navbar-profile-avatar" className="w-[32px] h-[32px] sm:w-[38px] sm:h-[38px] rounded-full overflow-hidden shrink-0">
+            <div id="navbar-profile-avatar" className="w-[32px] h-[32px] sm:w-[38px] sm:h-[38px] p-[3px] rounded-full overflow-hidden shrink-0 bg-[#1a1a1a]">
               <JOJOCommonImage
                 src={selectedProfile.avatar}
                 alt={selectedProfile.profile_name}
                 preset={JOJOImagePreset.Avatar}
-                width={38}
-                height={38}
                 radius={JOJOImageRadius.Full}
                 contentMode={JOJOImageContentMode.Cover}
+                wrapperClassName="w-full h-full"
               />
             </div>
           ) : (
