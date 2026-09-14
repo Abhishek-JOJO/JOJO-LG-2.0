@@ -7,7 +7,6 @@ import { useAsset } from "@/features/content/hooks/useAsset";
 import { useEpisodes } from "@/features/content/hooks/useEpisodes";
 import { ASSET_CATEGORY_CODE, Professional } from "@/features/content/model/types";
 import { isHlsUrl, VIDEO_CONSTANTS } from "@/lib/constants/video";
-import { deepLinkManager } from "@/lib/deeplink/deepLinkManager";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useGuestPopupStore } from "@/store/useGuestPopupStore";
 import { usePlayerStore } from "@/store/usePlayerStore";
@@ -20,7 +19,6 @@ import {
   ChevronRight,
   Play,
   Plus,
-  Share2,
   ThumbsUp,
   Volume2,
   VolumeX,
@@ -561,7 +559,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     (a) => Number(a.asset_id ?? a.assetId) === Number(asset?.assetId ?? assetId)
   );
   const [isLiked, setIsLiked] = useState(false);
-  const [shareSuccess, setShareSuccess] = useState(false);
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string | null>(null);
 
   // Video Autoplay States
@@ -925,43 +922,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     }
   });
 
-  const { ref: shareRef, focused: shareFocused } = useFocusable({
-    focusKey: `asset-share-${assetId}`,
-    onArrowPress: (direction) => {
-      if (direction === 'up') { navigateUpFromActions(); return false; }
-      if (direction === 'down') {
-        navigateDownFromActions();
-        return false;
-      }
-      return true;
-    },
-    onEnterPress: async () => {
-      if (typeof window !== "undefined") {
-        const shareUrl = await deepLinkManager.generateEncryptedShareUrl(
-          String(asset?.assetId ?? assetId),
-          String(asset?.assetTypeCode || "MOVIE"),
-          asset?.title || "",
-          storeUser?.id || "",
-          window.location.origin
-        );
-        const clipText = shareUrl || window.location.href;
-        navigator.clipboard.writeText(clipText).then(() => {
-          setShareSuccess(true);
-          setTimeout(() => setShareSuccess(false), 2000);
-          analyticsService.track(EVENT_NAMES.CONTENT_SHARED, {
-            asset_id: String(asset?.assetId ?? assetId),
-            asset_title: asset?.title ?? '',
-            content_type: asset?.assetType === 'SHOW' ? 'show' : 'movie',
-            share_method: 'clipboard',
-          });
-        });
-      }
-    },
-    onFocus: () => {
-      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  });
-
   const { ref: likeRef, focused: likeFocused } = useFocusable({
     focusKey: `asset-like-${assetId}`,
     onArrowPress: (direction) => {
@@ -1036,7 +996,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       const isAnyActionFocused =
         watchNowFocused ||
         watchlistFocused ||
-        shareFocused ||
         likeFocused ||
         muteFocused;
 
@@ -1078,7 +1037,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     asset,
     watchNowFocused,
     watchlistFocused,
-    shareFocused,
     likeFocused,
     muteFocused,
     videoStarted,
@@ -1507,7 +1465,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
               <>
                 <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
                 <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
-                <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
                 {activePreview?.videoUrl && videoStarted && videoReady && !videoError && (
                   <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
                 )}
@@ -1540,44 +1497,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             >
               {inWatchlist ? <Check size={20} className="text-theme_13_samecolour" /> : <Plus size={20} />}
             </button>
-
-            {/* Share */}
-            <div className="relative shrink-0">
-              <button
-                ref={shareRef as any}
-                onClick={async () => {
-                  if (typeof window !== "undefined") {
-                    const shareUrl = await deepLinkManager.generateEncryptedShareUrl(
-                      String(asset?.assetId ?? assetId),
-                      String(asset?.assetTypeCode || "MOVIE"),
-                      asset?.title || "",
-                      storeUser?.id || "",
-                      window.location.origin
-                    );
-                    const clipText = shareUrl || window.location.href;
-                    navigator.clipboard.writeText(clipText).then(() => {
-                      setShareSuccess(true);
-                      setTimeout(() => setShareSuccess(false), 2000);
-                      analyticsService.track(EVENT_NAMES.CONTENT_SHARED, {
-                        asset_id: String(asset?.assetId ?? assetId),
-                        asset_title: asset?.title ?? '',
-                        content_type: asset?.assetType === 'SHOW' ? 'show' : 'movie',
-                        share_method: 'clipboard',
-                      });
-                    });
-                  }
-                }}
-                className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all cursor-pointer ${shareFocused ? "bg-white text-black border-white scale-110 shadow-lg ring-4 ring-white/40 z-50" : "bg-white/10 text-white/80 border-white/15 hover:bg-white/20 hover:text-white"}`}
-                title={t("share")}
-              >
-                <Share2 size={20} />
-              </button>
-              {shareSuccess && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-neutral-900 border border-neutral-800 text-[10px] text-theme_13_samecolour font-bold whitespace-nowrap rounded shadow-lg animate-fadeIn">
-                  Link Copied!
-                </div>
-              )}
-            </div>
 
             {/* Like */}
             <button
