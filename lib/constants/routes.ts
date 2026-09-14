@@ -49,7 +49,8 @@ export const ROUTES = {
 
   // Protected routes
   WATCHING: '/watching',
-  MANAGE_PROFILE: "/account-settings?tab=profile",
+  MANAGE_PROFILE: "/profile",
+  TV_LOGIN: "/tv-login",
 
   // Player
   WATCH_BASE: '/watch',

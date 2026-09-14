@@ -333,6 +333,14 @@ function ProfileDropdownMenu({
           {t("watch_list")}
         </ProfileMenuLink>
 
+        <ProfileMenuLink href={ROUTES.SUBSCRIPTION}>
+          {t("subscription")}
+        </ProfileMenuLink>
+
+        <ProfileMenuLink href={ROUTES.TV_LOGIN}>
+          {t("tv_login")}
+        </ProfileMenuLink>
+
         <ProfileMenuLink href={ROUTES.ACCOUNT_SETTINGS}>
           {t("account_settings")}
         </ProfileMenuLink>
