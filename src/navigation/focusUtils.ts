@@ -1,6 +1,6 @@
 "use client";
 
-import { setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+import { setFocus, doesFocusableExist, getCurrentFocusKey, ROOT_FOCUS_KEY } from "@noriginmedia/norigin-spatial-navigation";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 
@@ -48,14 +48,20 @@ export function restorePageFocus() {
       return;
     }
 
-    // 1. Check if an element on screen ALREADY has visual spatial navigation focus.
-    // Checked via document.activeElement rather than a focus-ring class name, since
-    // the ring styling is a presentation detail that can change independently of
-    // which element actually holds focus.
-    const activeFocused = document.activeElement?.hasAttribute("data-focuskey")
-      ? document.activeElement
-      : null;
-    if (activeFocused) {
+    // 1. Check if something already has spatial-nav focus. This library manages
+    // focus virtually — ordinary Left/Right/geometric navigation never calls the
+    // DOM's real .focus() (only a few explicit cross-section jumps elsewhere in
+    // this app do) — so document.activeElement almost never actually reflects
+    // it, and checking that was a near-permanent false negative. That silently
+    // let this function barrel past a perfectly valid, already-focused card and
+    // reassign focus to the hero instead — including when ContentRailsView's
+    // effect re-runs restorePageFocus() after any data refetch (e.g. the
+    // bottom-of-page pagination fetch a fast scroll triggers), which is exactly
+    // what made the hero appear to "pop back" mid-scroll. getCurrentFocusKey()
+    // is the library's own source of truth for this, regardless of native DOM
+    // focus.
+    const currentKey = getCurrentFocusKey();
+    if (currentKey && currentKey !== ROOT_FOCUS_KEY && doesFocusableExist(currentKey)) {
       clearInterval(interval);
       return;
     }

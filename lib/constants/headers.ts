@@ -25,7 +25,7 @@ export const HEADERS = {
  * Default header values
  */
 export const DEFAULT_HEADER_VALUES = {
-  DEVICE_TYPE_CODE: "3", // 3 = Web
+  DEVICE_TYPE_CODE: "5", // 5= LG TV
   LANGUAGE: "1", // 1 = English
   APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || "2.0.0",
   PROJECT: "JOJO",

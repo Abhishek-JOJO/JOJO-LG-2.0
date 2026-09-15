@@ -343,12 +343,24 @@ export function ContentRailList({
 
   const [isAutoplayPaused, setIsAutoplayPaused] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  // See onFocus/onBlur on the hero's useFocusable below — debounces the
+  // scroll-to-top so a transient/spurious refocus during fast D-pad
+  // scrolling can't snap the page back to the hero.
+  const heroFocusScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   const handleItemClick = useCallback((item: ContentRailItem) => {
     onItemClick?.(item);
   }, [onItemClick]);
+
+  useEffect(() => {
+    return () => {
+      if (heroFocusScrollTimeoutRef.current) {
+        clearTimeout(heroFocusScrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Reset video playing state when slide changes
   useEffect(() => {
@@ -464,7 +476,25 @@ export function ContentRailList({
       setIsAutoplayPaused(true);
       useActiveRailStore.getState().setActiveSectionIndex(0);
       if (typeof window !== "undefined") {
-        window.scrollTo({ top: 0, behavior: "auto" });
+        // Belt-and-suspenders alongside the restorePageFocus() fix (see
+        // src/navigation/focusUtils.ts) for the real bug: debounce so a
+        // transient/spurious refocus of the hero can't snap the page back to
+        // top on its own either. onBlur below cancels it the instant focus
+        // moves on, so a real, intentional focus of the hero still scrolls
+        // to top exactly as before.
+        if (heroFocusScrollTimeoutRef.current) {
+          clearTimeout(heroFocusScrollTimeoutRef.current);
+        }
+        heroFocusScrollTimeoutRef.current = setTimeout(() => {
+          heroFocusScrollTimeoutRef.current = null;
+          window.scrollTo({ top: 0, behavior: "auto" });
+        }, 120);
+      }
+    },
+    onBlur: () => {
+      if (heroFocusScrollTimeoutRef.current) {
+        clearTimeout(heroFocusScrollTimeoutRef.current);
+        heroFocusScrollTimeoutRef.current = null;
       }
     }
   });

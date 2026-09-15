@@ -489,14 +489,21 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
           entire ~5-rail skeleton (with dozens of placeholder cards) underneath
           content that's already loaded and visible, on every single page fetch
           while scrolling — needless paint/DOM cost for a "more is coming" cue.
-        - All pages loaded (hasNextPage = false) → fixed empty spacer, no skeleton/spinner
+        - All pages loaded (hasNextPage = false) → fixed empty spacer, no skeleton/spinner.
+          This spacer must be tall enough that the page can still be scrolled all
+          the way to BaseContentCard's onFocus anchor (active section's top at
+          y=105) once the active rail becomes the very last one and upcomingRails
+          is empty — otherwise the document is too short, window.scrollTo() clamps
+          to the max scrollable position, the active rail lands lower on screen
+          than intended, and the hero carousel (sitting above it) stays visible
+          at the top of the viewport at the same time as the last rail.
       */}
       {isFetchingNextPage ? (
         <div className="h-16 w-full flex items-center justify-center">
           <div className="w-6 h-6 border-2 border-t-transparent border-white/40 rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="h-16" />
+        <div className="h-[70vh]" />
       )}
     </div>
   );
