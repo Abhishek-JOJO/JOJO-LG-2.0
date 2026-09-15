@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { ROUTES } from "@/lib/constants/routes";
 import { MAX_PROFILES } from "@/features/profile/constants/profile.constants";
 import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 function FocusableProfileCard({ profile, isSelected, onSelect, onEdit }: any) {
     const hasAvatar = profile.avatar && (profile.avatar.startsWith("http") || profile.avatar.startsWith("/"));
@@ -162,7 +163,7 @@ function ProfilesList() {
     const handleAddProfile = () => {
         window.sessionStorage.setItem("jojo.profile.returnTo", ROUTES.ACCOUNT_SETTINGS);
         window.sessionStorage.setItem(AVATAR_FLOW_STORAGE_KEYS.accountSettingsTab, "profile");
-        router.push(ROUTES.ADD_PROFILE);
+        safeNavigate(router, ROUTES.ADD_PROFILE);
     };
 
     const canAddMoreProfiles = profiles.length < MAX_PROFILES;

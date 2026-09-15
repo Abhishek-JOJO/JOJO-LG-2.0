@@ -22,6 +22,7 @@ import { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { analyticsService } from "@/shared/analytics";
 import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
 import { cn } from "@/lib/utils";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 // This page keeps re-rendering in the background is unlikely here (no hero
 // video), but retrySetFocus is used anyway for consistency with the rest of
@@ -171,7 +172,7 @@ export default function AccountSettingsPage() {
             <FocusableUpgradeButton
               focusKey="account-upgrade-btn"
               label={t("upgrade_to_gold_btn")}
-              onClick={() => router.push(ROUTES.SUBSCRIPTION)}
+              onClick={() => safeNavigate(router, ROUTES.SUBSCRIPTION)}
               upKey="nav-link-0"
               downKey={rowAfterUpgradeKey}
             />

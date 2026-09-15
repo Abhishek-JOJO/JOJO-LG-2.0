@@ -18,7 +18,28 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ProfileMenuLink } from "../ui/ProfileDropdownList";
 import { LogoutModal } from "./LogoutModal";
-import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+
+// The dropdown mounts ~13 focusables at once (profile list + menu links) the
+// moment it opens, via a React portal. norigin's setFocus/addFocusable share a
+// single-slot scheduler ("a new task replaces the pending next task"), so a
+// single setFocus call racing that mount storm can get clobbered and silently
+// do nothing — leaving the dropdown open with nothing focused. Retry a few
+// times instead of hoping one attempt lands (same fix used elsewhere in this
+// app for the identical race, e.g. AssetDetailView.tsx).
+function retrySetFocus(focusKey: string, attempts = 6, intervalMs = 90) {
+  let tries = 0;
+  const attempt = () => {
+    tries += 1;
+    if (doesFocusableExist(focusKey)) {
+      setFocus(focusKey);
+    }
+    if (tries < attempts) {
+      setTimeout(attempt, intervalMs);
+    }
+  };
+  setTimeout(attempt, intervalMs);
+}
 
 function FocusableProfileItem({ profile, isSelected, onSwitch }: any) {
   const { ref, focused } = useFocusable({
@@ -33,7 +54,7 @@ function FocusableProfileItem({ profile, isSelected, onSwitch }: any) {
       className={cn(
         "group flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer w-full text-left body_xs_regular text-theme_5",
         isSelected ? "" : "hover:bg-theme_11_samecolour",
-        focused ? "bg-theme_11_samecolour ring-2 ring-white" : ""
+        focused ? "bg-theme_11_samecolour border-2 border-white" : "border-2 border-transparent"
       )}
     >
       <div className="flex items-center gap-3.5">
@@ -86,8 +107,8 @@ function FocusableDropdownLogout({ onLogout, t }: any) {
       ref={ref as any}
       onClick={onLogout}
       className={cn(
-        "w-full text-left px-3 py-2 body_xs_regular text-theme_5 rounded-xl transition-all duration-200 cursor-pointer hover:text-theme_13_samecolour",
-        focused ? "bg-theme_11_samecolour ring-2 ring-white text-theme_13_samecolour" : ""
+        "w-full text-left px-3 py-2 body_xs_regular text-theme_5 rounded-xl border-2 border-transparent transition-all duration-200 cursor-pointer hover:text-theme_13_samecolour",
+        focused ? "bg-theme_11_samecolour border-white text-theme_13_samecolour" : ""
       )}
     >
       {t("logout")}
@@ -131,7 +152,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setIsVisible(true);
-        setTimeout(() => setFocus('profile-dropdown-boundary'), 50);
+        retrySetFocus('profile-dropdown-boundary');
       });
     });
     setIsDropdownOpen(true);
@@ -242,8 +263,8 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
         <div
           ref={focusableRef as any}
           onClick={toggleDropdown}
-          className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full border-2 border-[#FF6B00] bg-gradient-to-br from-[#FF6B00]/40 to-amber-500/20 ${
-            focused ? "scale-110 ring-4 ring-white" : "hover:scale-105"
+          className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full border-2 bg-gradient-to-br from-[#FF6B00]/40 to-amber-500/20 ${
+            focused ? "scale-110 border-white" : "border-[#FF6B00] hover:scale-105"
           }`}
           aria-label="Profile Menu"
         >

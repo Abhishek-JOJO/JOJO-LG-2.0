@@ -36,6 +36,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 const WEBOS_BACK_KEYCODE = 461;
 
@@ -133,7 +134,7 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
         );
         window.sessionStorage.setItem(AVATAR_FLOW_STORAGE_KEYS.editProfileId, profile.profile_id);
         window.sessionStorage.removeItem(AVATAR_FLOW_STORAGE_KEYS.fromAvatar);
-        router.push(ROUTES.AVATAR);
+        safeNavigate(router, ROUTES.AVATAR);
     };
 
     const handleSubmit = async (e: SubmitEvent) => {
