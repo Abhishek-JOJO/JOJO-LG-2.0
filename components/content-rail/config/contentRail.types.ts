@@ -37,6 +37,10 @@ export interface ContentRailItem {
   landscapeImage?: string;
   portraitImage?: string;
   posterImage?: string;
+  /** The asset's `poster` array entry whose ratio_id is exactly 4 — dedicated
+   * poster crop for portrait cards. Undefined when the asset has no such
+   * entry; callers should fall back to `portraitImage` in that case. */
+  posterImageRatio4?: string;
   thumbnailImage?: string;
   heroImage?: string;
   title_image?: string;

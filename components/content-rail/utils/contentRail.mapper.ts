@@ -134,6 +134,7 @@ export function mapApiRailItem(
   let portraitImage: string | undefined = undefined;
   let landscapeImage: string | undefined = undefined;
   let posterImage: string | undefined = undefined;
+  let posterImageRatio4: string | undefined = undefined;
   let heroImage: string | undefined = undefined;
 
   const isGenre =
@@ -173,6 +174,12 @@ export function mapApiRailItem(
       const rawPosterArr = Array.isArray(asset?.poster) ? asset.poster : undefined;
       const rawPortraitArr = Array.isArray(asset?.portrait) ? asset.portrait : undefined;
       const rawLandscapeArr = Array.isArray(asset?.landscape) ? asset.landscape : undefined;
+
+      // Dedicated poster crop for portrait cards: only ever the `poster`
+      // array's ratio_id===4 entry, no other fallback baked in here —
+      // callers that want a fallback (e.g. PortraitCard) fall back to
+      // `portraitImage` themselves when this is undefined.
+      posterImageRatio4 = rawPosterArr?.find((img: any) => Number(img?.ratio_id) === 4)?.url;
 
       const heroPosterUrl = rawPosterArr?.find((img: any) => Number(img?.ratio_id) === 1)?.url;
       posterImage =
@@ -269,6 +276,7 @@ export function mapApiRailItem(
     portraitImage,
     landscapeImage,
     posterImage,
+    posterImageRatio4,
     heroImage,
     thumbnailImage: image,
     title_image: asset?.title_image,

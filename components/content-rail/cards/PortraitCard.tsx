@@ -196,7 +196,9 @@ export const PortraitCard = React.memo(function PortraitCard({
 
   // 3. Handle Top 10 and Standard Portrait sub-variants
   const isTopTen = config.variant === RailCardVariant.TOP_TEN;
-  const imageUrl = item.portraitImage || item.image;
+  // Prefer the dedicated ratio_id===4 poster crop; when the asset doesn't
+  // have one, fall back to the existing portrait image resolution untouched.
+  const imageUrl = item.posterImageRatio4 || item.portraitImage || item.image;
 
   const cardContent = (
     <BaseContentCard
