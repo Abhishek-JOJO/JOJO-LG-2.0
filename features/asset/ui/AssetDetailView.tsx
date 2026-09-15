@@ -53,7 +53,7 @@ import { AnimatePresence } from "framer-motion";
 import { analyticsService } from "@/shared/analytics";
 import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
 import { buildPlanDetailAnalytics } from "@/features/asset/utils/buildPlanDetailAnalytics";
-import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, setFocus, doesFocusableExist, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 
 // This page's hero preview video fires onTimeUpdate ~4x/sec, which re-renders
 // the whole AssetDetailView tree (and every Focusable* child) on the same
@@ -125,10 +125,51 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
   const [activeTab, setActiveTab] = useState<"episodes" | "trailers" | "cast">("episodes");
   const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false);
+  // The season dropdown panel used to be `position: absolute` inside the tabs
+  // bar, which sits in normal scrollable flow — so opening it, then scrolling
+  // the page/modal, dragged the panel away with everything else instead of it
+  // staying put like a real popup overlay. Measuring the trigger's on-screen
+  // rect once when it opens and rendering the panel `position: fixed` at
+  // those coordinates pins it to the viewport instead, so it now behaves like
+  // an actual overlay regardless of how much the content underneath scrolls.
+  const seasonTriggerRef = useRef<HTMLDivElement>(null);
+  const [seasonPanelPos, setSeasonPanelPos] = useState<{ top: number; right: number } | null>(null);
+
+  // The hero (backdrop + title + action buttons) used to sit in normal
+  // document flow, so reaching the tabs/episodes/cast content meant
+  // scrolling — or D-pad-pressing Down through — a full screen's worth of
+  // hero first. The hero is now a pinned background layer (see
+  // "asset-detail-hero-layer" below) and this section becomes a full-screen
+  // sheet that slides up to cover it, exactly like the reference design.
+  // `trackChildren` makes norigin report whether any focusable *inside* this
+  // section currently has focus — that's the trigger: the moment the user's
+  // focus lands on a tab/episode/cast card (however it got there — Down from
+  // the action row, wrapping back around, etc.), the sheet opens; the moment
+  // focus leaves back to the action row, it closes. No new scroll/wheel
+  // listener needed since this app's navigation is D-pad/focus-driven.
+  const { ref: contentOverlayRef, focusKey: contentOverlayFocusKey, hasFocusedChild: contentOverlayOpen } = useFocusable({
+    focusable: false,
+    trackChildren: true,
+    focusKey: "asset-detail-content-overlay",
+  });
   const [canCastScrollLeft, setCanCastScrollLeft] = useState(false);
   const [canCastScrollRight, setCanCastScrollRight] = useState(false);
 
   const [isSocketConnected, setIsSocketConnected] = useState(socketClient.isConnected);
+
+  // Measure the trigger's on-screen position the moment the dropdown opens —
+  // deliberately NOT re-measured on scroll, since the whole point is for the
+  // popup to stay fixed in place while the page moves underneath it.
+  useEffect(() => {
+    if (!seasonDropdownOpen) {
+      setSeasonPanelPos(null);
+      return;
+    }
+    const rect = seasonTriggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setSeasonPanelPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    }
+  }, [seasonDropdownOpen]);
 
   useEffect(() => {
     if (socketClient.isConnected) {
@@ -1256,6 +1297,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         <FocusableCloseButton onClose={onClose} />
       )}
 
+      {/* Pinned background layer: hero backdrop + title/action buttons. This
+          used to be normal-flow content the user scrolled/D-pad-Down'ed past
+          to reach the tabs below — now it's a fixed layer that stays put
+          while the tabs/episodes/cast sheet slides up to cover it. */}
+      <div id="asset-detail-hero-layer" className="fixed inset-0 z-0">
       {/* Top Banner Section */}
       <div
         className={
@@ -1598,10 +1644,23 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           </div>
         </div>
       </div>
+      </div>
+      {/* End pinned background layer (#asset-detail-hero-layer) */}
 
+      {/* Full-screen sheet: tabs + episodes/cast/trailers + related — slides
+          up from below to cover the pinned hero layer above once focus
+          enters it (see contentOverlayOpen/trackChildren above), and slides
+          back down when focus returns to the action buttons. */}
+      <div
+        id="asset-detail-content-sheet"
+        ref={contentOverlayRef as any}
+        data-overlay-open={contentOverlayOpen ? "true" : "false"}
+        className={`fixed inset-0 z-30 overflow-y-auto bg-black/55 transition-transform duration-500 ease-out ${contentOverlayOpen ? "translate-y-0" : "translate-y-full"}`}
+      >
+      <FocusContext.Provider value={contentOverlayFocusKey}>
       {
         hasAnyTab && (
-          <div className={isStandalone ? "bg-theme_10 px-4 sm:px-6 lg:px-14 pt-7 sm:pt-9 pb-2 w-full" : "bg-theme_10 px-6 pt-7 pb-2 w-full"}>
+          <div className={isStandalone ? "px-4 sm:px-6 lg:px-14 pt-7 sm:pt-9 pb-2 w-full" : "px-6 pt-7 pb-2 w-full"}>
             <div className="flex flex-col gap-6">
               {/* Tabs Selector Bar */}
               <div className="flex items-center gap-3 sm:gap-4 pb-0.5">
@@ -1640,7 +1699,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
                 {/* Season Dropdown Selector - positioned on the right */}
                 {effectiveTab === "episodes" && seasonsOption.length > 0 && (
-                  <div className="relative ml-auto">
+                  <div ref={seasonTriggerRef} className="relative ml-auto">
                     {seasonsOption.length > 1 ? (
                       <>
                         <FocusableSeasonButton
@@ -1649,8 +1708,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                           onClick={() => setSeasonDropdownOpen(!seasonDropdownOpen)}
                         />
 
-                        {seasonDropdownOpen && (
-                          <div className="absolute right-0 mt-2 z-50 min-w-[200px] rounded-2xl bg-neutral-900 border border-neutral-800 shadow-xl overflow-hidden py-2">
+                        {seasonDropdownOpen && seasonPanelPos && (
+                          <div
+                            className="fixed z-50 min-w-[200px] rounded-2xl bg-neutral-900 border border-neutral-800 shadow-xl overflow-hidden py-2"
+                            style={{ top: seasonPanelPos.top, right: seasonPanelPos.right }}
+                          >
                             {seasonsOption.map((s, idx) => (
                               <FocusableSeasonDropdownItem
                                 key={s.assetId || idx}
@@ -1862,7 +1924,16 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                         img={img}
                         assetType={assetType}
                         isFallback={isFallback}
-                        isStandalone={isStandalone}
+                        // `isStandalone` alone drives layout styling for both the
+                        // modal and the real standalone page (AssetDetailModal.tsx
+                        // passes isStandalone={true} just to get the full-page
+                        // layout inside the overlay) — but FocusableRelatedItem also
+                        // uses this same flag to decide whether clicking a related
+                        // item should navigate to a new route or update in place.
+                        // `onClose` is only ever passed when we're inside the
+                        // closeable modal, so it's the one reliable signal for
+                        // "don't navigate away, just swap the overlay's content."
+                        isStandalone={isStandalone && !onClose}
                         router={router}
                         openAssetDetail={openAssetDetail}
                         assetId={assetId}
@@ -1876,6 +1947,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           </div>
         )}
       </div>
+      </FocusContext.Provider>
+      </div>
+      {/* End full-screen sheet */}
 
       {
         gateResult && gateResult.gate !== "none" && (
@@ -1913,7 +1987,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             professionalId={selectedProfessionalId}
             onClose={() => setSelectedProfessionalId(null)}
             openAssetDetail={openAssetDetail}
-            isStandalone={isStandalone}
+            // Same modal-vs-standalone distinction as FocusableRelatedItem above —
+            // `onClose` here refers to this AssetDetailView instance's own prop
+            // (present only inside the closeable modal), not the popup's local
+            // close handler passed just above.
+            isStandalone={isStandalone && !onClose}
             router={router}
           />
         )}
