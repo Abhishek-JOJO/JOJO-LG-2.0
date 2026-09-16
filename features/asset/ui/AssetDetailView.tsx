@@ -1903,17 +1903,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                     />
                   )}
                 </div>
-
-                {/* On-screen Close button for Magic Remote pointer / mouse users */}
-                <button
-                  type="button"
-                  onClick={closeContentOverlay}
-                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 text-white/70 hover:text-white flex items-center justify-center transition-all cursor-pointer border border-white/15 shrink-0 ml-4 mb-2"
-                  title="Close overlay"
-                  aria-label="Close overlay"
-                >
-                  <X size={18} />
-                </button>
               </div>
 
               {effectiveTab === "episodes" ? (
@@ -2491,13 +2480,22 @@ function FocusableTabButton({ label, isActive, onClick, focusKeyPrefix, assetId,
     <button
       ref={ref as any}
       onClick={handleActivate}
-      className={`relative pb-3 text-base sm:text-lg lg:text-xl font-bold transition-all outline-none shrink-0 cursor-pointer ${
+      // A ring/box-shadow-based focus indicator here gets clipped by this
+      // button's ancestor tab row (overflow-x-auto) — setting overflow-x to
+      // anything but visible forces the browser to compute overflow-y as auto
+      // too (CSS spec), which clips box-shadow the moment it extends past the
+      // row's own bounds vertically. That left only fragments of the ring
+      // visible instead of a full outline. A real border never has this
+      // problem: it's part of the element's own box model and can never be
+      // clipped by an ancestor's overflow. border-transparent by default
+      // reserves the same space so focusing never shifts layout.
+      className={`relative pb-3 px-1.5 -mx-1.5 rounded-md border-2 text-base sm:text-lg lg:text-xl font-bold transition-all outline-none shrink-0 cursor-pointer ${
         isActive
           ? "text-theme_13_samecolour"
           : focused
             ? "text-white"
             : "text-neutral-400 hover:text-white"
-      } ${focused ? "scale-105" : ""}`}
+      } ${focused ? "scale-105 border-white" : "border-transparent"}`}
     >
       <span className="relative">
         {label}
