@@ -40,6 +40,10 @@ export const useRemoteManager = () => {
           if (usePlayerStore.getState().isSearchOpen || useAssetDetailStore.getState().isOpen) {
             return;
           }
+          const contentSheet = typeof document !== 'undefined' ? document.getElementById("asset-detail-content-sheet") : null;
+          if (contentSheet && contentSheet.getAttribute("data-overlay-open") === "true") {
+            return;
+          }
           e.preventDefault();
           // If we're on the root page, minimize the app (platform convention),
           // otherwise go back in history

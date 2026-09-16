@@ -56,6 +56,7 @@ import { buildPlanDetailAnalytics } from "@/features/asset/utils/buildPlanDetail
 import { useFocusable, setFocus, doesFocusableExist, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
 import { mapApiRailItem } from "@/components/content-rail/utils/contentRail.mapper";
+import { WEBOS_KEYS } from "@/src/navigation/RemoteManager";
 
 // This page's hero preview video fires onTimeUpdate ~4x/sec, which re-renders
 // the whole AssetDetailView tree (and every Focusable* child) on the same
@@ -1162,6 +1163,109 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     videoReady
   ]);
 
+  // ── Overlay Sheet Dismissal & Focus Restoration ──────────────────────────
+  // Dismisses the full-screen content overlay sheet and returns focus to the
+  // primary Hero CTA (Watch Now / Play / Rent or Add to Watchlist).
+  const closeContentOverlay = useCallback(() => {
+    const watchNowKey = `asset-watch-now-${assetId}`;
+    const watchlistKey = `asset-watchlist-${assetId}`;
+    const targetKey =
+      doesFocusableExist(watchNowKey)
+        ? watchNowKey
+        : doesFocusableExist(watchlistKey)
+          ? watchlistKey
+          : watchNowKey;
+
+    retrySetFocus(targetKey, 6, 60);
+
+    if (contentOverlayRef.current) {
+      contentOverlayRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [assetId, contentOverlayRef]);
+
+  // Keep a ref of contentOverlayOpen for instant access in keydown handlers
+  const contentOverlayOpenRef = useRef(contentOverlayOpen);
+  useEffect(() => {
+    contentOverlayOpenRef.current = contentOverlayOpen;
+  }, [contentOverlayOpen]);
+
+  // Escape (browser testing) & webOS Remote Back button (keyCode 461) handling.
+  // Registered in the CAPTURE phase so it runs before any bubble-phase listeners
+  // (e.g. AssetDetailModal, RemoteManager).
+  // If the overlay sheet is open, Back closes the overlay sheet first and
+  // restores focus to the AssetDetail page hero layer. Only if the overlay sheet
+  // is already closed does Back proceed to close the modal or navigate back.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isBackKey =
+        e.keyCode === WEBOS_KEYS.BACK ||
+        e.key === "Escape" ||
+        (e.key === "Backspace" && !(e.target instanceof HTMLElement && ["INPUT", "TEXTAREA"].includes(e.target.tagName)));
+
+      if (!isBackKey) return;
+
+      // 1. If Cast Details Popup is open, CastDetailsPopup has its own listener to close itself
+      if (selectedProfessionalId) {
+        return;
+      }
+
+      // 2. If TVOD / Plan Gate popup is open, close it
+      if (gateResult && gateResult.gate !== "none") {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        clearGate();
+        return;
+      }
+
+      // 3. If Guest popup is open, close it
+      if (useGuestPopupStore.getState().isOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        useGuestPopupStore.getState().closeGuestPopup();
+        return;
+      }
+
+      // 4. If the Content Overlay sheet is open, close it and return to the Asset Detail hero!
+      const isOverlayActive =
+        contentOverlayOpenRef.current ||
+        contentOverlayRef.current?.getAttribute("data-overlay-open") === "true";
+
+      if (isOverlayActive) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        closeContentOverlay();
+        return;
+      }
+
+      // 5. If the Content Overlay is already closed and user is in standalone mode without an onClose handler,
+      // allow desktop Escape to navigate back in history:
+      if (isStandalone && !onClose && e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        window.history.back();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [
+    selectedProfessionalId,
+    gateResult,
+    clearGate,
+    contentOverlayOpen,
+    closeContentOverlay,
+    isStandalone,
+    onClose,
+    contentOverlayRef,
+  ]);
+
   if (showSkeleton) {
     return (
       <div
@@ -1748,51 +1852,68 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           <div className={isStandalone ? "px-4 sm:px-6 lg:px-14 pt-7 sm:pt-9 pb-16 w-full" : "px-6 pt-7 pb-16 w-full"}>
             <div className="flex flex-col gap-6">
               {/* Tabs Selector Bar - Clean text tabs with active orange underline matching SS 3 */}
-              <div className="flex items-center gap-8 sm:gap-10 pb-1 border-b border-white/10">
-                {hasEpisodesTab && (
-                  <FocusableTabButton
-                    label={t("episodes")}
-                    isActive={effectiveTab === "episodes"}
-                    onClick={() => setActiveTab("episodes")}
-                    focusKeyPrefix="tab-episodes"
-                    assetId={assetId}
-                    downTargetFocusKey={
-                      seasonsOption.length > 0
-                        ? `season-item-${selectedSeasonIndex}`
-                        : firstEpisodeFocusKey
-                    }
-                  />
-                )}
-                {hasTrailersTab && (
-                  <FocusableTabButton
-                    label={t("trailers")}
-                    isActive={effectiveTab === "trailers"}
-                    onClick={() => setActiveTab("trailers")}
-                    focusKeyPrefix="tab-trailers"
-                    assetId={assetId}
-                    downTargetFocusKey={firstTrailerFocusKey}
-                  />
-                )}
-                {hasCastTab && (
-                  <FocusableTabButton
-                    label={t("cast_crew")}
-                    isActive={effectiveTab === "cast"}
-                    onClick={() => setActiveTab("cast")}
-                    focusKeyPrefix="tab-cast"
-                    assetId={assetId}
-                    downTargetFocusKey={firstCastFocusKey}
-                  />
-                )}
-                {hasMoreLikeThisTab && (
-                  <FocusableTabButton
-                    label={t("more_like_this")}
-                    isActive={effectiveTab === "more_like_this"}
-                    onClick={() => setActiveTab("more_like_this")}
-                    focusKeyPrefix="tab-more_like_this"
-                    assetId={assetId}
-                    downTargetFocusKey={firstRelatedFocusKey}
-                  />
-                )}
+              <div className="flex items-center justify-between pb-1 border-b border-white/10">
+                <div className="flex items-center gap-8 sm:gap-10 overflow-x-auto no-scrollbar">
+                  {hasEpisodesTab && (
+                    <FocusableTabButton
+                      label={t("episodes")}
+                      isActive={effectiveTab === "episodes"}
+                      onClick={() => setActiveTab("episodes")}
+                      focusKeyPrefix="tab-episodes"
+                      assetId={assetId}
+                      onArrowUp={closeContentOverlay}
+                      downTargetFocusKey={
+                        seasonsOption.length > 0
+                          ? `season-item-${selectedSeasonIndex}`
+                          : firstEpisodeFocusKey
+                      }
+                    />
+                  )}
+                  {hasTrailersTab && (
+                    <FocusableTabButton
+                      label={t("trailers")}
+                      isActive={effectiveTab === "trailers"}
+                      onClick={() => setActiveTab("trailers")}
+                      focusKeyPrefix="tab-trailers"
+                      assetId={assetId}
+                      onArrowUp={closeContentOverlay}
+                      downTargetFocusKey={firstTrailerFocusKey}
+                    />
+                  )}
+                  {hasCastTab && (
+                    <FocusableTabButton
+                      label={t("cast_crew")}
+                      isActive={effectiveTab === "cast"}
+                      onClick={() => setActiveTab("cast")}
+                      focusKeyPrefix="tab-cast"
+                      assetId={assetId}
+                      onArrowUp={closeContentOverlay}
+                      downTargetFocusKey={firstCastFocusKey}
+                    />
+                  )}
+                  {hasMoreLikeThisTab && (
+                    <FocusableTabButton
+                      label={t("more_like_this")}
+                      isActive={effectiveTab === "more_like_this"}
+                      onClick={() => setActiveTab("more_like_this")}
+                      focusKeyPrefix="tab-more_like_this"
+                      assetId={assetId}
+                      onArrowUp={closeContentOverlay}
+                      downTargetFocusKey={firstRelatedFocusKey}
+                    />
+                  )}
+                </div>
+
+                {/* On-screen Close button for Magic Remote pointer / mouse users */}
+                <button
+                  type="button"
+                  onClick={closeContentOverlay}
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 text-white/70 hover:text-white flex items-center justify-center transition-all cursor-pointer border border-white/15 shrink-0 ml-4 mb-2"
+                  title="Close overlay"
+                  aria-label="Close overlay"
+                >
+                  <X size={18} />
+                </button>
               </div>
 
               {effectiveTab === "episodes" ? (
@@ -2336,7 +2457,7 @@ function FocusablePreviewNextButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function FocusableTabButton({ label, isActive, onClick, focusKeyPrefix, assetId, downTargetFocusKey }: any) {
+function FocusableTabButton({ label, isActive, onClick, focusKeyPrefix, assetId, downTargetFocusKey, onArrowUp }: any) {
   const handleActivate = () => {
     onClick();
     // Switching tabs unmounts the old tab's content and mounts the new one in
@@ -2348,8 +2469,12 @@ function FocusableTabButton({ label, isActive, onClick, focusKeyPrefix, assetId,
     focusKey: focusKeyPrefix,
     onEnterPress: handleActivate,
     onArrowPress: (direction) => {
-      if (direction === "up" && assetId) {
-        setFocus(`asset-watch-now-${assetId}`);
+      if (direction === "up") {
+        if (onArrowUp) {
+          onArrowUp();
+        } else if (assetId) {
+          setFocus(`asset-watch-now-${assetId}`);
+        }
         return false;
       }
       if (direction === "down" && downTargetFocusKey) {

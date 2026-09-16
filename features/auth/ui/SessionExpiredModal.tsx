@@ -4,9 +4,11 @@ import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { ShieldAlert } from "lucide-react";
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
+import { useRouter } from "next/navigation";
 import { useSessionExpiredStore } from "@/store/useSessionExpiredStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ROUTES } from "@/lib/constants/routes";
+import { tvNavigate } from "@/src/navigation/tvNavigate";
 
 /**
  * SessionExpiredModal
@@ -25,6 +27,7 @@ import { ROUTES } from "@/lib/constants/routes";
  */
 export function SessionExpiredModal() {
   const t = useTranslations("sessionExpiredModal");
+  const router = useRouter();
   const isVisible = useSessionExpiredStore((s) => s.isVisible);
   const dismiss = useSessionExpiredStore((s) => s._dismiss);
   const clearAuth = useAuthStore((s) => s.clearAuth);
@@ -83,11 +86,13 @@ export function SessionExpiredModal() {
     // 5. Dismiss modal
     dismiss();
 
-    // 6. Hard-navigate directly to login without returnUrl query parameter so the page fully re-initialises with clean state.
-    //    Using window.location.href instead of router.push to guarantee a full
-    //    page reload — this clears any in-memory React/Zustand state that
-    //    localStorage.clear() alone wouldn't touch.
-    window.location.replace(ROUTES.LOGIN);
+    // 6. Hard-navigate directly to login without returnUrl query parameter so the page fully
+    //    re-initialises with clean state. tvNavigate guarantees a full page reload (clearing
+    //    any in-memory React/Zustand state localStorage.clear() alone wouldn't touch) while
+    //    staying safe under webOS's packaged file:// export — a raw window.location.replace
+    //    with an absolute path resolves against the filesystem root there, fails to load, and
+    //    leaves the remote dead on webOS's native error page instead of the login screen.
+    tvNavigate(ROUTES.LOGIN, router, { replace: true });
   };
 
   return (

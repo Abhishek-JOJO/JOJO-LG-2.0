@@ -535,8 +535,13 @@ export default function JOJOCommonImage({
   const computedWrapperStyle: CSSProperties = {
     aspectRatio: normalizedAspectRatio as CSSProperties["aspectRatio"],
     borderRadius: customBorderRadius,
-    width,
-    height: normalizedAspectRatio ? undefined : height,
+    // width/height here are the source size requested from the CDN (see
+    // targetSize above), not the box's rendered size — in fill mode the box
+    // must stay 100% of its parent (via wrapperClassName), so forwarding
+    // these into inline style would pin it to a fixed pixel size instead
+    // and clip the parent short, same as the sibling <Image> guard below.
+    width: shouldUseFill ? undefined : width,
+    height: shouldUseFill ? undefined : height,
     ...wrapperStyle,
   };
 

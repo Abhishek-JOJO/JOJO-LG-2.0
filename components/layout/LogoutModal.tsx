@@ -12,8 +12,6 @@ interface LogoutModalProps {
 }
 
 export function LogoutModal({ isOpen, onClose }: LogoutModalProps) {
-  if (!isOpen) return null;
-
   const { logout } = useLogout();
   const t = useTranslations("profile-dropdown");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -23,8 +21,17 @@ export function LogoutModal({ isOpen, onClose }: LogoutModalProps) {
     logout();
   };
 
+  // This component stays mounted the whole time (see ProfileDropdown.tsx) with only
+  // `isOpen` toggling, so every hook below must run unconditionally on every render —
+  // an early `return null` above these hooks made the hook count depend on `isOpen`,
+  // which is a Rules-of-Hooks violation that corrupts this instance's fiber/hook state
+  // the moment the modal opens, leaving its focusables unregistered with spatial nav
+  // and the remote dead inside the popup. `focusable: isOpen` keeps these buttons out
+  // of nav consideration while closed instead (same pattern used for AdOverlay's
+  // always-mounted controls).
   const { ref: logoutBtnRef, focused: logoutFocused } = useFocusable({
     focusKey: "logout-modal-confirm-btn",
+    focusable: isOpen,
     onEnterPress: () => {
       if (!isLoggingOut) handleLogout();
     },
@@ -32,6 +39,7 @@ export function LogoutModal({ isOpen, onClose }: LogoutModalProps) {
 
   const { ref: cancelBtnRef, focused: cancelFocused } = useFocusable({
     focusKey: "logout-modal-cancel-btn",
+    focusable: isOpen,
     onEnterPress: () => {
       if (!isLoggingOut) onClose();
     },
@@ -45,6 +53,8 @@ export function LogoutModal({ isOpen, onClose }: LogoutModalProps) {
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
+
+  if (!isOpen) return null;
 
   return (
     <JOJOModal

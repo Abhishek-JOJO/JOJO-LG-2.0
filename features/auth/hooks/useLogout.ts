@@ -21,6 +21,7 @@ import { releaseLock } from "@lib/socket/socket.lock";
 import { logger } from "@/lib/logger/logger";
 import { ROUTES } from "@/lib/constants/routes";
 import { analyticsService } from "@/shared/analytics";
+import { tvNavigate } from "@/src/navigation/tvNavigate";
 
 export function useLogout() {
   const router = useRouter();
@@ -68,12 +69,17 @@ export function useLogout() {
 
       logger.info('[Logout] ✅ Logout complete, redirecting to login');
 
-      // 6. Redirect to login with full page reload to clear all React state and Suspense boundaries
-      window.location.replace(ROUTES.LOGIN);
+      // 6. Redirect to login with full page reload to clear all React state and Suspense
+      // boundaries. tvNavigate (not window.location.replace directly) is required here:
+      // on the packaged webOS build the app runs from file://, where an absolute path
+      // like "/login" resolves against the filesystem root instead of the app's install
+      // dir, so it fails to load and webOS's Web App Manager shows its own error page —
+      // which has no spatial-navigation focus handling, so the remote appears dead.
+      tvNavigate(ROUTES.LOGIN, router, { replace: true });
     } catch (error) {
       logger.error('[Logout] Error during logout', { error });
       // Still redirect to login even if there's an error
-      window.location.replace(ROUTES.LOGIN);
+      tvNavigate(ROUTES.LOGIN, router, { replace: true });
     }
   };
 

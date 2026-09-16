@@ -51,6 +51,11 @@ export function AssetDetailModal() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.key === "Escape" || e.keyCode === 461) && isOpen) {
+        const contentSheet = typeof document !== 'undefined' ? document.getElementById("asset-detail-content-sheet") : null;
+        if (contentSheet && contentSheet.getAttribute("data-overlay-open") === "true") {
+          // Handled by AssetDetailView's own overlay sheet close logic
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         closeAssetDetail();
