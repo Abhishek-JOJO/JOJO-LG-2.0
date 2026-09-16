@@ -2480,31 +2480,51 @@ function FocusableTabButton({ label, isActive, onClick, focusKeyPrefix, assetId,
     <button
       ref={ref as any}
       onClick={handleActivate}
-      // A ring/box-shadow-based focus indicator here gets clipped by this
-      // button's ancestor tab row (overflow-x-auto) — setting overflow-x to
-      // anything but visible forces the browser to compute overflow-y as auto
-      // too (CSS spec), which clips box-shadow the moment it extends past the
-      // row's own bounds vertically. That left only fragments of the ring
-      // visible instead of a full outline. A real border never has this
-      // problem: it's part of the element's own box model and can never be
-      // clipped by an ancestor's overflow. border-transparent by default
-      // reserves the same space so focusing never shifts layout.
-      className={`relative pb-3 px-1.5 -mx-1.5 rounded-md border-2 text-base sm:text-lg lg:text-xl font-bold transition-all outline-none shrink-0 cursor-pointer ${
+      // No scale-on-focus here (unlike most other focusables in this app):
+      // onFocus above pins this button flush against the TOP of its scrollable
+      // ancestor (#asset-detail-content-sheet, block:"start"). A scale transform
+      // expands the box from its center in every direction, including upward —
+      // past that container's own overflow-y-auto edge — so on a live TV
+      // screenshot the top of the focus border (and the tops of the letters
+      // themselves) were getting clipped clean off the moment focus landed here.
+      // The border-color change alone is already an unambiguous focus signal,
+      // so scale isn't needed and isn't worth the clipping it causes in this
+      // one scroll-pinned spot.
+      className={`relative pb-3 text-base sm:text-lg lg:text-xl font-bold transition-all outline-none shrink-0 cursor-pointer ${
         isActive
           ? "text-theme_13_samecolour"
           : focused
             ? "text-white"
             : "text-neutral-400 hover:text-white"
-      } ${focused ? "scale-105 border-white" : "border-transparent"}`}
+      }`}
     >
-      <span className="relative">
+      {/* The focus border lives on this inner span, tight around the label only
+          — not on the outer <button>, whose own box extends down through pb-3
+          to make room for the underline below. A border spanning that full
+          height would end its bottom edge right where the underline sits,
+          and the two colliding there produced a stray corner artifact (visible
+          in an on-device screenshot: a detached white square right where the
+          border and underline overlapped). Keeping the border scoped to just
+          the text keeps it fully clear of the underline's own space.
+          border-transparent by default reserves the same box so focusing
+          never shifts layout. (A ring/box-shadow here would get clipped by
+          this row's ancestor overflow-x-auto — see the sibling fix history —
+          which is why this is a real border, not a ring.) py-0.5 gives the
+          border a little breathing room above/below the glyphs themselves
+          (it was sitting with zero vertical padding, right against cap-height
+          and descenders). */}
+      <span
+        className={`relative inline-block rounded-md border-2 px-1.5 py-0.5 -mx-1.5 -my-0.5 ${
+          focused ? "border-white" : "border-transparent"
+        }`}
+      >
         {label}
-        {isActive && (
-          <span
-            className="absolute -bottom-3 left-0 right-0 h-[3px] bg-theme_13_samecolour rounded-full shadow-[0_0_10px_rgba(255,102,0,0.5)]"
-          />
-        )}
       </span>
+      {isActive && (
+        <span
+          className="absolute -bottom-3 left-0 right-0 h-[3px] bg-theme_13_samecolour rounded-full shadow-[0_0_10px_rgba(255,102,0,0.5)]"
+        />
+      )}
       {focused && !isActive && (
         <span
           className="absolute -bottom-3 left-0 right-0 h-[2px] bg-white/70 rounded-full"

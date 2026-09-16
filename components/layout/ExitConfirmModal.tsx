@@ -127,9 +127,16 @@ function ExitConfirmButtons({ onCancel, onExit }: { onCancel: () => void; onExit
         ref={cancelBtnRef as any}
         data-focuskey="exit-confirm-cancel-btn"
         onClick={onCancel}
+        // Same resting/focused pair as the Exit button below — both buttons
+        // share one neutral resting color and one "this one is focused" color
+        // (the primary theme orange), so the focused button is always
+        // unambiguous no matter which of the two currently has it. Cancel
+        // used to rest at bg-theme_13_samecolour (orange) by default — the
+        // exact color Exit turns on focus — so focusing Exit made both
+        // buttons look orange at once with nothing to tell them apart.
         className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${cancelFocused
-            ? "bg-white text-black scale-105 shadow-xl ring-4 ring-white z-50"
-            : "bg-theme_13_samecolour text-white hover:opacity-90"
+            ? "bg-theme_13_samecolour text-white scale-105 shadow-xl ring-4 ring-white z-50"
+            : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
           }`}
       >
         {t("cancel")}
@@ -140,7 +147,7 @@ function ExitConfirmButtons({ onCancel, onExit }: { onCancel: () => void; onExit
         data-focuskey="exit-confirm-exit-btn"
         onClick={onExit}
         className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${exitFocused
-            ? "bg-red-600 text-white scale-105 shadow-xl ring-4 ring-white z-50"
+            ? "bg-theme_13_samecolour text-white scale-105 shadow-xl ring-4 ring-white z-50"
             : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
           }`}
       >
