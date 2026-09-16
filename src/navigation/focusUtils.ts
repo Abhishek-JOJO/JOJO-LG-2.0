@@ -62,8 +62,24 @@ export function restorePageFocus() {
     // focus.
     const currentKey = getCurrentFocusKey();
     if (currentKey && currentKey !== ROOT_FOCUS_KEY && doesFocusableExist(currentKey)) {
-      clearInterval(interval);
-      return;
+      // doesFocusableExist() only proves the node is still registered — not that
+      // it's still relevant. AssetDetailModal/SearchModal wrap their content in
+      // AnimatePresence with a real exit transition (300ms), so every focusable
+      // inside a modal we just closed (isOpen already false, checked above) stays
+      // mounted and registered for the whole fade-out. Treating that as "focus is
+      // fine" means we never reassign focus to the page underneath at all — once
+      // the fade finishes and the modal is actually removed, norigin is left
+      // pointing at a focus key that no longer exists anywhere, and no further
+      // arrow press can recover from that. So a still-existing key only counts if
+      // it isn't sitting inside a modal we've already established is closed.
+      const currentEl = document.querySelector(`[data-focuskey="${currentKey}"]`);
+      const insideClosingModal = currentEl?.closest(
+        '[data-focuskey="MODAL_ASSET_DETAIL"], [data-focuskey="MODAL_SEARCH"]'
+      );
+      if (!insideClosingModal) {
+        clearInterval(interval);
+        return;
+      }
     }
 
     // 2. Hero carousel, if present on this page — only commit once it's actually

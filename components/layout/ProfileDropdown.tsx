@@ -263,13 +263,13 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
         <div
           ref={focusableRef as any}
           onClick={toggleDropdown}
-          className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full border-2 bg-gradient-to-br from-[#FF6B00]/40 to-amber-500/20 ${
-            focused ? "scale-110 border-white" : "border-[#FF6B00] hover:scale-105"
+          className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full border-2 ${
+            focused ? "scale-110 border-white" : "border-transparent hover:scale-105"
           }`}
           aria-label="Profile Menu"
         >
           {selectedProfile?.avatar && (selectedProfile.avatar.startsWith("http") || selectedProfile.avatar.startsWith("/")) ? (
-            <div id="navbar-profile-avatar" className="w-[32px] h-[32px] sm:w-[38px] sm:h-[38px] p-[3px] rounded-full overflow-hidden shrink-0 bg-[#1a1a1a]">
+            <div id="navbar-profile-avatar" className="w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] p-[3px] rounded-full overflow-hidden shrink-0 bg-[#1a1a1a]">
               <JOJOCommonImage
                 src={selectedProfile.avatar}
                 alt={selectedProfile.profile_name}
@@ -280,9 +280,9 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
               />
             </div>
           ) : (
-            <div id="navbar-profile-avatar" className="w-[32px] h-[32px] sm:w-[38px] sm:h-[38px] rounded-full flex items-center justify-center text-xs font-bold text-white bg-theme_13_samecolour shrink-0">
+            <div id="navbar-profile-avatar" className="w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full flex items-center justify-center text-sm font-bold text-white bg-theme_13_samecolour shrink-0">
               {selectedProfile?.profile_name?.charAt(0).toUpperCase() ||
-                <UserCircle className="w-5 h-5 text-white" />}
+                <UserCircle className="w-6 h-6 text-white" />}
             </div>
           )}
         </div>
