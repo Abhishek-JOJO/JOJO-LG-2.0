@@ -2,9 +2,9 @@
 
 import { useEffect } from 'react';
 import { normalizePathname } from '@/lib/utils/pathname';
-import { exitWebOSApp } from '@/lib/webos';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useAssetDetailStore } from '@/features/asset/store/useAssetDetailStore';
+import { useExitConfirmStore } from '@/store/useExitConfirmStore';
 
 // LG webOS Remote Key Codes
 export const WEBOS_KEYS = {
@@ -33,11 +33,15 @@ export const useRemoteManager = () => {
       // Map webOS specific keys to actions
       switch (e.keyCode) {
         case WEBOS_KEYS.BACK:
-          // A full-screen overlay (search, asset detail) owns the Back key while
-          // it's open — its own listener closes it. Registered later than this
-          // one, so without this check we'd navigate/exit out from under it
-          // before that listener ever runs.
-          if (usePlayerStore.getState().isSearchOpen || useAssetDetailStore.getState().isOpen) {
+          // A full-screen overlay (search, asset detail, the exit-confirm popup
+          // itself) owns the Back key while it's open — its own listener closes
+          // it. Registered later than this one, so without this check we'd
+          // navigate/exit/reopen out from under it before that listener ever runs.
+          if (
+            usePlayerStore.getState().isSearchOpen ||
+            useAssetDetailStore.getState().isOpen ||
+            useExitConfirmStore.getState().isOpen
+          ) {
             return;
           }
           const contentSheet = typeof document !== 'undefined' ? document.getElementById("asset-detail-content-sheet") : null;
@@ -45,11 +49,11 @@ export const useRemoteManager = () => {
             return;
           }
           e.preventDefault();
-          // If we're on the root page, minimize the app (platform convention),
-          // otherwise go back in history
+          // If we're on the root page, ask for confirmation before minimizing the
+          // app (platform convention) — otherwise go back in history.
           const currentPath = normalizePathname(window.location.pathname);
           if (currentPath === '/' || currentPath === '/landing' || currentPath === '/login') {
-            exitWebOSApp();
+            useExitConfirmStore.getState().open();
           } else {
             window.history.back();
           }

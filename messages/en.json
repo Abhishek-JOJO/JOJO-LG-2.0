@@ -1,6 +1,10 @@
 {
   "common": {
-    "logout": "Logout"
+    "logout": "Logout",
+    "cancel": "Cancel",
+    "exit_app_title": "Exit JOJO?",
+    "exit_app_desc": "Are you sure you want to exit the app?",
+    "exit_app_confirm": "Exit"
   },
   "guestLoginPopup": {
     "title": "Login Required",

@@ -1,6 +1,10 @@
 {
   "common": {
-    "logout": "લૉગઆઉટ"
+    "logout": "લૉગઆઉટ",
+    "cancel": "રદ કરો",
+    "exit_app_title": "JOJO બંધ કરવું છે?",
+    "exit_app_desc": "શું તમે ખરેખર એપ બંધ કરવા માંગો છો?",
+    "exit_app_confirm": "બંધ કરો"
   },
   "guestLoginPopup": {
     "title": "સાઇન ઇન કરવું જરૂરી છે",

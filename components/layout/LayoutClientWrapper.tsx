@@ -12,6 +12,7 @@ import { SessionExpiredModal } from "@/features/auth/ui/SessionExpiredModal";
 import { StatusLine } from "@/components/common/StatusLine";
 import { AmbientBackground } from "@/components/common/AmbientBackground";
 import { SearchModal } from "@/components/search/SearchModal";
+import { ExitConfirmModal } from "@/components/layout/ExitConfirmModal";
 import { usePlayerStore } from "@/store/usePlayerStore";
 export function LayoutClientWrapper({ children }: { children: React.ReactNode }) {
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
@@ -65,6 +66,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
       <SearchModal isOpen={isSearchOpen} onClose={() => setSearchOpen(false)} />
       <GuestLoginPopup />
       <SessionExpiredModal />
+      <ExitConfirmModal />
       {showFooter && !hideHeaderFooter && <Footer />}
       <StatusLine />
     </>

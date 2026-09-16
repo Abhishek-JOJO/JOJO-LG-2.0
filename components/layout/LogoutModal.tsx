@@ -4,11 +4,36 @@ import React, { useState, useEffect } from "react";
 import { JOJOModal } from "@/components/ui/JOJOModal";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 import { useTranslations } from "next-intl";
-import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 
 interface LogoutModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+// JOJOModalContent (the shared modal chrome) sets focus to its own container
+// boundary on open, not to any button inside it — on TV hardware that leaves
+// focus sitting on a non-leaf node arrows can freely escape from, straight into
+// the page behind the modal. A single setTimeout(() => setFocus(...), N) to
+// correct that is a known-fragile race (see retrySetFocus in
+// app/account-settings/page.tsx and the identical fix in ExitConfirmModal.tsx):
+// the target button's own useFocusable() registration effect can commit a tick
+// or more after this fires on slower TV hardware, so setFocus() on a
+// still-unregistered key is a silent no-op. Retrying until doesFocusableExist()
+// confirms it's actually registered is what makes this reliable.
+function retrySetFocus(focusKey: string, attempts = 8, intervalMs = 80) {
+  let tries = 0;
+  const attempt = () => {
+    tries += 1;
+    if (doesFocusableExist(focusKey)) {
+      setFocus(focusKey);
+      return;
+    }
+    if (tries < attempts) {
+      setTimeout(attempt, intervalMs);
+    }
+  };
+  setTimeout(attempt, intervalMs);
 }
 
 export function LogoutModal({ isOpen, onClose }: LogoutModalProps) {
@@ -21,36 +46,9 @@ export function LogoutModal({ isOpen, onClose }: LogoutModalProps) {
     logout();
   };
 
-  // This component stays mounted the whole time (see ProfileDropdown.tsx) with only
-  // `isOpen` toggling, so every hook below must run unconditionally on every render —
-  // an early `return null` above these hooks made the hook count depend on `isOpen`,
-  // which is a Rules-of-Hooks violation that corrupts this instance's fiber/hook state
-  // the moment the modal opens, leaving its focusables unregistered with spatial nav
-  // and the remote dead inside the popup. `focusable: isOpen` keeps these buttons out
-  // of nav consideration while closed instead (same pattern used for AdOverlay's
-  // always-mounted controls).
-  const { ref: logoutBtnRef, focused: logoutFocused } = useFocusable({
-    focusKey: "logout-modal-confirm-btn",
-    focusable: isOpen,
-    onEnterPress: () => {
-      if (!isLoggingOut) handleLogout();
-    },
-  });
-
-  const { ref: cancelBtnRef, focused: cancelFocused } = useFocusable({
-    focusKey: "logout-modal-cancel-btn",
-    focusable: isOpen,
-    onEnterPress: () => {
-      if (!isLoggingOut) onClose();
-    },
-  });
-
   useEffect(() => {
     if (isOpen) {
-      const timer = setTimeout(() => {
-        setFocus("logout-modal-cancel-btn");
-      }, 120);
-      return () => clearTimeout(timer);
+      retrySetFocus("logout-modal-cancel-btn");
     }
   }, [isOpen]);
 
@@ -70,35 +68,85 @@ export function LogoutModal({ isOpen, onClose }: LogoutModalProps) {
         </p>
       </div>
 
-      <div className="flex w-full items-center justify-center gap-4 mt-4">
-        {/* Logout Button */}
-        <button
-          ref={logoutBtnRef as any}
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-          className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${
-            logoutFocused
-              ? "bg-red-600 text-white scale-105 shadow-xl ring-4 ring-white z-50"
-              : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
-          }`}
-        >
-          {isLoggingOut ? t("logging_out") || "Logging out..." : t("logout")}
-        </button>
-
-        {/* Cancel Button */}
-        <button
-          ref={cancelBtnRef as any}
-          onClick={onClose}
-          disabled={isLoggingOut}
-          className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${
-            cancelFocused
-              ? "bg-white text-black scale-105 shadow-xl ring-4 ring-white z-50"
-              : "bg-theme_13_samecolour text-white hover:opacity-90"
-          }`}
-        >
-          {t("cancel")}
-        </button>
-      </div>
+      <LogoutModalButtons
+        isLoggingOut={isLoggingOut}
+        onLogout={handleLogout}
+        onCancel={onClose}
+      />
     </JOJOModal>
+  );
+}
+
+/**
+ * Deliberately its own component, not inline useFocusable() calls inside
+ * LogoutModal itself: a component's hook calls read FocusContext from its OWN
+ * position in the render tree (wherever LogoutModal itself sits — under
+ * ProfileDropdown, near the navbar), never from a <FocusContext.Provider> that
+ * same component later renders inside its own returned JSX. Passing children to
+ * <JOJOModal> doesn't re-parent the component that created them for context
+ * purposes — only a component whose own function body actually executes inside
+ * JOJOModalContent's subtree resolves FocusContext to the modal's boundary.
+ * Keeping the buttons inline here registered them as if they were direct
+ * children of the navbar instead of the modal — outside JOJO_MODAL_CONTAINER's
+ * isFocusBoundary entirely — so arrow presses could walk straight past the
+ * modal into the page behind it. Same pitfall, same fix, as ExitConfirmModal.tsx.
+ */
+function LogoutModalButtons({
+  isLoggingOut,
+  onLogout,
+  onCancel,
+}: {
+  isLoggingOut: boolean;
+  onLogout: () => void;
+  onCancel: () => void;
+}) {
+  const t = useTranslations("profile-dropdown");
+
+  const { ref: logoutBtnRef, focused: logoutFocused } = useFocusable({
+    focusKey: "logout-modal-confirm-btn",
+    onEnterPress: () => {
+      if (!isLoggingOut) onLogout();
+    },
+  });
+
+  const { ref: cancelBtnRef, focused: cancelFocused } = useFocusable({
+    focusKey: "logout-modal-cancel-btn",
+    onEnterPress: () => {
+      if (!isLoggingOut) onCancel();
+    },
+  });
+
+  return (
+    <div className="flex w-full items-center justify-center gap-4 mt-4">
+      {/* Logout Button */}
+      <button
+        ref={logoutBtnRef as any}
+        data-focuskey="logout-modal-confirm-btn"
+        onClick={onLogout}
+        disabled={isLoggingOut}
+        className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${
+          logoutFocused
+            ? "bg-red-600 text-white scale-105 shadow-xl ring-4 ring-white z-50"
+            : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
+        }`}
+      >
+        {isLoggingOut ? t("logging_out") || "Logging out..." : t("logout")}
+      </button>
+
+      {/* Cancel Button */}
+      <button
+        ref={cancelBtnRef as any}
+        data-focuskey="logout-modal-cancel-btn"
+        onClick={onCancel}
+        disabled={isLoggingOut}
+        className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${
+          cancelFocused
+            ? "bg-white text-black scale-105 shadow-xl ring-4 ring-white z-50"
+            : "bg-theme_13_samecolour text-white hover:opacity-90"
+        }`}
+      >
+        {t("cancel")}
+      </button>
+    </div>
   );
 }

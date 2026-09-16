@@ -15,19 +15,6 @@ export function AssetDetailModal() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
-  // focusable: isOpen — this component (and its useFocusable call) is mounted for the
-  // whole app lifetime, but its ref only attaches to a real DOM node while the modal is
-  // actually rendered below (AnimatePresence). Without `focusable: isOpen`, norigin keeps
-  // this a live candidate in the focus tree at all times with no coordinates, so any
-  // arrow press elsewhere in the app that falls through to norigin's default
-  // nearest-neighbor search (no explicit onArrowPress override) can land focus here and
-  // lose it permanently until reload — see the matching fix on MODAL_SEARCH.
-  const { ref: focusRef, focusKey } = useFocusable({
-    focusKey: 'MODAL_ASSET_DETAIL',
-    isFocusBoundary: true,
-    focusable: isOpen,
-  });
-
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => setFocus('MODAL_ASSET_DETAIL'), 100);
@@ -119,27 +106,72 @@ export function AssetDetailModal() {
   return (
     <AnimatePresence>
       {isOpen && activeAssetId && (
-        <FocusContext.Provider value={focusKey}>
-          <div ref={focusRef as any} className="fixed inset-0 z-[99999] overflow-hidden bg-[var(--theme_12)]">
-            {/* Scrollable Container */}
-            <div
-              ref={scrollContainerRef}
-              onClick={handleBackdropClick}
-              className="absolute inset-0 overflow-y-auto flex items-start justify-center p-0 overscroll-contain"
-            >
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="relative w-full min-h-screen m-0 z-10"
-              >
-                <AssetDetailView assetId={activeAssetId} onClose={closeAssetDetail} isStandalone={true} />
-              </motion.div>
-            </div>
-          </div>
-        </FocusContext.Provider>
+        <AssetDetailModalBoundary
+          activeAssetId={activeAssetId}
+          closeAssetDetail={closeAssetDetail}
+          scrollContainerRef={scrollContainerRef}
+          onBackdropClick={handleBackdropClick}
+        />
       )}
     </AnimatePresence>
+  );
+}
+
+/**
+ * Owns the MODAL_ASSET_DETAIL focus boundary itself, deliberately kept out of the
+ * always-mounted parent above — this component (and its useFocusable call) only
+ * exists while the modal is actually open, so its norigin registration is created
+ * and destroyed together with the real DOM node instead of lingering.
+ *
+ * The previous approach kept useFocusable's registration alive for the app's whole
+ * lifetime with `focusable: isOpen` toggling it on/off, specifically to stop a
+ * default nearest-neighbor arrow search from landing on it while empty (see git
+ * history). But keeping the registration alive turned out to cause a second,
+ * worse bug: norigin's `autoRestoreFocus` (enabled on ROOT_FOCUS_KEY in
+ * SpatialNavigationProvider) walks up to the nearest still-registered ancestor
+ * once a focused child's node is torn down — and on this TV hardware, that child
+ * teardown lags the visual close by 700ms-1.3s, so MODAL_ASSET_DETAIL (still
+ * registered, `node=null`) was reliably "restored" to well after
+ * restorePageFocus() had already moved focus to the hero/navbar, silently
+ * stealing it right back. A boundary that doesn't exist at all while closed can't
+ * be an auto-restore target either, which fixes both bugs at once.
+ */
+function AssetDetailModalBoundary({
+  activeAssetId,
+  closeAssetDetail,
+  scrollContainerRef,
+  onBackdropClick,
+}: {
+  activeAssetId: string;
+  closeAssetDetail: () => void;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  onBackdropClick: (e: React.MouseEvent) => void;
+}) {
+  const { ref: focusRef, focusKey } = useFocusable({
+    focusKey: 'MODAL_ASSET_DETAIL',
+    isFocusBoundary: true,
+  });
+
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <div ref={focusRef as any} data-focuskey={focusKey} className="fixed inset-0 z-[99999] overflow-hidden bg-[var(--theme_12)]">
+        {/* Scrollable Container */}
+        <div
+          ref={scrollContainerRef}
+          onClick={onBackdropClick}
+          className="absolute inset-0 overflow-y-auto flex items-start justify-center p-0 overscroll-contain"
+        >
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="relative w-full min-h-screen m-0 z-10"
+          >
+            <AssetDetailView assetId={activeAssetId} onClose={closeAssetDetail} isStandalone={true} />
+          </motion.div>
+        </div>
+      </div>
+    </FocusContext.Provider>
   );
 }

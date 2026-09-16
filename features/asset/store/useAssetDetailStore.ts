@@ -92,23 +92,14 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
   closeAssetDetail: () => {
     if (typeof window === "undefined") return;
 
-    const { originalPath, isOpen, historyCount } = get();
+    const { originalPath, isOpen } = get();
     if (!isOpen) return;
 
     const hadAssetDetailHistoryEntry = window.history.state?.type === "asset-detail";
     const targetPath = originalPath || "/";
 
-    // Reset app state synchronously, before touching browser history. history.go()
-    // below only resolves later, via an async popstate event — on TV-class hardware
-    // that round-trip is slow enough that a second physical Back press can land
-    // before isOpen ever actually flips false. Two things depended on isOpen
-    // updating promptly: RemoteManager's own Back handler reads it to decide whether
-    // it owns the keypress at all (while stale-true, it kept deferring to this
-    // modal), and AssetDetailModal's focus-restore effect only runs once isOpen
-    // goes false. With both stuck waiting on the pending history navigation, the
-    // home page was left with no focus at all — so the next Back press fell through
-    // to RemoteManager's root-page logic with nothing to go back to, and it showed
-    // the exit-app prompt instead of just restoring navbar focus.
+    // Reset app state synchronously, before touching browser history — see below for
+    // why history is never allowed to drive this.
     set({
       activeAssetId: null,
       activeContentType: null,
@@ -119,11 +110,22 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
       shouldScrollToBottom: false,
     });
 
-    // Still unwind the browser/webOS history stack we pushed onto while open —
-    // otherwise a subsequent Back press would silently consume a leftover stale
-    // entry instead of actually navigating.
+    // Overwrite (never pop/go) the history entry openAssetDetail pushed while open.
+    // This used to unwind it with history.go(-(historyCount+1)), but go() only
+    // resolves later via an async popstate event — and Next.js's own App Router
+    // also listens for popstate globally for its client-side routing, so that
+    // event round-trips through the router's own reconciliation against whatever
+    // entry we land on. On this TV hardware that reconciliation reliably re-opened
+    // this modal about a second later (isOpen flipping back true, landing focus on
+    // the modal's own empty boundary key instead of the page underneath) — and even
+    // ignoring that, go() simply resolving late was already enough for a second
+    // physical Back press to land while isOpen was still stale-true. The physical
+    // remote's Back key never needed a real browser navigation to begin with — it's
+    // handled directly, synchronously, right here — so replaceState (which never
+    // fires popstate) removes the stale "asset-detail" marker just as effectively,
+    // without ever handing control back to the router.
     if (hadAssetDetailHistoryEntry) {
-      window.history.go(-(historyCount + 1));
+      window.history.replaceState({ type: "page" }, "", window.location.href);
       return;
     }
 
