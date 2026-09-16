@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { useTranslations } from "next-intl";
-import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
+import JOJOCommonImage, { JOJOImageContentMode } from "@/components/ui/JOJOCommonImage";
 import { ContentRailItem, RailCardVariant } from "../config/contentRail.types";
 import { RailCardDesignConfig, RailCardWidth } from "../config/contentRail.config";
 import { LOGOS } from "@/lib/constants/assets";
@@ -381,7 +381,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
               src={LOGOS.CROWN_LOGO}
               alt={t("premium_badge_alt")}
               fill
-              className="object-contain"
+              contentMode={JOJOImageContentMode.Contain}
               wrapperClassName="w-full h-full"
             />
           </div>

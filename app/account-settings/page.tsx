@@ -18,7 +18,7 @@ import { ROUTES } from "@/lib/constants/routes";
 import { mapApiRailItem } from "@/components/content-rail/utils/contentRail.mapper";
 import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
 import { LOGOS } from "@/lib/constants/assets";
-import { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
+import { JOJOImageContentMode, JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { analyticsService } from "@/shared/analytics";
 import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
 import { cn } from "@/lib/utils";
@@ -143,7 +143,7 @@ export default function AccountSettingsPage() {
           >
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 relative flex-shrink-0 flex items-center justify-center bg-[#FAAF3F]/10 rounded-xl border border-[#FAAF3F]/20">
-                <JOJOCommonImage src={LOGOS.CROWN_LOGO} alt="Crown" width={20} height={20} preset={JOJOImagePreset.Default} />
+                <JOJOCommonImage src={LOGOS.CROWN_LOGO} alt="Crown" width={20} height={20} preset={JOJOImagePreset.Default} contentMode={JOJOImageContentMode.Contain} />
               </div>
               <div className="text-left">
                 <span

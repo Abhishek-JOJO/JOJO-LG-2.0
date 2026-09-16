@@ -95,17 +95,20 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
     const { originalPath, isOpen, historyCount } = get();
     if (!isOpen) return;
 
-    if (window.history.state && window.history.state.type === "asset-detail") {
-      window.history.go(-(historyCount + 1));
-      return;
-    }
-
+    const hadAssetDetailHistoryEntry = window.history.state?.type === "asset-detail";
     const targetPath = originalPath || "/";
-    // Check if the current URL matches the targetPath, if not, restore it
-    if (window.location.pathname !== targetPath.split("?")[0]) {
-      window.history.pushState({ type: "page" }, "", targetPath);
-    }
 
+    // Reset app state synchronously, before touching browser history. history.go()
+    // below only resolves later, via an async popstate event — on TV-class hardware
+    // that round-trip is slow enough that a second physical Back press can land
+    // before isOpen ever actually flips false. Two things depended on isOpen
+    // updating promptly: RemoteManager's own Back handler reads it to decide whether
+    // it owns the keypress at all (while stale-true, it kept deferring to this
+    // modal), and AssetDetailModal's focus-restore effect only runs once isOpen
+    // goes false. With both stuck waiting on the pending history navigation, the
+    // home page was left with no focus at all — so the next Back press fell through
+    // to RemoteManager's root-page logic with nothing to go back to, and it showed
+    // the exit-app prompt instead of just restoring navbar focus.
     set({
       activeAssetId: null,
       activeContentType: null,
@@ -115,6 +118,18 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
       historyCount: 0,
       shouldScrollToBottom: false,
     });
+
+    // Still unwind the browser/webOS history stack we pushed onto while open —
+    // otherwise a subsequent Back press would silently consume a leftover stale
+    // entry instead of actually navigating.
+    if (hadAssetDetailHistoryEntry) {
+      window.history.go(-(historyCount + 1));
+      return;
+    }
+
+    if (window.location.pathname !== targetPath.split("?")[0]) {
+      window.history.pushState({ type: "page" }, "", targetPath);
+    }
   },
 
   navigateBackToAsset: (id, contentType, title) => {

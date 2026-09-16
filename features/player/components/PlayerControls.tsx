@@ -35,7 +35,7 @@ import type {
   ThumbnailCue,
 } from '../model/types';
 import { LOGOS } from '@/lib/constants/assets';
-import JOJOCommonImage from '@/components/ui/JOJOCommonImage';
+import JOJOCommonImage, { JOJOImageContentMode } from '@/components/ui/JOJOCommonImage';
 
 // ── Icon button wrapper ────────────────────────────────────────────────────────
 
@@ -612,6 +612,7 @@ export function PlayerControls({
                 src={LOGOS.BACKWARD_ICON}
                 width={25}
                 height={25}
+                contentMode={JOJOImageContentMode.Contain}
                 className="w-5.5 h-5.5 object-contain transition-all duration-150"
               />
             </IconBtn>
@@ -627,6 +628,7 @@ export function PlayerControls({
                 src={LOGOS.FORWARD_ICON}
                 width={25}
                 height={25}
+                contentMode={JOJOImageContentMode.Contain}
                 className="w-5.5 h-5.5 object-contain transition-all duration-150"
               />
             </IconBtn>

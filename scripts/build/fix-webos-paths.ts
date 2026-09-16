@@ -425,6 +425,22 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
         modified = true;
       }
 
+      // Strip the CSS Color 4 "in <colorspace>" interpolation-method keyword that Tailwind
+      // v4 puts on every gradient utility's --tw-gradient-position (e.g. "to right in oklab").
+      // webOS Chromium doesn't parse that syntax, and an unrecognized token inside
+      // linear-gradient() invalidates the whole declaration — not just a color-space
+      // fallback, the gradient's background-image never applies at all. That silently
+      // breaks every bg-gradient-to-* element in the app (buttons, overlays, etc.);
+      // dropping the interpolation keyword falls back to the default (sRGB) space, which
+      // is visually indistinguishable here since every stop is a plain hex/rgb color.
+      if (content.includes('--tw-gradient-position')) {
+        content = content.replace(
+          /(--tw-gradient-position:[^;}]*?)\s+in\s+(?:oklab|oklch|srgb-linear|srgb|hsl|hwb|lab|lch|xyz-d50|xyz-d65|xyz)\b/gi,
+          '$1'
+        );
+        modified = true;
+      }
+
       if (modified) {
         fs.writeFileSync(filePath, content, 'utf8');
         cssCount++;

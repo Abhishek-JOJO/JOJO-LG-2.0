@@ -259,6 +259,47 @@ function GenreRow({
   );
 }
 
+// ─── Recently Added grid ────────────────────────────────────────────────────
+
+/**
+ * The "Recently Added" rail renders as a plain poster grid (PosterCard, same as
+ * the active-search-results state) instead of going through ContentRailSection's
+ * horizontally-scrolling row. ContentRailSection/ContentRailList's per-card
+ * onArrowPress wiring (spotlight lead-card cycling, row-active dimming via
+ * useActiveRailStore, home-page section jump targets like nav-link-N /
+ * hero-carousel) was built for the home page's row layout; reused inside this
+ * modal it fights the D-pad instead of just moving focus, since this section
+ * has no spotlight lead slot, no row dimming, and none of those home-page
+ * escape-hatch targets exist here. A uniform grid of PosterCards needs none of
+ * that — it's exactly the same component already working correctly for the
+ * search-results grid below — so it just navigates with norigin's default
+ * nearest-neighbor search like any other grid.
+ */
+function RecentlyAddedGrid({
+  title,
+  items,
+  onCardClick,
+}: {
+  title: string;
+  items: any[];
+  onCardClick: (item: any, index: number) => void;
+}) {
+  return (
+    <div className="px-8 mb-2">
+      <h3 className="title-xs-semibold text-theme_1 mb-3">{title}</h3>
+      <div className={POSTER_GRID}>
+        {items.map((item, idx) => (
+          <PosterCard
+            key={item.id ?? idx}
+            item={item}
+            onClick={() => onCardClick(item, idx)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Skeleton grid ────────────────────────────────────────────────────────────
 
 function PosterGridSkeleton({ count = 10 }: { count?: number }) {
@@ -905,6 +946,19 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                     recentRails.map((rawRail: any, idx: number) => {
                       const rail = mapApiRail(rawRail, idx);
                       if (!rail?.items || rail?.items?.length === 0) return null;
+
+                      // "Recently Added" gets a plain poster grid instead of a
+                      // scrolling rail row — see RecentlyAddedGrid above for why.
+                      if (/recently added/i.test(rail.title || "")) {
+                        return (
+                          <RecentlyAddedGrid
+                            key={rail.id || idx}
+                            title={rail.title}
+                            items={rail.items}
+                            onCardClick={handleCardClick}
+                          />
+                        );
+                      }
 
                       return (
                         <ContentRailSection

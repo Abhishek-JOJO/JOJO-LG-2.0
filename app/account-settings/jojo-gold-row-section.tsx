@@ -1,4 +1,4 @@
-import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
+import JOJOCommonImage, { JOJOImageContentMode, JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { StorageKey } from "@/enums/storage.enum";
 import { useVerifySubscription } from "@/hooks/useVerifySubscription";
 import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
@@ -69,6 +69,7 @@ export default function JOJOGoldRowSection() {
                             width={20}
                             height={20}
                             preset={JOJOImagePreset.Default}
+                            contentMode={JOJOImageContentMode.Contain}
                         />
                     </div>
                     <div className="text-left">
