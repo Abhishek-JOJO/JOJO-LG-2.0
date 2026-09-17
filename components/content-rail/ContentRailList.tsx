@@ -23,6 +23,7 @@ import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { extractDominantAmbientColor } from "@/lib/utils/colorExtractor";
 import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 import { preloadImageUrl, preloadRailItems } from "./utils/imagePreloader";
+import { tvSoundManager } from "@/lib/webos/tvSoundManager";
 
 interface ContentRailListProps {
   items: ContentRailItem[];
@@ -410,6 +411,7 @@ export function ContentRailList({
     focusable: isHeroVariant,
     onArrowPress: (direction) => {
       if (!isHeroVariant) return true;
+      tvSoundManager.play("nav");
       if (direction === 'left') {
         if (items?.length > 1) {
           setIsAutoplayPaused(true);
@@ -468,6 +470,7 @@ export function ContentRailList({
     },
     onEnterPress: () => {
       if (isHeroVariant && items?.length) {
+        tvSoundManager.play("select");
         onItemClick?.(items[activeIndex]);
       }
     },

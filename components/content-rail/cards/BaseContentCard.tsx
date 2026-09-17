@@ -10,6 +10,7 @@ import { LOGOS } from "@/lib/constants/assets";
 import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
+import { tvSoundManager } from "@/lib/webos/tvSoundManager";
 
 interface BaseContentCardProps {
   item: ContentRailItem;
@@ -83,6 +84,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     focusKey: focusKeyProp,
     focusable,
     onArrowPress: (direction) => {
+      tvSoundManager.play("nav");
       if ((direction === 'left' || direction === 'right') && onArrowLeftRight) {
         onArrowLeftRight(direction);
         return false;
@@ -206,6 +208,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       onFocusChange?.(index);
     },
     onEnterPress: () => {
+      tvSoundManager.play("select");
       onClick?.(item);
     }
   });
@@ -271,6 +274,50 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       })
     : "";
 
+  // Cards in the spotlight rail (the sticky landscape slot 0 and the portrait
+  // slots beside it) are stable DOM nodes keyed by slot position, not by item —
+  // pressing Left/Right shifts which item each slot displays by swapping
+  // `imageUrl` on the *same* <img>, which previously hard-cut with no
+  // transition at all. This crossfades old → new instead, mirroring the hero
+  // carousel's opacity-only technique: keep at most two layers mounted, mount
+  // the incoming one at opacity-0 so it has a painted frame to transition from,
+  // reveal it a frame later via rAF, then drop the outgoing layer once the fade
+  // is done. Opacity-only avoids any layout/paint cost beyond compositing.
+  const IMAGE_CROSSFADE_MS = 260;
+  const [imageLayers, setImageLayers] = useState<{ src: string; key: number }[]>(() =>
+    resizedImageUrl ? [{ src: resizedImageUrl, key: 0 }] : []
+  );
+  const imageLayerKeyRef = useRef(0);
+  const [revealedImageKey, setRevealedImageKey] = useState(0);
+
+  useEffect(() => {
+    if (!resizedImageUrl) {
+      setImageLayers([]);
+      return;
+    }
+    setImageLayers((prev) => {
+      if (prev.length && prev[prev.length - 1].src === resizedImageUrl) return prev;
+      imageLayerKeyRef.current += 1;
+      const newLayer = { src: resizedImageUrl, key: imageLayerKeyRef.current };
+      return prev.length ? [prev[prev.length - 1], newLayer] : [newLayer];
+    });
+  }, [resizedImageUrl]);
+
+  useEffect(() => {
+    if (imageLayers.length < 2) return;
+    const newKey = imageLayers[imageLayers.length - 1].key;
+    const raf = requestAnimationFrame(() => setRevealedImageKey(newKey));
+    // A little past the CSS transition's own duration so the outgoing layer
+    // never gets yanked out a frame before the fade has actually finished.
+    const timer = setTimeout(() => {
+      setImageLayers((prev) => (prev.length > 1 ? [prev[prev.length - 1]] : prev));
+    }, IMAGE_CROSSFADE_MS + 150);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, [imageLayers]);
+
   const cardInner = (
     <div
       className="relative h-full w-full overflow-hidden bg-neutral-900 transition-colors transform-gpu isolation-isolate"
@@ -286,15 +333,20 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         outlineOffset: "-2px",
       }}
     >
-      {imageUrl && (
+      {imageLayers.length > 0 && (
         <div className="absolute inset-0 w-full h-full bg-neutral-900" style={{ transform: 'translateZ(0)', willChange: 'contents' }}>
-          <img
-            src={resizedImageUrl}
-            alt={item?.title || ""}
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            loading="eager"
-          />
+          {imageLayers.map((layer) => (
+            <img
+              key={layer.key}
+              src={layer.src}
+              alt={item?.title || ""}
+              className={`absolute inset-0 w-full h-full object-cover pointer-events-none select-none transition-opacity ease-out ${
+                imageLayers.length === 1 || layer.key === revealedImageKey ? "opacity-100" : "opacity-0"
+              }`}
+              style={{ width: "100%", height: "100%", objectFit: "cover", transitionDuration: `${IMAGE_CROSSFADE_MS}ms` }}
+              loading="eager"
+            />
+          ))}
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { normalizePathname } from '@/lib/utils/pathname';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useAssetDetailStore } from '@/features/asset/store/useAssetDetailStore';
 import { useExitConfirmStore } from '@/store/useExitConfirmStore';
+import { tvSoundManager } from '@/lib/webos/tvSoundManager';
 
 // LG webOS Remote Key Codes
 export const WEBOS_KEYS = {
@@ -27,6 +28,12 @@ export const WEBOS_KEYS = {
 export const useRemoteManager = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Primes the shared TV UI sound AudioContext on the very first remote
+      // keypress of the session — the earliest reliable user gesture app-wide,
+      // and where webOS TV's ~500ms Web Audio warm-up should happen (silently),
+      // not on the user's first actual select sound. No-ops after the first call.
+      tvSoundManager.init();
+
       // If a component (e.g. modal or video player) already handled & prevented the key, do not override
       if (e.defaultPrevented) return;
 

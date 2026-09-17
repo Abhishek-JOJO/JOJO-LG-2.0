@@ -297,6 +297,7 @@ export const appConfig = {
         isShowLanguageDropdown: false,
         isShowAutoProgressBarHeroBanner: false,
         isEnableHomeCarouselLike: false,
+        enableTvUiSound: true,
         /**
          * Mobile access flags:
          * - MOBILE_RESPONSIVE_WITH_AUTH: allow auth/profile onboarding routes on mobile.

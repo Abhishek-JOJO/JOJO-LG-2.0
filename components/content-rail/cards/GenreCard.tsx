@@ -10,6 +10,7 @@ import { getGenreBackground } from "@/lib/utils";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { ROUTES } from "@/lib/constants/routes";
 import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { tvSoundManager } from "@/lib/webos/tvSoundManager";
 
 interface GenreCardProps {
   item: ContentRailItem;
@@ -65,6 +66,7 @@ export function GenreCard({
       }
     },
     onArrowPress: (direction) => {
+      tvSoundManager.play("nav");
       // Rail-to-rail vertical jumping needs to work inside a modal (search, asset
       // detail) too — those rails are wrapped in the exact same <section
       // data-section-index> structure as the home page. The only modal-specific
@@ -152,6 +154,7 @@ export function GenreCard({
       return true;
     },
     onEnterPress: () => {
+      tvSoundManager.play("select");
       if (onClick) {
         onClick();
       } else if ((item as any)?.slug || item?.title) {
