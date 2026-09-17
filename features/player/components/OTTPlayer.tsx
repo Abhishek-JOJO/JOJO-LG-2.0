@@ -202,6 +202,9 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   const isMenuOpenRef = useRef(false);
   const focusToControlsRef = useRef(false);
   const isPlayerFocusedRef = useRef(true);
+  // Bumped to force-close an open Settings/Subtitle submenu on Back/Escape —
+  // see PlayerControls' forceCloseMenus prop and the back-key handler below.
+  const [closeMenusSignal, setCloseMenusSignal] = useState(0);
 
   const showControls = useCallback(() => {
     setControlsVisible(true);
@@ -1076,7 +1079,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   useEffect(() => {
     if (controlsVisible && focusToControlsRef.current) {
       const timer = setTimeout(() => {
-        setFocus('play-pause-btn');
+        setFocus('player-controls-row');
       }, 100);
       focusToControlsRef.current = false;
       return () => clearTimeout(timer);
@@ -1098,6 +1101,17 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         if (showEpisodesPanel) {
           setShowEpisodesPanel(false);
           setFocus('ott-player-main');
+          return;
+        }
+
+        // Close an open Settings/Subtitle submenu first, without touching
+        // controlsVisible — Back used to only ever hide the whole control
+        // bar, leaving the submenu's own open state (and isMenuOpenRef)
+        // stuck true forever, so it silently popped back open the next time
+        // controls reappeared and auto-hide stayed disabled from then on.
+        if (isMenuOpenRef.current) {
+          setCloseMenusSignal((s) => s + 1);
+          isMenuOpenRef.current = false;
           return;
         }
 
@@ -1127,6 +1141,27 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     storeSetSpeed(s);
     engineRef.current?.setPlaybackSpeed(s);
   }, [storeSetSpeed]);
+
+  // Rate button — no backend rating endpoint exists yet in this codebase
+  // (only the PLAYER_RATE_CLICKED analytics event was ever wired up, never a
+  // real API call), so this is a local, per-session toggle + the existing
+  // analytics event, not a persisted rating. Resets each time a new title
+  // loads (contentId dependency) rather than carrying over between videos.
+  const [isRated, setIsRated] = useState(false);
+  useEffect(() => {
+    setIsRated(false);
+  }, [video.contentId]);
+  const handleRate = useCallback(() => {
+    setIsRated((prev) => {
+      const next = !prev;
+      analyticsService.track(EVENT_NAMES.PLAYER_RATE_CLICKED, {
+        asset_id: String(video.contentId),
+        asset_title: video.title ?? '',
+        is_rated: next,
+      });
+      return next;
+    });
+  }, [video.contentId, video.title]);
 
   const handleQualityChange = useCallback((id: number) => {
     setActiveQuality(id);
@@ -1423,7 +1458,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       handlePlayPause();
       
       if (controlsVisible) {
-        setFocus('play-pause-btn');
+        setFocus('player-controls-row');
       } else {
         showControls();
         focusToControlsRef.current = true;
@@ -1436,8 +1471,14 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       }
 
       showControls();
-      setFocus('play-pause-btn');
-      return true;
+      setFocus('player-controls-row');
+      // Must suppress norigin's own default nearest-neighbor search here —
+      // setFocus() is async (it awaits getNextFocusKey() before mutating
+      // focusKey), so returning anything other than false lets the library's
+      // own smartNavigate run immediately afterward from the stale prior
+      // focusKey, racing the explicit setFocus above and landing focus
+      // unpredictably depending on which resolves last.
+      return false;
     }
   });
 
@@ -1567,11 +1608,21 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         }}
         className={`relative w-full bg-black select-none overflow-hidden transition-shadow ${isPlayerFocused ? "ring-2 ring-white/50" : ""}`}
         style={{
-          aspectRatio: isFullscreen ? 'auto' : '16 / 9',
-          width: isFullscreen ? '100vw' : '100%',
-          height: isFullscreen ? '100vh' : 'auto',
-          maxHeight: isFullscreen ? '100vh' : 'calc(100vh - 30px)',
-          maxWidth: isFullscreen ? '100vw' : '100%',
+          // A TV app has no "windowed" state to expand out of — the WebApp
+          // already renders at the full native screen resolution from frame
+          // one (confirmed on-device: window.innerWidth/innerHeight already
+          // equals the screen size regardless of document.fullscreenElement).
+          // This used to size the player at a smaller 16:9/percentage box
+          // until the browser Fullscreen API's isFullscreen flipped true —
+          // which only ever happened after the user's first pointerdown/
+          // keydown (see the auto-fullscreen effect above) — so the video
+          // visibly jumped/resized on first interaction instead of always
+          // filling the screen like a TV player should.
+          aspectRatio: 'auto',
+          width: '100vw',
+          height: '100vh',
+          maxHeight: '100vh',
+          maxWidth: '100vw',
           cursor: controlsVisible ? 'default' : 'none',
           ...captionStyles,
         }}
@@ -1852,10 +1903,13 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
               onPipToggle={togglePip}
               onEpisodes={seasons.length > 0 ? handleEpisodesToggle : undefined}
               onNextEpisode={nextEpisodeFromList ? handleNextEpisodePlay : undefined}
+              onRate={handleRate}
+              isRated={isRated}
               onMenuOpenChange={(isOpen) => {
                 isMenuOpenRef.current = isOpen;
                 showControls();
               }}
+              forceCloseMenus={closeMenusSignal}
             />
           </div>
         )}

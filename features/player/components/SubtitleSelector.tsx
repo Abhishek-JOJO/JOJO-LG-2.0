@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import React, { useState, useEffect, useRef } from 'react';
+import { useFocusable, setFocus, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { CAPTION_SIZE_LABELS, CAPTION_SIZE_OPTIONS } from '../constants/player.constants';
 import type { CaptionSize, SubtitleTrack } from '../model/types';
 
@@ -274,6 +274,10 @@ interface SubtitleSelectorProps {
   onCaptionBgOpacityChange?: (opacity: number) => void;
   renderTrigger?: (onClick: () => void) => React.ReactNode;
   onOpenChange?: (isOpen: boolean) => void;
+  /** Bumped by the parent to force this dropdown closed (e.g. on Back/Escape) —
+   * `open` is this component's own internal state, not controlled by the
+   * parent, so a plain boolean/counter prop change is what triggers it. */
+  forceClose?: number;
   isVisible?: boolean;
 }
 
@@ -293,6 +297,7 @@ export function SubtitleSelector({
   onCaptionBgOpacityChange,
   renderTrigger,
   onOpenChange,
+  forceClose,
   isVisible = true,
 }: SubtitleSelectorProps) {
   const [open, setOpen] = useState(false);
@@ -305,6 +310,25 @@ export function SubtitleSelector({
       setView('tracks');
     }
   };
+
+  const isFirstForceCloseRef = useRef(true);
+  useEffect(() => {
+    if (isFirstForceCloseRef.current) {
+      isFirstForceCloseRef.current = false;
+      return;
+    }
+    setOpenWithNotify(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceClose]);
+
+  // Focus boundary while open — same rationale as SettingsSelector in
+  // PlayerControls.tsx: without it, norigin's default search can wander off
+  // this popup onto the still-focusable controls it's merely drawn over.
+  const { ref: subtitleBoundaryRef, focusKey: subtitlePanelFocusKey } = useFocusable({
+    focusKey: 'subtitle-panel',
+    isFocusBoundary: true,
+    focusable: open,
+  });
 
   const allOptions = [OFF_TRACK, ...tracks];
   const active = allOptions.find((t) => t.id === activeTrackId) ?? OFF_TRACK;
@@ -338,7 +362,10 @@ export function SubtitleSelector({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpenWithNotify(false)} />
-          <div className="absolute bottom-full right-0 mb-3 bg-[#141414]/98 border border-white/15 rounded-xl overflow-hidden min-w-[280px] z-50 shadow-2xl backdrop-blur-md player-menu-pop-in">
+          <FocusContext.Provider value={subtitlePanelFocusKey}>
+          <div
+            ref={subtitleBoundaryRef as any}
+            className="absolute bottom-full right-0 mb-3 bg-[#141414]/98 border border-white/15 rounded-xl overflow-hidden min-w-[280px] z-50 shadow-2xl backdrop-blur-md player-menu-pop-in">
             {view === 'tracks' && (
               <>
                 <div className="px-4 py-3 border-b border-white/10">
@@ -474,6 +501,7 @@ export function SubtitleSelector({
               </div>
             )}
           </div>
+          </FocusContext.Provider>
         </>
       )}
     </div>

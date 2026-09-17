@@ -28,10 +28,8 @@ export const AdOverlay = memo(function AdOverlay({
   isAdMuted,
   onPlayPause,
   onMuteToggle,
-  onFullscreenToggle,
   onBack,
   onGoAdsFree,
-  isFullscreen,
   onAdClick,
 }: AdOverlayProps) {
   const elapsed = adState.totalSeconds - adState.remainingSeconds;
@@ -74,12 +72,6 @@ export const AdOverlay = memo(function AdOverlay({
     focusable: controlsFocusable && canSkip,
     onEnterPress: onSkip,
   });
-  const { ref: fullscreenRef, focused: fullscreenFocused } = useFocusable({
-    focusKey: 'ad-fullscreen-btn',
-    focusable: controlsFocusable,
-    onEnterPress: onFullscreenToggle,
-  });
-
   // Land the D-pad on the ad's own controls the moment it actually starts —
   // otherwise focus stays wherever it was (likely an occluded control behind
   // the ad), leaving the ad effectively unusable by remote.
@@ -318,20 +310,8 @@ export const AdOverlay = memo(function AdOverlay({
               )}
             </div>
 
-            {/* Fullscreen Button */}
-            <button
-              ref={fullscreenRef}
-              onClick={(e) => {
-                e.stopPropagation();
-                onFullscreenToggle();
-              }}
-              className={`flex items-center justify-center p-1.5 rounded hover:bg-white/10 transition-all outline-none text-white ${
-                fullscreenFocused ? 'ring-[3px] ring-white bg-white/20 scale-[1.15] shadow-2xl' : ''
-              }`}
-              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-            >
-              <PlayerIcon name={isFullscreen ? 'exit-fullscreen' : 'fullscreen'} size={24} />
-            </button>
+            {/* No on-screen Fullscreen toggle — this is a TV app, the video
+                already always fills the whole screen, nothing to toggle. */}
           </div>
         </div>
       </div>

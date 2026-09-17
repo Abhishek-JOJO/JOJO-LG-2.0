@@ -3,19 +3,23 @@
 /**
  * PlayerControls
  *
- * UI matches the screenshot exactly:
- *
- * TOP BAR (shown on hover):
- *   ← Title
+ * TOP BAR (shown on hover): title only — no on-screen Back button, this is a
+ * TV remote app and the physical Back key already handles that.
  *
  * PROGRESS ROW:
- *   [track——●————————————] "Episodes"  01:22:12
+ *   [track——●————————————]                                     01:22:12
  *
  * BOTTOM ROW:
- *   [<<]  [▶]  [>>]  [🔊]          [CC] [⚙] [👍] [🔁] [⏭] [⛶]
+ *   [<<]  [▶]  [>>]  [🔊]     Subtitles  Quality  Speed  Rate  Episodes  Next Episode
  *
- * All icons use /public/player-icons/ PNGs via PlayerIcon component.
- * Play/Pause/Mute use inline SVGs (no separate asset needed).
+ * Right-side actions are labeled icon+text buttons (icon left, label right,
+ * same row) rather than bare icon glyphs, and Quality/Speed/Audio are three
+ * separate direct-access buttons instead of one combined "Settings" gear —
+ * one press to reach any setting instead of an extra hub-menu step.
+ *
+ * All icons use /public/player-icons/ PNGs via PlayerIcon component, except
+ * Quality/Speed/Audio which have no dedicated asset and are small hand-drawn
+ * inline SVGs. Play/Pause/Mute use inline SVGs (no separate asset needed).
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -23,7 +27,7 @@ import { ProgressBar } from './ProgressBar';
 import { PlayerIcon } from './PlayerIcon';
 import { SubtitleSelector } from './SubtitleSelector';
 import { PLAYBACK_SPEEDS } from '../constants/player.constants';
-import { useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { useFocusable, setFocus, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { analyticsService } from '@/shared/analytics';
 import { EVENT_NAMES } from '@/shared/analytics/constants/analytics.constants';
 import type {
@@ -34,8 +38,6 @@ import type {
   CaptionSize,
   ThumbnailCue,
 } from '../model/types';
-import { LOGOS } from '@/lib/constants/assets';
-import JOJOCommonImage, { JOJOImageContentMode } from '@/components/ui/JOJOCommonImage';
 
 // ── Icon button wrapper ────────────────────────────────────────────────────────
 
@@ -63,11 +65,11 @@ function IconBtn({ onClick, label, children, active = false, disabled = false, i
       aria-label={label}
       disabled={disabled}
       className={`
-        flex items-center justify-center p-1.5 rounded transition-all duration-150 outline-none
+        flex items-center justify-center gap-2 px-3.5 py-2 rounded-full transition-all duration-150 outline-none
         hover:bg-theme_1/10 active:scale-95
         ${active ? 'opacity-100' : 'opacity-90 hover:opacity-100'}
         ${disabled ? 'pointer-events-none opacity-40' : ''}
-        ${focused ? 'ring-[3px] ring-white bg-white/20 scale-[1.25] shadow-2xl z-30 opacity-100' : ''}
+        ${focused ? 'ring-[3px] ring-white bg-white/20 scale-[1.1] shadow-2xl z-30 opacity-100' : ''}
       `}
     >
       {children}
@@ -75,49 +77,33 @@ function IconBtn({ onClick, label, children, active = false, disabled = false, i
   );
 }
 
-function ChevronRightSmall() {
+// ── Small hand-drawn icons for buttons with no dedicated asset in
+// /public/player-icons/ (same approach as ChevronLeft/RightSmall above) ─────
+
+function QualityIcon() {
   return (
-    <svg width="6" height="10" viewBox="0 0 6 10" fill="none" aria-hidden="true" className="shrink-0 opacity-60">
-      <path d="M1 1L5 5L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+      <rect x="3" y="5" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="11" r="2.5" stroke="currentColor" strokeWidth="1.6" />
     </svg>
   );
 }
 
-function ChevronLeftSmall() {
+function SpeedIcon() {
   return (
-    <svg width="6" height="10" viewBox="0 0 6 10" fill="none" aria-hidden="true" className="shrink-0 opacity-70">
-      <path d="M5 1L1 5L5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+      <circle cx="12" cy="13" r="8" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 13L16 9M9 4h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
 
-interface SettingsMenuRowProps {
-  label: string;
-  value: string;
-  focusKey?: string;
-  isVisible?: boolean;
-  onClick: () => void;
-}
-
-function SettingsMenuRow({ label, value, focusKey, isVisible = true, onClick }: SettingsMenuRowProps) {
-  const { ref, focused } = useFocusable({
-    focusKey,
-    focusable: isVisible,
-    onEnterPress: onClick
-  });
-
+function AudioTrackIcon() {
   return (
-    <button
-      ref={ref}
-      onClick={onClick}
-      className={`w-full flex items-center justify-between gap-4 px-4 py-3.5 text-left transition-colors outline-none ${focused ? 'bg-neutral-800 ring-2 ring-inset ring-white font-bold' : 'hover:bg-theme_1/10'}`}
-    >
-      <span className="text-sm text-theme_1 font-medium">{label}</span>
-      <span className="flex items-center gap-2 min-w-0 text-theme_1/60">
-        <span className="text-xs truncate max-w-[130px]">{value}</span>
-        <ChevronRightSmall />
-      </span>
-    </button>
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+      <path d="M4 14v-4M9 17v-10M14 20v-16M19 14v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -159,12 +145,22 @@ interface SettingsSelectorProps {
   onAudioChange: (id: number) => void;
   speed: PlaybackSpeed;
   onSpeedChange: (speed: PlaybackSpeed) => void;
-  renderTrigger: (onClick: () => void) => React.ReactNode;
   /** Called whenever the dropdown opens or closes — used to suppress seekbar thumbnail */
   onOpenChange?: (isOpen: boolean) => void;
+  /** Bumped by the parent to force this dropdown closed (e.g. on Back/Escape) —
+   * `open` is this component's own internal state, not controlled by the
+   * parent, so a plain boolean/counter prop change is what triggers it. */
+  forceClose?: number;
   isVisible?: boolean;
 }
 
+/**
+ * Renders as three separate labeled trigger buttons (Quality / Audio / Speed)
+ * — not one combined "Settings" gear with a sub-menu hub — each opening the
+ * same popup directly at its own option list. Matches the reference OTT
+ * design: direct, one-press access per setting instead of a gear icon that
+ * hides everything behind an extra navigation step.
+ */
 function SettingsSelector({
   qualities,
   activeQualityId,
@@ -174,27 +170,36 @@ function SettingsSelector({
   onAudioChange,
   speed,
   onSpeedChange,
-  renderTrigger,
   onOpenChange,
+  forceClose,
   isVisible = true,
 }: SettingsSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<'main' | 'quality' | 'audio' | 'speed'>('main');
+  const [view, setView] = useState<'quality' | 'audio' | 'speed'>('quality');
+  const lastTriggerKeyRef = useRef('menu-trigger-quality');
 
-  const activeQuality = qualities.find((q) => q.id === activeQualityId) ?? qualities[0];
-  const activeAudio = audioTracks.find((t) => t.id === activeAudioTrackId) ?? audioTracks[0];
+  // Focus boundary while open: without this, norigin's default nearest-
+  // neighbor search can wander off this popup onto the still-focusable
+  // (merely visually occluded, z-50 popup sits above them) PlayerControls
+  // buttons underneath — same fix already applied to EpisodesPanel for the
+  // identical overlay-over-controls shape. `focusable: open` keeps this a
+  // no-op while closed, since this component never unmounts.
+  const { ref: settingsBoundaryRef, focusKey: settingsPanelFocusKey } = useFocusable({
+    focusKey: 'settings-panel',
+    isFocusBoundary: true,
+    focusable: open,
+  });
 
   useEffect(() => {
     if (open) {
       setTimeout(() => {
-        if (view === 'main') setFocus(qualities.length > 0 ? 'menu-row-quality' : 'menu-row-speed');
-        else if (view === 'quality' && qualities.length > 0) setFocus(`opt-quality-${qualities[0].id}`);
+        if (view === 'quality' && qualities.length > 0) setFocus(`opt-quality-${qualities[0].id}`);
         else if (view === 'audio' && audioTracks.length > 0) setFocus(`opt-audio-${audioTracks[0].id}`);
         else if (view === 'speed') setFocus(`opt-speed-${PLAYBACK_SPEEDS[0]}`);
       }, 50);
     } else {
       setTimeout(() => {
-        if (isVisible) setFocus('settings-trigger-btn');
+        if (isVisible) setFocus(lastTriggerKeyRef.current);
       }, 50);
     }
   }, [open, view, isVisible, qualities, audioTracks]);
@@ -207,66 +212,79 @@ function SettingsSelector({
     }
   };
 
-  const handleClose = () => {
-    setOpenWithNotify(false);
-    setView('main');
+  const handleClose = () => setOpenWithNotify(false);
+
+  const openView = (v: 'quality' | 'audio' | 'speed', triggerKey: string) => {
+    lastTriggerKeyRef.current = triggerKey;
+    setView(v);
+    setOpenWithNotify(true);
   };
 
+  const isFirstForceCloseRef = useRef(true);
+  useEffect(() => {
+    if (isFirstForceCloseRef.current) {
+      isFirstForceCloseRef.current = false;
+      return;
+    }
+    setOpen(false);
+    onOpenChange?.(false);
+  }, [forceClose]);
+
   return (
-    <div className="relative">
-      {renderTrigger(() => setOpenWithNotify(!open))}
+    <div className="relative flex items-center gap-2.5 sm:gap-4">
+      {qualities.length > 0 && (
+        <IconBtn
+          focusKey="menu-trigger-quality"
+          onClick={() => openView('quality', 'menu-trigger-quality')}
+          label="Quality"
+          isVisible={isVisible}
+          active={open && view === 'quality'}
+        >
+          <QualityIcon />
+          <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Quality</span>
+        </IconBtn>
+      )}
+
+      {audioTracks.length > 1 && (
+        <IconBtn
+          focusKey="menu-trigger-audio"
+          onClick={() => openView('audio', 'menu-trigger-audio')}
+          label="Audio"
+          isVisible={isVisible}
+          active={open && view === 'audio'}
+        >
+          <AudioTrackIcon />
+          <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Audio</span>
+        </IconBtn>
+      )}
+
+      <IconBtn
+        focusKey="menu-trigger-speed"
+        onClick={() => openView('speed', 'menu-trigger-speed')}
+        label="Speed"
+        isVisible={isVisible}
+        active={open && view === 'speed'}
+      >
+        <SpeedIcon />
+        <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Speed</span>
+      </IconBtn>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={handleClose} />
-          <div className="absolute bottom-full right-0 mb-3 bg-[#141414]/98 border border-theme_1/15 rounded-xl overflow-hidden min-w-[280px] z-50 shadow-2xl backdrop-blur-md player-menu-pop-in">
-            {view === 'main' && (
-              <div className="py-1">
-                <div className="px-4 py-3 border-b border-theme_1/10">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-theme_1/50">
-                    Playback Settings
-                  </p>
-                </div>
-
-                {qualities.length > 0 && (
-                  <SettingsMenuRow
-                    focusKey="menu-row-quality"
-                    label="Quality"
-                    value={activeQuality?.isAuto ? 'Auto' : (activeQuality?.label ?? 'Auto')}
-                    isVisible={isVisible && open}
-                    onClick={() => setView('quality')}
-                  />
-                )}
-
-                {audioTracks.length > 1 && (
-                  <SettingsMenuRow
-                    focusKey="menu-row-audio"
-                    label="Audio"
-                    value={activeAudio?.label ?? 'Default'}
-                    isVisible={isVisible && open}
-                    onClick={() => setView('audio')}
-                  />
-                )}
-
-                <SettingsMenuRow
-                  focusKey="menu-row-speed"
-                  label="Speed"
-                  value={speed === 1 ? 'Normal' : `${speed}x`}
-                  isVisible={isVisible && open}
-                  onClick={() => setView('speed')}
-                />
-              </div>
-            )}
+          <FocusContext.Provider value={settingsPanelFocusKey}>
+          <div
+            ref={settingsBoundaryRef as any}
+            className="absolute bottom-full right-0 mb-3 bg-[#141414]/98 border border-theme_1/15 rounded-xl overflow-hidden min-w-[220px] z-50 shadow-2xl backdrop-blur-md player-menu-pop-in"
+          >
+            <div className="px-4 py-3 border-b border-theme_1/10">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-theme_1/50">
+                {view === 'quality' ? 'Quality' : view === 'audio' ? 'Audio' : 'Speed'}
+              </p>
+            </div>
 
             {view === 'quality' && (
               <div className="py-1 max-h-72 overflow-y-auto">
-                <button
-                  onClick={() => setView('main')}
-                  className="w-full px-4 py-3 text-left text-sm text-theme_1/70 hover:bg-theme_1/5 border-b border-theme_1/10 flex items-center gap-2"
-                >
-                  <ChevronLeftSmall />
-                  Quality
-                </button>
                 {qualities.map((q) => (
                   <SettingsOptionRow
                     key={q.id}
@@ -290,13 +308,6 @@ function SettingsSelector({
 
             {view === 'audio' && (
               <div className="py-1 max-h-72 overflow-y-auto">
-                <button
-                  onClick={() => setView('main')}
-                  className="w-full px-4 py-3 text-left text-sm text-theme_1/70 hover:bg-theme_1/5 border-b border-theme_1/10 flex items-center gap-2"
-                >
-                  <ChevronLeftSmall />
-                  Audio
-                </button>
                 {audioTracks.map((track) => (
                   <SettingsOptionRow
                     key={track.id}
@@ -315,13 +326,6 @@ function SettingsSelector({
 
             {view === 'speed' && (
               <div className="py-1">
-                <button
-                  onClick={() => setView('main')}
-                  className="w-full px-4 py-3 text-left text-sm text-theme_1/70 hover:bg-theme_1/5 border-b border-theme_1/10 flex items-center gap-2"
-                >
-                  <ChevronLeftSmall />
-                  Speed
-                </button>
                 {PLAYBACK_SPEEDS.map((s) => (
                   <SettingsOptionRow
                     key={s}
@@ -342,6 +346,7 @@ function SettingsSelector({
               </div>
             )}
           </div>
+          </FocusContext.Provider>
         </>
       )}
     </div>
@@ -356,6 +361,11 @@ interface PlayerControlsProps {
   title?: string;
   onBack?: () => void;
   onMenuOpenChange?: (isOpen: boolean) => void;
+  /** Bumped by the parent (e.g. on Back/Escape) to force-close any open Settings/
+   * Subtitle submenu without touching controlsVisible — see OTTPlayer's Back-key
+   * handler. A plain boolean/counter "signal" prop since the open/closed state
+   * itself intentionally stays local to this component. */
+  forceCloseMenus?: number;
   showCertificate?: boolean;
 
   // Playback state
@@ -425,16 +435,11 @@ interface PlayerControlsProps {
 export function PlayerControls({
   isVisible,
   title,
-  onBack,
   showCertificate = false,
-  isPlaying,
   currentTime,
   duration,
   buffered,
-  volume,
-  isMuted,
   speed,
-  isFullscreen,
   isPipActive,
   isPipSupported,
   qualities,
@@ -451,12 +456,7 @@ export function PlayerControls({
   thumbnailCues,
   isThumbnailEnabled,
   adCuePoints,
-  onPlayPause,
   onSeek,
-  onForward,
-  onBackward,
-  onVolumeChange,
-  onMuteToggle,
   onSpeedChange,
   onQualityChange,
   onAudioChange,
@@ -466,15 +466,27 @@ export function PlayerControls({
   onCaptionTextColorChange,
   onCaptionBgColorChange,
   onCaptionBgOpacityChange,
-  onFullscreenToggle,
   onPipToggle,
   onEpisodes,
   onNextEpisode,
   onRate,
   onMenuOpenChange,
+  forceCloseMenus,
   isRated = false,
 }: PlayerControlsProps) {
-  const [showVolume, setShowVolume] = useState(false);
+  // Stable focus target for OTTPlayer's setFocus() calls that used to target
+  // the now-removed 'play-pause-btn' (e.g. when controls reappear). trackChildren
+  // + saveLastFocusedChild means setFocus('player-controls-row') resolves to
+  // whichever child was last focused, or the preferred one on first entry —
+  // same pattern used for ContentRailList's spotlight-rail boundary.
+  const { ref: controlsRowRef } = useFocusable({
+    focusKey: 'player-controls-row',
+    focusable: false,
+    trackChildren: true,
+    saveLastFocusedChild: true,
+    preferredChildFocusKey: 'subtitles-trigger-btn',
+  });
+
   const [showSettings, setShowSettings] = useState(false);
   const [showSubtitles, setShowSubtitles] = useState(false);
 
@@ -482,57 +494,24 @@ export function PlayerControls({
     onMenuOpenChange?.(showSettings || showSubtitles);
   }, [showSettings, showSubtitles, onMenuOpenChange]);
 
-  const isDraggingVolume = useRef(false);
-  const isHoveringVolume = useRef(false);
-  const volumeHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearVolumeTimer = () => {
-    if (volumeHideTimer.current) {
-      clearTimeout(volumeHideTimer.current);
-      volumeHideTimer.current = null;
-    }
-  };
-
-  const handleVolumeMouseEnter = () => {
-    isHoveringVolume.current = true;
-    clearVolumeTimer();
-    setShowVolume(true);
-  };
-
-  const handleVolumeMouseLeave = () => {
-    isHoveringVolume.current = false;
-    clearVolumeTimer();
-    if (!isDraggingVolume.current) {
-      volumeHideTimer.current = setTimeout(() => {
-        if (!isHoveringVolume.current && !isDraggingVolume.current) {
-          setShowVolume(false);
-        }
-      }, 200);
-    }
-  };
-
+  // Previously, Back/Escape had no way to close an open Settings/Subtitle
+  // submenu — it only ever hid the whole control bar, leaving this open state
+  // (and onMenuOpenChange's isOpen=true) stuck forever, so the menu silently
+  // popped back open the next time controls reappeared and auto-hide stayed
+  // permanently disabled. Skips the initial mount (forceCloseMenus starts
+  // undefined) so this doesn't fire a redundant no-op close on first render.
+  const isFirstForceCloseRef = useRef(true);
   useEffect(() => {
-    const handleRelease = () => {
-      if (isDraggingVolume.current) {
-        isDraggingVolume.current = false;
-        if (!isHoveringVolume.current) {
-          setShowVolume(false);
-        }
-      }
-    };
-    window.addEventListener('mouseup', handleRelease);
-    window.addEventListener('touchend', handleRelease);
-    return () => {
-      window.removeEventListener('mouseup', handleRelease);
-      window.removeEventListener('touchend', handleRelease);
-      if (volumeHideTimer.current) {
-        clearTimeout(volumeHideTimer.current);
-      }
-    };
-  }, []);
+    if (isFirstForceCloseRef.current) {
+      isFirstForceCloseRef.current = false;
+      return;
+    }
+    setShowSettings(false);
+    setShowSubtitles(false);
+  }, [forceCloseMenus]);
 
   // Suppress seekbar VTT thumbnail whenever any control overlay is active
-  const suppressThumbnail = showVolume || showSettings || showSubtitles;
+  const suppressThumbnail = showSettings || showSubtitles;
 
   const progressBarElement = (
     <ProgressBar
@@ -559,25 +538,13 @@ export function PlayerControls({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {onBack && (
-            <IconBtn onClick={onBack} label="Back" isVisible={isVisible}>
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-white/90 group-hover:text-white transition-colors"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </IconBtn>
-          )}
+          {/* No on-screen Back button here — this is a TV remote app, not a
+              mouse-driven web page. The physical/remote Back key already
+              closes the player (see OTTPlayer's handlePlayerBackKey), so a
+              clickable chevron here was just a redundant, web-convention
+              focus target sitting in the D-pad flow for no reason. */}
           {title && (
-            <span className="text-theme_1 font-semibold text-base tracking-wide truncate drop-shadow">
+            <span className="text-theme_1 font-semibold text-xl sm:text-2xl tracking-wide truncate drop-shadow">
               {title}
             </span>
           )}
@@ -602,105 +569,19 @@ export function PlayerControls({
           </div>
         </div>
 
-        {/* ── Control icons row ────────────────────────────────────────────── */}
-        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-y-2.5 w-full">
-          {/* ── Left group ─────────────────────────────────────────────────── */}
-          <div className="flex items-center gap-2.5 sm:gap-4 md:gap-5 shrink-0">
-            {/* Backward 10s */}
-            <IconBtn onClick={onBackward} label="Seek backward 10 seconds" isVisible={isVisible}>
-              <JOJOCommonImage
-                src={LOGOS.BACKWARD_ICON}
-                width={25}
-                height={25}
-                contentMode={JOJOImageContentMode.Contain}
-                className="w-5.5 h-5.5 object-contain transition-all duration-150"
-              />
-            </IconBtn>
-
-            {/* Play / Pause — larger for visual hierarchy, primary action */}
-            <IconBtn focusKey="play-pause-btn" onClick={onPlayPause} label={isPlaying ? 'Pause' : 'Play'} isVisible={isVisible}>
-              <PlayerIcon name={isPlaying ? 'pause' : 'play'} size={32} />
-            </IconBtn>
-
-            {/* Forward 10s */}
-            <IconBtn onClick={onForward} label="Seek forward 10 seconds" isVisible={isVisible}>
-              <JOJOCommonImage
-                src={LOGOS.FORWARD_ICON}
-                width={25}
-                height={25}
-                contentMode={JOJOImageContentMode.Contain}
-                className="w-5.5 h-5.5 object-contain transition-all duration-150"
-              />
-            </IconBtn>
-
-            {/* Volume */}
-            <div
-              className="relative flex items-center"
-              onMouseEnter={handleVolumeMouseEnter}
-              onMouseLeave={handleVolumeMouseLeave}
-            >
-              <IconBtn
-                onClick={() => {
-                  onMuteToggle();
-                  analyticsService.track(EVENT_NAMES.PLAYER_MUTE_TOGGLED, {
-                    is_muted: !isMuted,
-                    source: 'player_controls',
-                  });
-                }}
-                label={isMuted ? 'Unmute' : 'Mute'}
-                isVisible={isVisible}
-              >
-                <PlayerIcon name={isMuted || volume === 0 ? 'mute' : 'unmute'} size={24} />
-              </IconBtn>
-
-              {/* Horizontal volume popover slider */}
-              {showVolume && (
-                <div
-                  className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-4 py-3 bg-black/95 border border-theme_1/10 
-                  rounded-full flex items-center justify-center shadow-2xl z-50 transition-all duration-200"
-                  style={{ width: '130px', height: '25px' }}
-                >
-                  <div className="relative w-24 h-1 bg-theme_1/20 rounded-full flex items-center justify-center">
-                    {/* The active filled portion (left of track to thumb) */}
-                    <div
-                      className="absolute left-0 h-full bg-theme_1 rounded-full"
-                      style={{ width: `${isMuted ? 0 : volume * 100}%` }}
-                    />
-
-                    {/* range input horizontal (no rotation needed) */}
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={isMuted ? 0 : volume}
-                      onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-                      onMouseDown={() => {
-                        isDraggingVolume.current = true;
-                      }}
-                      onTouchStart={() => {
-                        isDraggingVolume.current = true;
-                      }}
-                      style={{
-                        WebkitAppearance: 'none',
-                        width: '96px',
-                        background: 'transparent',
-                      }}
-                      className="absolute cursor-pointer outline-none focus:outline-none [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-theme_1 [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-theme_1 [&::-moz-range-thumb]:border-0"
-                    />
-                  </div>
-                  {/* Tooltip arrow pointing left */}
-                  <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[6px] border-r-black/95" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Spacer ─────────────────────────────────────────────────────── */}
-          <div className="flex-grow hidden sm:block" />
-
-          {/* ── Right group ────────────────────────────────────────────────── */}
-          <div className="flex items-center gap-2.5 sm:gap-4 md:gap-5 shrink-0">
+        {/* ── Control icons row ─────────────────────────────────────────────
+            No left-side Backward/Play-Pause/Forward/Volume group — this is a
+            TV remote app: OK on the player background already toggles
+            play/pause directly (see OTTPlayer's ott-player-main
+            onEnterPress), the seek bar's own Left/Right handles ±10s once
+            focused, and volume is the TV remote's own hardware buttons, not
+            an app-level control. Matches the reference design, which shows
+            none of these either. */}
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-y-2.5 w-full">
+          <div
+            ref={controlsRowRef as any}
+            className="flex items-center gap-2.5 sm:gap-4 md:gap-5 shrink-0"
+          >
             {/* Captions / Subtitle selector */}
             {subtitleTracks && subtitleTracks.length > 0 && (
               <div className="relative">
@@ -726,55 +607,61 @@ export function PlayerControls({
                   onCaptionTextColorChange={onCaptionTextColorChange}
                   onCaptionBgOpacityChange={onCaptionBgOpacityChange}
                   onOpenChange={setShowSubtitles}
+                  forceClose={forceCloseMenus}
                   isVisible={isVisible}
                   renderTrigger={(onClick) => (
-                    <IconBtn onClick={onClick} label="Subtitles" isVisible={isVisible}>
-                      <PlayerIcon name="captions" size={24} />
+                    <IconBtn focusKey="subtitles-trigger-btn" onClick={onClick} label="Subtitles" isVisible={isVisible}>
+                      <PlayerIcon name="captions" size={26} />
+                      <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Subtitles</span>
                     </IconBtn>
                   )}
                 />
               </div>
             )}
 
-            {/* Settings — quality + speed + audio combined */}
-            <div className="relative">
-              <SettingsSelector
-                qualities={qualities}
-                activeQualityId={activeQualityId}
-                onQualityChange={onQualityChange}
-                audioTracks={audioTracks}
-                activeAudioTrackId={activeAudioTrackId}
-                onAudioChange={onAudioChange}
-                speed={speed}
-                onSpeedChange={onSpeedChange}
-                onOpenChange={setShowSettings}
-                isVisible={isVisible}
-                renderTrigger={(onClick) => (
-                  <IconBtn focusKey="settings-trigger-btn" onClick={onClick} label="Settings" isVisible={isVisible}>
-                    <PlayerIcon name="settings" size={24} />
-                  </IconBtn>
-                )}
-              />
-            </div>
+            {/* Quality / Audio / Speed — three separate direct-access buttons */}
+            <SettingsSelector
+              qualities={qualities}
+              activeQualityId={activeQualityId}
+              onQualityChange={onQualityChange}
+              audioTracks={audioTracks}
+              activeAudioTrackId={activeAudioTrackId}
+              onAudioChange={onAudioChange}
+              speed={speed}
+              onSpeedChange={onSpeedChange}
+              onOpenChange={setShowSettings}
+              forceClose={forceCloseMenus}
+              isVisible={isVisible}
+            />
+
+            {/* Rate */}
+            {onRate && (
+              <IconBtn focusKey="rate-btn" onClick={onRate} label={isRated ? 'Rated' : 'Rate'} isVisible={isVisible} active={isRated}>
+                <PlayerIcon name="rate" size={26} />
+                <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Rate</span>
+              </IconBtn>
+            )}
 
             {/* Episodes */}
             {onEpisodes && (
               <IconBtn onClick={onEpisodes} label="Episodes" isVisible={isVisible}>
-                <PlayerIcon name="episodes" size={24} />
+                <PlayerIcon name="episodes" size={26} />
+                <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Episodes</span>
               </IconBtn>
             )}
 
             {/* Next episode */}
             {onNextEpisode && (
               <IconBtn onClick={onNextEpisode} label="Next episode" isVisible={isVisible}>
-                <PlayerIcon name="next-episode" size={24} />
+                <PlayerIcon name="next-episode" size={26} />
+                <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Next Episode</span>
               </IconBtn>
             )}
 
-            {/* Fullscreen */}
-            <IconBtn onClick={onFullscreenToggle} label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} isVisible={isVisible}>
-              <PlayerIcon name={isFullscreen ? 'exit-fullscreen' : 'fullscreen'} size={24} />
-            </IconBtn>
+            {/* No on-screen Fullscreen toggle — this is a TV app, the video
+                already always fills the whole screen (see OTTPlayer's
+                container sizing), there's no windowed state to toggle
+                between. */}
           </div>
         </div>
       </div>
