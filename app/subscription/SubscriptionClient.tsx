@@ -23,25 +23,54 @@ import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
 import { ROUTES } from "@/lib/constants/routes";
 import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { useOverseasDetection } from "@/features/geo/hooks/useOverseasDetection";
-import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 
-function FocusablePlanCard({ onClick, children, isSelected, isMultiMonth, has3OrMorePlans, badge, cardStyleClass, cardRoundingClass, product }: any) {
+// This page never set any initial D-pad focus at all — a TV user landing here
+// had nothing focused and no current position for norigin to navigate from, so
+// every arrow press did nothing ("navigation not working"). Same
+// doesFocusableExist-guarded retry as the rest of this app (see
+// app/account-settings/page.tsx, app/watchlist/page.tsx): a single setFocus()
+// on mount is a known-fragile race on TV hardware, since the target's own
+// useFocusable() registration effect can commit a tick or more later.
+function retrySetFocus(focusKey: string, attempts = 8, intervalMs = 100) {
+    let tries = 0;
+    const attempt = () => {
+        tries += 1;
+        if (doesFocusableExist(focusKey)) {
+            setFocus(focusKey);
+            return;
+        }
+        if (tries < attempts) {
+            setTimeout(attempt, intervalMs);
+        }
+    };
+    setTimeout(attempt, intervalMs);
+}
+
+function FocusablePlanCard({ onClick, children, isSelected, isMultiMonth, has3OrMorePlans, badge, cardStyleClass, cardRoundingClass, product, focusKey }: any) {
     const { ref, focused } = useFocusable({
+        focusKey,
         focusable: true,
         onEnterPress: onClick
     });
-    
+
     return (
         <motion.div
             ref={ref}
             id={`plan-${product?.productId}`}
+            data-focuskey={focusKey}
             onClick={onClick}
-            className={`z-1 
-                relative w-full cursor-pointer text-left
+            // A ring/box-shadow-based focus indicator gets clipped by this page's
+            // overflow-hidden ancestor the same way it did on the asset-detail
+            // tabs — a real border is part of the element's own box model and
+            // can never be clipped by an ancestor's overflow. border-transparent
+            // by default reserves the same space so focusing never shifts layout.
+            className={`z-1
+                relative w-full cursor-pointer text-left border-2
                 ${has3OrMorePlans ? "flex flex-row items-center justify-between p-4 sm:p-5" : "flex-1 flex flex-col items-start gap-1 p-4 sm:p-4"}
                 ${cardRoundingClass}
                 ${cardStyleClass}
-                ${focused ? "ring-4 ring-white scale-[1.03]" : ""}
+                ${focused ? "border-white scale-[1.03]" : "border-transparent"}
             `}
             style={{
                 background: isSelected && !isMultiMonth
@@ -58,8 +87,9 @@ function FocusablePlanCard({ onClick, children, isSelected, isMultiMonth, has3Or
     );
 }
 
-function FocusableProceedButton({ onClick, children, className, style, ...props }: any) {
+function FocusableProceedButton({ onClick, children, className, style, focusKey, ...props }: any) {
     const { ref, focused } = useFocusable({
+        focusKey,
         focusable: true,
         onEnterPress: onClick
     });
@@ -67,8 +97,9 @@ function FocusableProceedButton({ onClick, children, className, style, ...props 
     return (
         <JOJOCustomButton
             ref={ref}
+            data-focuskey={focusKey}
             onClick={onClick}
-            className={`${className} ${focused ? "ring-4 ring-white scale-[1.02] shadow-[0_0_32px_rgba(242,110,33,0.35)]" : ""}`}
+            className={`${className} border-2 ${focused ? "border-white scale-[1.02] shadow-[0_0_32px_rgba(242,110,33,0.35)]" : "border-transparent"}`}
             style={style}
             {...props}
         >
@@ -139,6 +170,23 @@ export default function SubscriptionPage() {
         return products[0];
     }, [products, selectedProductId]);
 
+    // Land the D-pad somewhere as soon as there's something to land it on — this
+    // page previously never set any initial focus at all, so a TV user arriving
+    // here had nothing focused and arrow presses did nothing. Both hooks below
+    // must run unconditionally before the isGold early return (Rules of Hooks),
+    // so each just no-ops internally when its own branch isn't the active one.
+    useEffect(() => {
+        if (isGold) {
+            retrySetFocus("gold-already-proceed-btn");
+        }
+    }, [isGold]);
+
+    useEffect(() => {
+        if (!isGold && selectedProduct) {
+            retrySetFocus(`plan-card-${selectedProduct.productId}`);
+        }
+    }, [isGold, selectedProduct]);
+
     // Render Modal immediately if Gold (No skeleton)
     if (isGold) {
         const returnWatchAssetId = typeof window !== "undefined" ? sessionStorage.getItem("return_watch_asset_id") : null;
@@ -176,6 +224,7 @@ export default function SubscriptionPage() {
                             </p>
                         </div>
                         <FocusableProceedButton
+                            focusKey="gold-already-proceed-btn"
                             onClick={handleAlreadyGoldClose}
                             size={JOJOButton.Size.L}
                             state={JOJOButton.State.ACTIVE}
@@ -306,6 +355,7 @@ export default function SubscriptionPage() {
                                 return (
                                     <FocusablePlanCard
                                         key={product?.productId}
+                                        focusKey={`plan-card-${product?.productId}`}
                                         product={product}
                                         isSelected={isSelected}
                                         isMultiMonth={isMultiMonth}
@@ -417,6 +467,7 @@ export default function SubscriptionPage() {
                         {/* ── CTA Button ──────────────────────────────────── */}
                         <FocusableProceedButton
                             id="subscription-proceed-btn"
+                            focusKey="subscription-proceed-btn"
                             onClick={() => {
                                 try {
                                     if (selectedProduct) {

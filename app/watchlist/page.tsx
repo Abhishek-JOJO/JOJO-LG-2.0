@@ -55,14 +55,14 @@ function FocusableRetryBtn({ onClick }: { onClick: () => void }) {
 // Sits on top of its card's own <a> focusable rather than being reachable only
 // on mouse hover (the CSS-only `group-hover:opacity-100` it used to rely on
 // never fires for D-pad navigation, so a TV remote could never remove a title
-// from the watchlist before this). Pressing Down on the card hands focus here
-// (wired via BaseContentCard's onArrowUpDown prop below); pressing Up here
-// returns to the card.
+// from the watchlist before this). Reached by pressing Right from a card that
+// has no next card in its own row (wired via BaseContentCard's
+// onArrowLeftRight prop below) — pressing Up or Left here returns to that card.
 function FocusableRemoveBtn({ focusKey, cardFocusKey, onRemove }: { focusKey: string; cardFocusKey: string; onRemove: () => void }) {
   const { ref, focused } = useFocusable({
     focusKey,
     onArrowPress: (direction) => {
-      if (direction === "up") {
+      if (direction === "up" || direction === "left") {
         setFocus(cardFocusKey);
         return false;
       }
@@ -250,12 +250,43 @@ export default function WatchlistPage() {
                   fluid
                   className="aspect-video"
                   focusKey={cardFocusKey}
-                  onArrowUpDown={(direction) => {
-                    if (direction === "down") {
-                      setFocus(removeFocusKey);
-                      return true;
+                  // Down used to unconditionally jump to this card's own Delete
+                  // button, which blocked normal grid navigation to the row
+                  // below on every single card — no onArrowUpDown here now, so
+                  // Down falls through to BaseContentCard's own default
+                  // nearest-neighbor search and correctly lands on the card
+                  // below instead. Delete is reached via Right instead, and
+                  // only when there's no next card in the same row to its
+                  // right (checked geometrically via getBoundingClientRect,
+                  // since the grid's column count varies by breakpoint) —
+                  // otherwise Right moves to the next card, same as before.
+                  onArrowLeftRight={(direction) => {
+                    if (direction === "left") {
+                      if (idx > 0) {
+                        const prevItem = assets[idx - 1];
+                        const prevId = Number(prevItem.asset_id ?? prevItem.assetId);
+                        setFocus(`watchlist-card-${prevId}`);
+                      }
+                      return;
                     }
-                    return false;
+                    const nextItem = assets[idx + 1];
+                    if (nextItem) {
+                      const nextId = Number(nextItem.asset_id ?? nextItem.assetId);
+                      const nextCardKey = `watchlist-card-${nextId}`;
+                      const currentEl = document.querySelector(`[data-focuskey="${cardFocusKey}"]`);
+                      const nextEl = document.querySelector(`[data-focuskey="${nextCardKey}"]`);
+                      const sameRow =
+                        currentEl &&
+                        nextEl &&
+                        Math.abs(
+                          currentEl.getBoundingClientRect().top - nextEl.getBoundingClientRect().top
+                        ) < 5;
+                      if (sameRow) {
+                        setFocus(nextCardKey);
+                        return;
+                      }
+                    }
+                    setFocus(removeFocusKey);
                   }}
                 >
                   <FocusableRemoveBtn
