@@ -10,7 +10,7 @@
  *   [track——●————————————]                                     01:22:12
  *
  * BOTTOM ROW:
- *   [<<]  [▶]  [>>]  [🔊]     Subtitles  Quality  Speed  Rate  Episodes  Next Episode
+ *   [<<]  [▶]  [>>]  [🔊]     Subtitles  Quality  Speed  Episodes  Next Episode
  *
  * Right-side actions are labeled icon+text buttons (icon left, label right,
  * same row) rather than bare icon glyphs, and Quality/Speed/Audio are three
@@ -426,8 +426,6 @@ interface PlayerControlsProps {
   onPipToggle: () => void;
   onEpisodes?: () => void;
   onNextEpisode?: () => void;
-  onRate?: () => void;
-  isRated?: boolean;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -469,10 +467,8 @@ export function PlayerControls({
   onPipToggle,
   onEpisodes,
   onNextEpisode,
-  onRate,
   onMenuOpenChange,
   forceCloseMenus,
-  isRated = false,
 }: PlayerControlsProps) {
   // Stable focus target for OTTPlayer's setFocus() calls that used to target
   // the now-removed 'play-pause-btn' (e.g. when controls reappear). trackChildren
@@ -634,13 +630,6 @@ export function PlayerControls({
               isVisible={isVisible}
             />
 
-            {/* Rate */}
-            {onRate && (
-              <IconBtn focusKey="rate-btn" onClick={onRate} label={isRated ? 'Rated' : 'Rate'} isVisible={isVisible} active={isRated}>
-                <PlayerIcon name="rate" size={26} />
-                <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Rate</span>
-              </IconBtn>
-            )}
 
             {/* Episodes */}
             {onEpisodes && (
@@ -652,7 +641,11 @@ export function PlayerControls({
 
             {/* Next episode */}
             {onNextEpisode && (
-              <IconBtn onClick={onNextEpisode} label="Next episode" isVisible={isVisible}>
+              // Wrapped in a zero-arg call — onClick is natively invoked with a
+              // MouseEvent, and handleNextEpisodePlay's optional startAtSeconds
+              // param would otherwise silently receive that event object on a
+              // real mouse/pointer click instead of staying undefined.
+              <IconBtn onClick={() => onNextEpisode()} label="Next episode" isVisible={isVisible}>
                 <PlayerIcon name="next-episode" size={26} />
                 <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Next Episode</span>
               </IconBtn>

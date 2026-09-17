@@ -54,7 +54,13 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
 
   return (
     <>
-      <AmbientBackground />
+      {/* Warm hover/focus-tinted glow meant to sit behind browse/home rail
+          content — on standalone pages (the video player chief among them)
+          there's no card to tint it from, so it was just the last color left
+          over from whatever was focused before navigating here, showing
+          through as an unexplained gradient flash during the brief gap
+          before that page's own opaque loading UI paints over it. */}
+      {!isStandalonePage && <AmbientBackground />}
       {showNavbar && !hideHeaderFooter && <Navbar />}
       <main
         className={`${mainClassName} bg-transparent`}

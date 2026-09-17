@@ -83,11 +83,21 @@ export function useSeekBar({
     return () => observer.disconnect();
   }, [updateBarRect]);
 
-  // Clear optimistic position once playback reaches the committed seek target
+  // Clear optimistic position once playback reaches the committed seek
+  // target. This used to compare fractions with a flat 1.5%-of-duration
+  // tolerance — fine for a short clip, but on a long video (e.g. a
+  // 2.5-hour, ~9200s title) 1.5% is ~138 seconds, so the real (still
+  // advancing) playback position was almost always "close enough" to
+  // whatever target a D-pad press had just set, clearing the optimistic
+  // overlay and snapping the thumb/VTT preview back to live playback
+  // before the actual seek had even landed — the "thumbnail not proper
+  // move" jitter. Comparing absolute seconds instead keeps this tied to
+  // how close playback actually is to the target, regardless of the
+  // video's length.
   useEffect(() => {
     if (pendingFraction === null || duration <= 0) return;
-    const playbackFraction = currentTime / duration;
-    if (Math.abs(playbackFraction - pendingFraction) < 0.015) {
+    const pendingTime = pendingFraction * duration;
+    if (Math.abs(currentTime - pendingTime) < 1) {
       setPendingFraction(null);
       lastCommittedFractionRef.current = null;
     }
@@ -192,6 +202,8 @@ export function useSeekBar({
     [currentTime, duration, keyboardStepSeconds, onSeek]
   );
 
+  const previewSeek = useCallback((fraction: number) => setPendingFraction(clampFraction(fraction)), []);
+
   const playbackFraction = duration > 0 ? currentTime / duration : 0;
 
   const displayFraction = isScrubbing
@@ -210,6 +222,15 @@ export function useSeekBar({
     displayTime,
     barRect,
     clearHover: () => setHoverFraction(null),
+    // Optimistic-only position update — moves the fill/thumb/VTT preview
+    // immediately without calling onSeek (a real engine seek, which triggers
+    // a buffering event every time). Callers debounce the actual commitSeek.
+    // Stable identity (useCallback, no deps — setState functions are always
+    // stable) so callers that memoize a handler around it (e.g. ProgressBar's
+    // onArrowPress) don't get a fresh reference every render just because
+    // this one changed.
+    previewSeek,
+    commitSeek,
     trackProps: {
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,

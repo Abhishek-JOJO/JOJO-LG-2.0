@@ -54,6 +54,7 @@ import type {
   PlayerStatus,
   PlaybackSpeed,
   CaptionSize,
+  NextEpisodeInfo,
 } from '../model/types';
 import { EpisodesPanel } from './EpisodesPanel';
 import type { AssetSeason, AssetEpisode } from '@features/asset/model/types';
@@ -206,12 +207,19 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   // see PlayerControls' forceCloseMenus prop and the back-key handler below.
   const [closeMenusSignal, setCloseMenusSignal] = useState(0);
 
+  // Auto-hide is driven purely by inactivity (no key/pointer input for 3s),
+  // not by which specific element currently has focus. It used to also
+  // require focus to be back on the bare player background — but focus
+  // normally sits on a control (the seek bar, a settings button, etc.) for
+  // nearly all real usage, so that condition was almost never true and
+  // controls effectively never auto-hid. A menu being open is still a
+  // legitimate reason to hold off (the user is mid-selection), so that
+  // guard stays.
   const showControls = useCallback(() => {
     setControlsVisible(true);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    
-    // Never hide controls if a menu is open OR if the focus is on a controller button!
-    if (isMenuOpenRef.current || !isPlayerFocusedRef.current) return; 
+
+    if (isMenuOpenRef.current) return;
 
     hideTimerRef.current = setTimeout(() => {
       setControlsVisible(false);
@@ -222,16 +230,43 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   const handleContainerMouseMove = useCallback(() => showControls(), [showControls]);
   const handleContainerMouseLeave = useCallback(() => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    if (isMenuOpenRef.current || !isPlayerFocusedRef.current) return;
+    if (isMenuOpenRef.current) return;
     // Don't hide immediately on mouse leave — let the timer do it
   }, []);
-
-
 
   // Show on mount, clean up timer on unmount
   useEffect(() => {
     showControls();
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
+  }, [showControls]);
+
+  // Single source of truth for "the user is active": ANY key press,
+  // anywhere in the player, resets the inactivity timer — not just the
+  // handful of onArrowPress/onEnterPress handlers that happened to
+  // individually remember to call showControls(). Without this, holding
+  // Left/Right on the seek bar (which has its own onArrowPress and never
+  // called showControls itself) could let the 3s timer expire and hide the
+  // controls mid-scrub. Capture phase so it fires before any individual
+  // control's own handler might stop propagation.
+  useEffect(() => {
+    const handleAnyKey = () => showControls();
+    window.addEventListener('keydown', handleAnyKey, { capture: true });
+    return () => window.removeEventListener('keydown', handleAnyKey, { capture: true });
+  }, [showControls]);
+
+  // Was an inline arrow function passed straight into PlayerControls' JSX
+  // below — a fresh function identity on every OTTPlayer render (which
+  // happens continuously during playback, e.g. every currentTime tick).
+  // PlayerControls re-runs its own onMenuOpenChange effect whenever that
+  // identity changes, which calls showControls() every time — perpetually
+  // resetting the 3s inactivity timer regardless of whether the user had
+  // actually done anything. That alone was enough to keep controls visible
+  // forever even after the focus-based gate above was fixed. A stable
+  // identity means that effect only actually re-fires when showSettings/
+  // showSubtitles genuinely change, as intended.
+  const handleMenuOpenChange = useCallback((isOpen: boolean) => {
+    isMenuOpenRef.current = isOpen;
+    showControls();
   }, [showControls]);
 
   // ── Auto-fullscreen on mount (OTT style) ──────────────────────────────────
@@ -347,6 +382,21 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   const SEEK_COOLDOWN_MS = 3000;
   const userRecentlySeekedRef = useRef(false);
   const seekCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Suppresses the loading spinner for buffering that's a direct result of a
+  // just-performed seek — see handleSeek and the BUFFER_START handler below.
+  const isSeekingRef = useRef(false);
+  const seekingGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The native 'waiting' event (→ BUFFER_START) was flipping status to
+  // 'buffering' immediately, so even a brief rebuffer — very common a couple
+  // seconds into playback, once the small initial buffer runs low and the
+  // engine tops it back up — threw a full-screen loader over the video for a
+  // flash before instantly clearing again. Real OTT players don't show a
+  // spinner for a stall that resolves almost as fast as it started; only
+  // showing it once buffering has actually persisted past a short grace
+  // window (and never at all if BUFFER_END arrives first) keeps the loader
+  // reserved for stalls a viewer would actually perceive as "stuck."
+  const BUFFERING_LOADER_DELAY_MS = 500;
+  const bufferingLoaderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // State-based flag for JSX: latched true when the next-episode overlay
   // is triggered while a seek is active. Unlike the ref (which clears after
   // 3s), this stays true for the lifetime of the overlay so the countdown
@@ -381,6 +431,109 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     return null;
   }, [seasons, currentEpisodeId]);
 
+  // Normalizes whichever next-episode source is actually available into the
+  // shape <NextEpisodeOverlay> needs — video.seriesInfo?.nextEpisode is
+  // preferred when present, but per the comment on the 90%-trigger effect
+  // below, that field is never actually populated anywhere in this codebase
+  // today, so nextEpisodeFromList (client-computed from the seasons prop) is
+  // what the overlay is built from in practice.
+  const nextEpisodeOverlayInfo: NextEpisodeInfo | null = useMemo(() => {
+    if (video.seriesInfo?.nextEpisode) return video.seriesInfo.nextEpisode;
+    if (!nextEpisodeFromList) return null;
+    const { episode } = nextEpisodeFromList;
+    return {
+      contentId: String(episode.asset_id),
+      title: episode.asset_title,
+      thumbnailUrl:
+        episode.poster?.find((p: any) => p.is_default)?.url ?? episode.poster?.[0]?.url ?? '',
+      durationSeconds: Number(episode.asset_total_duration) || 0,
+    };
+  }, [video.seriesInfo, nextEpisodeFromList]);
+
+  // Single, unified entry point for ALL "advance to next episode" flows —
+  // the 90% overlay countdown, the nextTitle cue-window card, the natural
+  // 'ended' fallback, and the manual controls button all funnel through this
+  // one function now (they used to call the parent's onEpisodeSelect prop
+  // directly for 3 of those 4 paths, silently skipping the NEXT_EPISODE
+  // analytics event and router.replace semantics this function provides —
+  // Back after auto-advancing via one of those other paths used to return to
+  // the just-finished episode instead of skipping past it). Declared here
+  // (not near the other handlers further down) specifically so the
+  // nextTitle-window and natural-'ended' effects right below can reference
+  // it without a TDZ/"used before declaration" error. `startAtSeconds` is
+  // only meaningful for the nextTitle path, which points at a specific
+  // resume position (e.g. skip the next episode's own recap) rather than
+  // starting from 0 — it's threaded through the same sessionStorage
+  // resumeTime/bypassResumePrompt fields player.service.ts already reads for
+  // continue-watching, so the next page's playback start honors it directly
+  // without a "Resume from X?" prompt getting in the way.
+  const handleNextEpisodePlay = useCallback((startAtSeconds?: number) => {
+    let nextId = '';
+    if (video.seriesInfo?.nextEpisode) {
+      nextId = video.seriesInfo.nextEpisode.contentId;
+    } else if (nextEpisodeFromList) {
+      nextId = String(nextEpisodeFromList.episode.asset_id);
+    }
+
+    if (!nextId) return;
+
+    if (nextEpisodeFromList && seasons) {
+      const { episode, season } = nextEpisodeFromList;
+      const seriesTitle = video.seriesInfo?.seriesTitle || video.title;
+      const seriesId = video.parentId || video.contentId;
+
+      // Carry over subscription/purchase status from current episode to prevent ads on next episode
+      let isSvodSubscribed = false;
+      let isTvodPurchased = false;
+      let assetCategoryCode = video.assetCategory === 'tvod' ? 3 : video.assetCategory === 'svod' ? 2 : 1;
+      let assetCategory = video.assetCategory || 'avod';
+
+      try {
+        const currentMeta = sessionStorage.getItem(`play_metadata_${video.contentId}`);
+        if (currentMeta) {
+          const parsedMeta = JSON.parse(currentMeta);
+          if (parsedMeta.isSvodSubscribed !== undefined) isSvodSubscribed = parsedMeta.isSvodSubscribed;
+          if (parsedMeta.isTvodPurchased !== undefined) isTvodPurchased = parsedMeta.isTvodPurchased;
+          if (parsedMeta.assetCategoryCode !== undefined) assetCategoryCode = parsedMeta.assetCategoryCode;
+          if (parsedMeta.assetCategory !== undefined) assetCategory = parsedMeta.assetCategory;
+        }
+      } catch (e) {
+        // ignore parse error
+      }
+
+      sessionStorage.setItem(
+        `play_metadata_${nextId}`,
+        JSON.stringify({
+          title: episode.asset_title,
+          description: episode.asset_description,
+          seriesInfo: {
+            seriesId: String(seriesId),
+            seriesTitle: seriesTitle,
+            seasonNumber: Number(season.season_number ?? 1),
+            episodeNumber: Number(episode.episode_number ?? 1),
+            nextEpisode: null,
+          },
+          certification: video.certification ?? null,
+          classifications: video.classifications ?? null,
+          isSvodSubscribed,
+          isTvodPurchased,
+          assetCategoryCode,
+          assetCategory,
+          assetTypeName: 'episode',
+          ...(startAtSeconds !== undefined
+            ? { resumeTime: startAtSeconds, bypassResumePrompt: true }
+            : {}),
+        })
+      );
+    }
+
+    engineRef.current?.eventBus.emit('NEXT_EPISODE', {
+      triggeredBy: 'auto',
+      nextContentId: nextId,
+    });
+    router.replace(ROUTES.WATCH(nextId));
+  }, [router, video, nextEpisodeFromList, seasons]);
+
   useEffect(() => {
     setHasTriggeredNextEpisodeAuto(false);
     setIsNextEpisodePromptDismissed(false);
@@ -401,16 +554,15 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     if (userRecentlySeekedRef.current) return; // ← seek guard
     if (currentTime >= video.nextTitle.visibleEndSeconds - 0.5) {
       setHasTriggeredNextEpisodeAuto(true);
-      if (onEpisodeSelect) {
-        logger.info('[OTTPlayer] Next title visibleEnd reached, auto-playing next episode');
-        onEpisodeSelect(
-          nextEpisodeFromList.episode,
-          nextEpisodeFromList.season,
-          video.nextTitle.startAtSeconds
-        );
-      }
+      logger.info('[OTTPlayer] Next title visibleEnd reached, auto-playing next episode');
+      // Routed through the same handleNextEpisodePlay the overlay/manual button
+      // use — this used to call onEpisodeSelect directly, which skips the
+      // NEXT_EPISODE analytics event and uses router.push semantics instead of
+      // replace (so Back after auto-advancing here used to return to the
+      // just-finished episode instead of skipping past it).
+      handleNextEpisodePlay(video.nextTitle.startAtSeconds);
     }
-  }, [currentTime, video.nextTitle, nextEpisodeFromList, hasTriggeredNextEpisodeAuto, isNextEpisodePromptDismissed, onEpisodeSelect]);
+  }, [currentTime, video.nextTitle, nextEpisodeFromList, hasTriggeredNextEpisodeAuto, isNextEpisodePromptDismissed, handleNextEpisodePlay]);
 
   const handleEpisodesToggle = useCallback(() => {
     setShowEpisodesPanel((v) => !v);
@@ -481,15 +633,13 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         return; // ← seek guard: card is visible but auto-play is blocked
       }
       setHasTriggeredNextEpisodeAuto(true);
-      if (onEpisodeSelect) {
-        logger.info('[OTTPlayer] Video ended naturally, auto-playing next episode');
-        onEpisodeSelect(
-          nextEpisodeFromList.episode,
-          nextEpisodeFromList.season
-        );
-      }
+      logger.info('[OTTPlayer] Video ended naturally, auto-playing next episode');
+      // Routed through handleNextEpisodePlay (see its own comment) instead of
+      // onEpisodeSelect — consistent NEXT_EPISODE analytics + router.replace
+      // with every other next-episode trigger.
+      handleNextEpisodePlay();
     }
-  }, [status, nextEpisodeFromList, hasTriggeredNextEpisodeAuto, onEpisodeSelect]);
+  }, [status, nextEpisodeFromList, hasTriggeredNextEpisodeAuto, handleNextEpisodePlay]);
 
   // ── Eager cleanup on contentId change ─────────────────────────────────────
   // This effect runs FIRST when video.contentId changes. It immediately stops
@@ -579,12 +729,28 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       engine.eventBus.on('PAUSE', () => setIsPlaying(false))
     );
     unsubs.push(
-      engine.eventBus.on('BUFFER_START', () => setStatus('buffering'))
+      engine.eventBus.on('BUFFER_START', () => {
+        if (isSeekingRef.current) return; // this buffering is the seek itself, not a stall
+        if (bufferingLoaderTimerRef.current) clearTimeout(bufferingLoaderTimerRef.current);
+        bufferingLoaderTimerRef.current = setTimeout(() => {
+          setStatus('buffering');
+          bufferingLoaderTimerRef.current = null;
+        }, BUFFERING_LOADER_DELAY_MS);
+      })
     );
     unsubs.push(
-      engine.eventBus.on('BUFFER_END', () =>
-        setStatus(isPlaying ? 'playing' : 'paused')
-      )
+      engine.eventBus.on('BUFFER_END', () => {
+        if (bufferingLoaderTimerRef.current) {
+          clearTimeout(bufferingLoaderTimerRef.current);
+          bufferingLoaderTimerRef.current = null;
+        }
+        isSeekingRef.current = false;
+        if (seekingGraceTimerRef.current) {
+          clearTimeout(seekingGraceTimerRef.current);
+          seekingGraceTimerRef.current = null;
+        }
+        setStatus(isPlaying ? 'playing' : 'paused');
+      })
     );
     unsubs.push(
       engine.eventBus.on('ENDED', () => {
@@ -869,6 +1035,10 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     return () => {
       isCancelled = true;
       for (const unsub of unsubs) unsub();
+      if (bufferingLoaderTimerRef.current) {
+        clearTimeout(bufferingLoaderTimerRef.current);
+        bufferingLoaderTimerRef.current = null;
+      }
       // Only destroy if still the active engine (eager cleanup may have
       // already destroyed these refs and set them to null)
       if (engineRef.current === engine) {
@@ -914,7 +1084,17 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
 
   useEffect(() => {
     if (!PLAYER_FEATURE_FLAGS.nextEpisode) return;
-    if (!video.seriesInfo?.nextEpisode) return;
+    // video.seriesInfo?.nextEpisode is never actually populated anywhere in
+    // this codebase — every seriesInfo constructor hardcodes nextEpisode:
+    // null (OTTPlayer's own sessionStorage writes above, WatchClient.tsx,
+    // useWatchGating.ts, player.service.ts). Gating purely on it made this
+    // whole 90%-threshold overlay permanently dead in production. The
+    // client-computed nextEpisodeFromList (walks the seasons prop) is the
+    // one reliably-available source, so it's the real gate now.
+    // video.nextTitle is excluded here because that's Path B — a more
+    // precise, backend-timed cue window with its own inline card — for
+    // content that has it, we don't want both prompts competing.
+    if ((!video.seriesInfo?.nextEpisode && !nextEpisodeFromList) || video.nextTitle) return;
     if (duration <= 0) return;
 
     const pct = (currentTime / duration) * 100;
@@ -926,7 +1106,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       }
       setShowNextEpisode(true);
     }
-  }, [currentTime, duration, video.seriesInfo, showNextEpisode]);
+  }, [currentTime, duration, video.seriesInfo, video.nextTitle, nextEpisodeFromList, showNextEpisode]);
 
   // ── Resume prompt (after duration is known) ────────────────────────────────
 
@@ -1086,11 +1266,6 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     }
   }, [controlsVisible]);
 
-  // Automatically focus player when ready or mounted
-  useEffect(() => {
-    setFocus('ott-player-main');
-  }, []);
-
   // Handle webOS Back key (461) and Escape key for player overlay dismissal / exit
   useEffect(() => {
     const handlePlayerBackKey = (e: KeyboardEvent) => {
@@ -1142,27 +1317,6 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     engineRef.current?.setPlaybackSpeed(s);
   }, [storeSetSpeed]);
 
-  // Rate button — no backend rating endpoint exists yet in this codebase
-  // (only the PLAYER_RATE_CLICKED analytics event was ever wired up, never a
-  // real API call), so this is a local, per-session toggle + the existing
-  // analytics event, not a persisted rating. Resets each time a new title
-  // loads (contentId dependency) rather than carrying over between videos.
-  const [isRated, setIsRated] = useState(false);
-  useEffect(() => {
-    setIsRated(false);
-  }, [video.contentId]);
-  const handleRate = useCallback(() => {
-    setIsRated((prev) => {
-      const next = !prev;
-      analyticsService.track(EVENT_NAMES.PLAYER_RATE_CLICKED, {
-        asset_id: String(video.contentId),
-        asset_title: video.title ?? '',
-        is_rated: next,
-      });
-      return next;
-    });
-  }, [video.contentId, video.title]);
-
   const handleQualityChange = useCallback((id: number) => {
     setActiveQuality(id);
     engineRef.current?.setQuality(id);
@@ -1202,6 +1356,25 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       userRecentlySeekedRef.current = false;
       seekCooldownTimerRef.current = null;
     }, SEEK_COOLDOWN_MS);
+
+    // ── Suppress the full-screen loader for this seek's own buffering ──────
+    // Every seek fires the native 'waiting' event (→ BUFFER_START) while the
+    // browser re-buffers at the new position, even for a near-instant local
+    // seek — showing the loading spinner for that is expected on a genuine
+    // network stall, not on routine scrubbing. isSeekingRef tells the
+    // BUFFER_START handler below to skip the spinner for buffering that's a
+    // direct result of THIS seek; it's cleared as soon as playback actually
+    // resumes (BUFFER_END/'playing'), so a real stall that outlasts the seek
+    // still shows the loader normally. The timeout is just a safety net in
+    // case 'playing' never fires (e.g. seek lands past the end, or errors).
+    isSeekingRef.current = true;
+    if (seekingGraceTimerRef.current) {
+      clearTimeout(seekingGraceTimerRef.current);
+    }
+    seekingGraceTimerRef.current = setTimeout(() => {
+      isSeekingRef.current = false;
+      seekingGraceTimerRef.current = null;
+    }, 2000);
 
     engine.seek(clamped);
   }, []);
@@ -1339,70 +1512,6 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     }
   }, [fireAdIfPending]);
 
-  const handleNextEpisodePlay = useCallback(() => {
-    let nextId = '';
-    if (video.seriesInfo?.nextEpisode) {
-      nextId = video.seriesInfo.nextEpisode.contentId;
-    } else if (nextEpisodeFromList) {
-      nextId = String(nextEpisodeFromList.episode.asset_id);
-    }
-
-    if (!nextId) return;
-
-    if (nextEpisodeFromList && seasons) {
-      const { episode, season } = nextEpisodeFromList;
-      const seriesTitle = video.seriesInfo?.seriesTitle || video.title;
-      const seriesId = video.parentId || video.contentId;
-
-      // Carry over subscription/purchase status from current episode to prevent ads on next episode
-      let isSvodSubscribed = false;
-      let isTvodPurchased = false;
-      let assetCategoryCode = video.assetCategory === 'tvod' ? 3 : video.assetCategory === 'svod' ? 2 : 1;
-      let assetCategory = video.assetCategory || 'avod';
-
-      try {
-        const currentMeta = sessionStorage.getItem(`play_metadata_${video.contentId}`);
-        if (currentMeta) {
-          const parsedMeta = JSON.parse(currentMeta);
-          if (parsedMeta.isSvodSubscribed !== undefined) isSvodSubscribed = parsedMeta.isSvodSubscribed;
-          if (parsedMeta.isTvodPurchased !== undefined) isTvodPurchased = parsedMeta.isTvodPurchased;
-          if (parsedMeta.assetCategoryCode !== undefined) assetCategoryCode = parsedMeta.assetCategoryCode;
-          if (parsedMeta.assetCategory !== undefined) assetCategory = parsedMeta.assetCategory;
-        }
-      } catch (e) {
-        // ignore parse error
-      }
-
-      sessionStorage.setItem(
-        `play_metadata_${nextId}`,
-        JSON.stringify({
-          title: episode.asset_title,
-          description: episode.asset_description,
-          seriesInfo: {
-            seriesId: String(seriesId),
-            seriesTitle: seriesTitle,
-            seasonNumber: Number(season.season_number ?? 1),
-            episodeNumber: Number(episode.episode_number ?? 1),
-            nextEpisode: null,
-          },
-          certification: video.certification ?? null,
-          classifications: video.classifications ?? null,
-          isSvodSubscribed,
-          isTvodPurchased,
-          assetCategoryCode,
-          assetCategory,
-          assetTypeName: 'episode',
-        })
-      );
-    }
-
-    engineRef.current?.eventBus.emit('NEXT_EPISODE', {
-      triggeredBy: 'auto',
-      nextContentId: nextId,
-    });
-    router.replace(ROUTES.WATCH(nextId));
-  }, [router, video, nextEpisodeFromList, seasons]);
-
   const handleNextEpisodeCancel = useCallback(() => {
     setShowNextEpisode(false);
     setNextEpisodeTriggeredBySeeking(false);
@@ -1482,15 +1591,15 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     }
   });
 
+  // Only syncs the ref now (still read by this focusKey's own onEnterPress/
+  // onArrowPress above to no-op stale callbacks) — this used to also cancel
+  // the hide timer and force controls visible whenever focus moved off the
+  // bare player background onto any control, which is what made auto-hide
+  // never actually fire during normal use. The global any-key listener
+  // above is now the single thing responsible for resetting the timer.
   useEffect(() => {
     isPlayerFocusedRef.current = isPlayerFocused;
-    if (!isPlayerFocused) {
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-      setControlsVisible(true);
-    } else if (controlsVisible) {
-      showControls();
-    }
-  }, [isPlayerFocused, controlsVisible, showControls]);
+  }, [isPlayerFocused]);
 
   useEffect(() => {
     setHasStartedPlaying(false);
@@ -1588,6 +1697,117 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     const progress = (elapsed / totalWindow) * 100;
     return Math.max(0, Math.min(100, progress));
   }, [video.skipRecap, currentTime]);
+
+  // Skip Intro/Recap were plain <button onClick> elements with no
+  // useFocusable at all — invisible to the D-pad entirely on a remote-only
+  // TV app, so there was never any way to actually reach or press them.
+  // Hooks must run unconditionally every render (can't live inside the
+  // conditionally-rendered JSX below), so `focusable` itself carries the
+  // same visibility window used to decide whether to render the button —
+  // same pattern as the ad overlay's controls further down this file.
+  const isSkipIntroVisible =
+    !!video.skipIntro &&
+    currentTime >= video.skipIntro.visibleAtSeconds &&
+    currentTime < video.skipIntro.visibleEndSeconds &&
+    !adState.isPlaying &&
+    !error;
+  const isSkipRecapVisible =
+    !!video.skipRecap &&
+    currentTime >= video.skipRecap.visibleAtSeconds &&
+    currentTime < video.skipRecap.visibleEndSeconds &&
+    !adState.isPlaying &&
+    !error;
+
+  const handleSkipIntro = useCallback(() => {
+    if (!video.skipIntro) return;
+    const target = video.skipIntro.durationSeconds;
+    logger.info('[OTTPlayer] Skipping intro, seeking to', { target });
+    engineRef.current?.seek(target);
+    engineRef.current?.play();
+    analyticsService.track(EVENT_NAMES.SKIP_INTRO_CLICKED, {
+      asset_id: String(video.contentId),
+      asset_title: video.title ?? '',
+      position_seconds: Math.round(currentTime),
+      skip_to_seconds: target,
+    });
+  }, [video.skipIntro, video.contentId, video.title, currentTime]);
+
+  const handleSkipRecap = useCallback(() => {
+    if (!video.skipRecap) return;
+    const target = video.skipRecap.durationSeconds;
+    logger.info('[OTTPlayer] Skipping recap, seeking to', { target });
+    engineRef.current?.seek(target);
+    engineRef.current?.play();
+    analyticsService.track(EVENT_NAMES.SKIP_RECAP_CLICKED, {
+      asset_id: String(video.contentId),
+      asset_title: video.title ?? '',
+      position_seconds: Math.round(currentTime),
+      skip_to_seconds: target,
+    });
+  }, [video.skipRecap, video.contentId, video.title, currentTime]);
+
+  const { ref: skipIntroRef, focused: skipIntroFocused } = useFocusable({
+    focusKey: 'skip-intro-btn',
+    focusable: isSkipIntroVisible,
+    onEnterPress: handleSkipIntro,
+  });
+  const { ref: skipRecapRef, focused: skipRecapFocused } = useFocusable({
+    focusKey: 'skip-recap-btn',
+    focusable: isSkipRecapVisible,
+    onEnterPress: handleSkipRecap,
+  });
+
+  // Land the D-pad on the button the moment it actually appears — it's an
+  // absolutely-positioned overlay disconnected from the rest of the layout,
+  // so nothing would naturally direct focus onto it otherwise (same reason
+  // the ad-skip button and NextEpisodeCard both do this on mount/appear).
+  // Seeded from the current visibility (not `false`) so this only fires for
+  // a genuine LATER appearance — the very first appearance, at mount, is its
+  // own deliberate decision below, not this effect racing it.
+  const wasSkipIntroVisibleRef = useRef(isSkipIntroVisible);
+  useEffect(() => {
+    if (isSkipIntroVisible && !wasSkipIntroVisibleRef.current) {
+      const timer = setTimeout(() => setFocus('skip-intro-btn'), 50);
+      wasSkipIntroVisibleRef.current = true;
+      return () => clearTimeout(timer);
+    }
+    if (!isSkipIntroVisible) wasSkipIntroVisibleRef.current = false;
+  }, [isSkipIntroVisible]);
+
+  const wasSkipRecapVisibleRef = useRef(isSkipRecapVisible);
+  useEffect(() => {
+    if (isSkipRecapVisible && !wasSkipRecapVisibleRef.current) {
+      const timer = setTimeout(() => setFocus('skip-recap-btn'), 50);
+      wasSkipRecapVisibleRef.current = true;
+      return () => clearTimeout(timer);
+    }
+    if (!isSkipRecapVisible) wasSkipRecapVisibleRef.current = false;
+  }, [isSkipRecapVisible]);
+
+  // Initial focus landing, decided once at mount: Skip Intro (or Recap, if
+  // that's what's showing instead) takes priority over the seek bar when
+  // one is already visible the moment playback starts, so the remote can
+  // dismiss it immediately. Otherwise focus falls back to the seek bar —
+  // not the video background, not play/pause — so a user can immediately
+  // scrub/preview without an extra Up-then-navigate step. The delay matches
+  // the "appears later" effects above — the target button (if any) needs a
+  // tick to register with SpatialNavigation after its first conditional
+  // render before `setFocus` can find it.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isSkipIntroVisible) {
+        setFocus('skip-intro-btn');
+      } else if (isSkipRecapVisible) {
+        setFocus('skip-recap-btn');
+      } else {
+        setFocus('player-seekbar');
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+    // Intentionally mount-only — this is the one-time INITIAL landing
+    // decision; the effects above own every subsequent appearance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const captionStyles = {
     '--caption-font-size': `${captionFontSize}px`,
@@ -1724,11 +1944,11 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
 
         {/* Next episode */}
         {showNextEpisode &&
-          video.seriesInfo?.nextEpisode &&
+          nextEpisodeOverlayInfo &&
           !adState.isPlaying &&
           !error && (
             <NextEpisodeOverlay
-              nextEpisode={video.seriesInfo.nextEpisode}
+              nextEpisode={nextEpisodeOverlayInfo}
               onPlayNow={handleNextEpisodePlay}
               onCancel={handleNextEpisodeCancel}
               suppressAutoPlay={nextEpisodeTriggeredBySeeking}
@@ -1739,26 +1959,16 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         <PlaybackFeedback action={feedbackAction} />
 
         {/* Skip Intro Overlay — shows from visibleAtSeconds until user clicks or seeks past durationSeconds */}
-        {video.skipIntro &&
-          currentTime >= video.skipIntro.visibleAtSeconds &&
-          currentTime < video.skipIntro.visibleEndSeconds &&
-          !adState.isPlaying &&
-          !error && (
+        {isSkipIntroVisible && (
             <button
-              onClick={() => {
-                const target = video.skipIntro!.durationSeconds;
-                logger.info('[OTTPlayer] Skipping intro, seeking to', { target });
-                engineRef.current?.seek(target);
-                engineRef.current?.play();
-                analyticsService.track(EVENT_NAMES.SKIP_INTRO_CLICKED, {
-                  asset_id: String(video.contentId),
-                  asset_title: video.title ?? '',
-                  position_seconds: Math.round(currentTime),
-                  skip_to_seconds: target,
-                });
-              }}
-              className="absolute bottom-24 right-6 z-50 px-6 py-2.5 bg-black/85 hover:bg-black border border-theme_1/20 text-theme_1 rounded-lg text-sm font-bold tracking-wide transition-all duration-200 active:scale-95 shadow-2xl hover:border-theme_1/40 overflow-hidden"
-              style={{ pointerEvents: 'auto', backdropFilter: 'blur(8px)' }}
+              ref={skipIntroRef}
+              onClick={handleSkipIntro}
+              className={`absolute bottom-28 right-8 z-50 px-8 py-4 bg-black/85 hover:bg-black border-2 text-theme_1 rounded-xl text-lg sm:text-xl font-bold tracking-wide transition-all duration-200 active:scale-95 shadow-2xl overflow-hidden ${
+                skipIntroFocused
+                  ? 'border-white ring-[3px] ring-white bg-black scale-[1.06]'
+                  : 'border-theme_1/20 hover:border-theme_1/40'
+              }`}
+              style={{ pointerEvents: 'auto', backdropFilter: 'blur(8px)', minWidth: 220, minHeight: 64 }}
             >
               <span
                 className="absolute inset-y-0 left-0 bg-[#F26E21] transition-[width] duration-200 ease-linear"
@@ -1770,26 +1980,16 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
           )}
 
         {/* Skip Recap Overlay — shows from visibleAtSeconds until user clicks or seeks past durationSeconds */}
-        {video.skipRecap &&
-          currentTime >= video.skipRecap.visibleAtSeconds &&
-          currentTime < video.skipRecap.visibleEndSeconds &&
-          !adState.isPlaying &&
-          !error && (
+        {isSkipRecapVisible && (
             <button
-              onClick={() => {
-                const target = video.skipRecap!.durationSeconds;
-                logger.info('[OTTPlayer] Skipping recap, seeking to', { target });
-                engineRef.current?.seek(target);
-                engineRef.current?.play();
-                analyticsService.track(EVENT_NAMES.SKIP_RECAP_CLICKED, {
-                  asset_id: String(video.contentId),
-                  asset_title: video.title ?? '',
-                  position_seconds: Math.round(currentTime),
-                  skip_to_seconds: target,
-                });
-              }}
-              className="absolute bottom-24 right-6 z-50 px-6 py-2.5 bg-black/85 hover:bg-black border border-theme_1/20 text-theme_1 rounded-lg text-sm font-bold tracking-wide transition-all duration-200 active:scale-95 shadow-2xl hover:border-theme_1/40 overflow-hidden"
-              style={{ pointerEvents: 'auto', backdropFilter: 'blur(8px)' }}
+              ref={skipRecapRef}
+              onClick={handleSkipRecap}
+              className={`absolute bottom-28 right-8 z-50 px-8 py-4 bg-black/85 hover:bg-black border-2 text-theme_1 rounded-xl text-lg sm:text-xl font-bold tracking-wide transition-all duration-200 active:scale-95 shadow-2xl overflow-hidden ${
+                skipRecapFocused
+                  ? 'border-white ring-[3px] ring-white bg-black scale-[1.06]'
+                  : 'border-theme_1/20 hover:border-theme_1/40'
+              }`}
+              style={{ pointerEvents: 'auto', backdropFilter: 'blur(8px)', minWidth: 220, minHeight: 64 }}
             >
               <span
                 className="absolute inset-y-0 left-0 bg-[#F26E21] transition-[width] duration-200 ease-linear"
@@ -1824,11 +2024,11 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
                 }
                 onPlayNow={() => {
                   setHasTriggeredNextEpisodeAuto(true);
-                  onEpisodeSelect?.(
-                    nextEpisodeFromList.episode,
-                    nextEpisodeFromList.season,
-                    video.nextTitle!.startAtSeconds
-                  );
+                  // Routed through handleNextEpisodePlay (see its own
+                  // comment) instead of onEpisodeSelect — consistent
+                  // NEXT_EPISODE analytics + router.replace with every other
+                  // next-episode trigger.
+                  handleNextEpisodePlay(video.nextTitle!.startAtSeconds);
                 }}
                 onCancel={() => setIsNextEpisodePromptDismissed(true)}
               />
@@ -1903,12 +2103,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
               onPipToggle={togglePip}
               onEpisodes={seasons.length > 0 ? handleEpisodesToggle : undefined}
               onNextEpisode={nextEpisodeFromList ? handleNextEpisodePlay : undefined}
-              onRate={handleRate}
-              isRated={isRated}
-              onMenuOpenChange={(isOpen) => {
-                isMenuOpenRef.current = isOpen;
-                showControls();
-              }}
+              onMenuOpenChange={handleMenuOpenChange}
               forceCloseMenus={closeMenusSignal}
             />
           </div>

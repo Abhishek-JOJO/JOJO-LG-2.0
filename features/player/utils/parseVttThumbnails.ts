@@ -128,21 +128,34 @@ export async function fetchAndParseVttThumbnails(
 }
 
 /**
+ * Find the index of the thumbnail cue for a given playback position (same
+ * exact-match-then-last-started-fallback logic as getThumbnailAtTime, but
+ * returning the index lets callers also look up neighboring cues — e.g. a
+ * 3-frame prev/current/next filmstrip preview).
+ */
+export function getThumbnailIndexAtTime(
+  cues: ThumbnailCue[],
+  timeSeconds: number
+): number {
+  const exactIndex = cues.findIndex(
+    (c) => timeSeconds >= c.startSeconds && timeSeconds < c.endSeconds
+  );
+  if (exactIndex !== -1) return exactIndex;
+
+  // Fallback: last cue that has started (handles boundary timestamps)
+  for (let i = cues.length - 1; i >= 0; i -= 1) {
+    if (timeSeconds >= cues[i].startSeconds) return i;
+  }
+  return -1;
+}
+
+/**
  * Find the thumbnail cue for a given playback position.
  */
 export function getThumbnailAtTime(
   cues: ThumbnailCue[],
   timeSeconds: number
 ): ThumbnailCue | null {
-  const exact =
-    cues.find(
-      (c) => timeSeconds >= c.startSeconds && timeSeconds < c.endSeconds
-    ) ?? null;
-  if (exact) return exact;
-
-  // Fallback: last cue that has started (handles boundary timestamps)
-  for (let i = cues.length - 1; i >= 0; i -= 1) {
-    if (timeSeconds >= cues[i].startSeconds) return cues[i];
-  }
-  return null;
+  const index = getThumbnailIndexAtTime(cues, timeSeconds);
+  return index === -1 ? null : cues[index];
 }

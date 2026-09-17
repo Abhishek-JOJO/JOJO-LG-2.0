@@ -16,6 +16,8 @@ import { logger } from "@/lib/logger/logger";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { getMobileDownloadAppRoute } from "@/lib/mobile/mobileAccess";
 import { useBootstrap } from "@lib/bootstrap/BootstrapContext";
+import { localStorageManager } from "@lib/localStorage/localStorage.manager";
+import { StorageKey } from "@enums/storage.enum";
 
 export type GateStatus = "loading" | "blocked" | "allowed";
 
@@ -119,7 +121,12 @@ export function useWatchPageGating(id: string): WatchPageGateResult {
   const isOverseas = countryCode && countryCode !== appConfig.GEO_DEFAULT_COUNTRY_CODE;
 
   // 6. Evaluate all gating checks synchronously
-  const hasTokenInStorage = typeof window !== "undefined" && Boolean(localStorage.getItem("AUTH_TOKEN"));
+  // Same wrong-key bug as useVideoDetails.ts: the actual storage key is
+  // "ott_auth_token" (StorageKey.AUTH_TOKEN), not the raw string
+  // "AUTH_TOKEN" — this always evaluated false, silently defeating the
+  // isGateLoading race-guard below that's meant to hold the gate at
+  // "loading" until the auth store catches up with what's on disk.
+  const hasTokenInStorage = Boolean(localStorageManager.get<string>(StorageKey.AUTH_TOKEN));
   const isUserAuthenticated = isAuthenticated || Boolean(token) || hasTokenInStorage;
 
   const isGateLoading =
@@ -142,6 +149,18 @@ export function useWatchPageGating(id: string): WatchPageGateResult {
 
     // Wait while app or viewport readiness is initializing
     if (!isReady || !isAppReady) {
+      return { status: "loading" };
+    }
+
+    // A valid session exists on disk but the auth store hasn't caught up
+    // yet (the store starts null and is populated by a top-level effect
+    // shortly after mount) — wait rather than momentarily treating this as
+    // an unauthenticated/guest session. Proceeding here with a stale/empty
+    // token was letting the player mount and start its own fetch keyed off
+    // that empty session, which then refetched a moment later once the
+    // store caught up — the gate briefly reappearing over an
+    // already-mounted player.
+    if (hasTokenInStorage && (!isAuthenticated || !token)) {
       return { status: "loading" };
     }
 

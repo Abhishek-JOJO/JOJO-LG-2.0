@@ -12,10 +12,22 @@ import { useAuthStore } from '@store/useAuthStore';
 import { fetchVideoDetails } from '../services/player.service';
 import { logger } from '@lib/logger/logger';
 import { appConfig } from '@/lib/config/app.config';
+import { localStorageManager } from '@lib/localStorage/localStorage.manager';
+import { StorageKey } from '@enums/storage.enum';
 
 export function useVideoDetails(contentId: string, isAppReady: boolean = true, enabled: boolean = true) {
   const token = useAuthStore((state) => state.token);
-  const effectiveSessionId = token || (typeof window !== "undefined" ? localStorage.getItem("AUTH_TOKEN") : null);
+  // Was reading the raw localStorage key "AUTH_TOKEN" — the actual key the
+  // rest of the app stores it under (via localStorageManager/StorageKey) is
+  // "ott_auth_token", so this fallback silently never matched anything. On
+  // the very first render, before the top-level auth-store hydration effect
+  // has run, `token` is still null and this fallback was the only thing that
+  // could fill it in — its mismatch meant effectiveSessionId briefly
+  // resolved to null there. Since it's part of this query's key, that null
+  // could produce a different key than the one used moments later once
+  // `token` populates, triggering a second fetch (and the loading gate
+  // flashing again) for what's actually the same request.
+  const effectiveSessionId = token || localStorageManager.get<string>(StorageKey.AUTH_TOKEN);
 
   return useQuery({
     queryKey: ['video-details', contentId, effectiveSessionId],
