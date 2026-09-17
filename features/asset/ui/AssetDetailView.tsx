@@ -223,6 +223,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const { ref: contentOverlayRef, focusKey: contentOverlayFocusKey, hasFocusedChild: contentOverlayOpen } = useFocusable({
     focusable: false,
     trackChildren: true,
+    isFocusBoundary: true,
     focusKey: "asset-detail-content-overlay",
   });
   const [canCastScrollLeft, setCanCastScrollLeft] = useState(false);
@@ -665,6 +666,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   );
   const [isLiked, setIsLiked] = useState(false);
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string | null>(null);
+  const lastFocusedCastKeyRef = useRef<string | null>(null);
+  const [lastFocusedCastKey, setLastFocusedCastKey] = useState<string | null>(null);
+  const handleCastFocused = useCallback((key: string) => {
+    lastFocusedCastKeyRef.current = key;
+    setLastFocusedCastKey(key);
+  }, []);
 
   // Video Autoplay States
   const [videoStarted, setVideoStarted] = useState(false);
@@ -972,12 +979,16 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const navigateDownFromActions = () => {
     const state = listsRef.current;
     if (state.isShowAsset) {
+      setActiveTab('episodes');
       retrySetFocus('tab-episodes');
     } else if (asset?.trailers && asset.trailers.length > 0) {
+      setActiveTab('trailers');
       retrySetFocus('tab-trailers');
     } else if (state.hasCast && state.firstCastId) {
+      setActiveTab('cast');
       retrySetFocus('tab-cast');
     } else if (state.hasRelated && state.firstRelatedId) {
+      setActiveTab('more_like_this');
       retrySetFocus('tab-more_like_this');
     } else {
       retrySetFocus(`asset-watch-now-${assetId}`);
@@ -1409,6 +1420,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 : hasCastTab ? "cast"
                   : hasMoreLikeThisTab ? "more_like_this"
                     : "episodes";
+
+  const availableTabs: Array<"episodes" | "trailers" | "cast" | "more_like_this"> = [];
+  if (hasEpisodesTab) availableTabs.push("episodes");
+  if (hasTrailersTab) availableTabs.push("trailers");
+  if (hasCastTab) availableTabs.push("cast");
+  if (hasMoreLikeThisTab) availableTabs.push("more_like_this");
 
   const firstEpisodeFocusKey = seasonsOption.length > 0
     ? `season-item-${selectedSeasonIndex}`
@@ -1849,16 +1866,16 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       <FocusContext.Provider value={contentOverlayFocusKey}>
       {
         hasAnyTab && (
-          <div className={isStandalone ? "px-4 sm:px-6 lg:px-14 pt-7 sm:pt-9 pb-16 w-full" : "px-6 pt-7 pb-16 w-full"}>
+          <div className={isStandalone ? "px-6 sm:px-10 lg:px-16 pt-20 sm:pt-24 pb-20 w-full" : "px-8 pt-20 pb-20 w-full"}>
             <div className="flex flex-col gap-6">
-              {/* Tabs Selector Bar - Clean text tabs with active orange underline matching SS 3 */}
-              <div className="flex items-center justify-between pb-1 border-b border-white/10">
-                <div className="flex items-center gap-8 sm:gap-10 overflow-x-auto no-scrollbar">
+              {/* Tabs Selector Bar - Clean TV tabs with active orange underline and zero-clip focus state */}
+              <div className="flex items-center justify-between border-b border-white/10">
+                <div className="flex items-center gap-4 sm:gap-6 py-3 px-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                   {hasEpisodesTab && (
                     <FocusableTabButton
                       label={t("episodes")}
                       isActive={effectiveTab === "episodes"}
-                      onClick={() => setActiveTab("episodes")}
+                      onActivate={() => setActiveTab("episodes")}
                       focusKeyPrefix="tab-episodes"
                       assetId={assetId}
                       onArrowUp={closeContentOverlay}
@@ -1867,39 +1884,79 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                           ? `season-item-${selectedSeasonIndex}`
                           : firstEpisodeFocusKey
                       }
+                      isFirst={availableTabs[0] === "episodes"}
+                      isLast={availableTabs[availableTabs.length - 1] === "episodes"}
+                      onArrowLeft={() => {
+                        const idx = availableTabs.indexOf("episodes");
+                        if (idx > 0) retrySetFocus(`tab-${availableTabs[idx - 1]}`);
+                      }}
+                      onArrowRight={() => {
+                        const idx = availableTabs.indexOf("episodes");
+                        if (idx < availableTabs.length - 1) retrySetFocus(`tab-${availableTabs[idx + 1]}`);
+                      }}
                     />
                   )}
                   {hasTrailersTab && (
                     <FocusableTabButton
                       label={t("trailers")}
                       isActive={effectiveTab === "trailers"}
-                      onClick={() => setActiveTab("trailers")}
+                      onActivate={() => setActiveTab("trailers")}
                       focusKeyPrefix="tab-trailers"
                       assetId={assetId}
                       onArrowUp={closeContentOverlay}
                       downTargetFocusKey={firstTrailerFocusKey}
+                      isFirst={availableTabs[0] === "trailers"}
+                      isLast={availableTabs[availableTabs.length - 1] === "trailers"}
+                      onArrowLeft={() => {
+                        const idx = availableTabs.indexOf("trailers");
+                        if (idx > 0) retrySetFocus(`tab-${availableTabs[idx - 1]}`);
+                      }}
+                      onArrowRight={() => {
+                        const idx = availableTabs.indexOf("trailers");
+                        if (idx < availableTabs.length - 1) retrySetFocus(`tab-${availableTabs[idx + 1]}`);
+                      }}
                     />
                   )}
                   {hasCastTab && (
                     <FocusableTabButton
                       label={t("cast_crew")}
                       isActive={effectiveTab === "cast"}
-                      onClick={() => setActiveTab("cast")}
+                      onActivate={() => setActiveTab("cast")}
                       focusKeyPrefix="tab-cast"
                       assetId={assetId}
                       onArrowUp={closeContentOverlay}
-                      downTargetFocusKey={firstCastFocusKey}
+                      downTargetFocusKey={lastFocusedCastKey || firstCastFocusKey}
+                      isFirst={availableTabs[0] === "cast"}
+                      isLast={availableTabs[availableTabs.length - 1] === "cast"}
+                      onArrowLeft={() => {
+                        const idx = availableTabs.indexOf("cast");
+                        if (idx > 0) retrySetFocus(`tab-${availableTabs[idx - 1]}`);
+                      }}
+                      onArrowRight={() => {
+                        const idx = availableTabs.indexOf("cast");
+                        if (idx < availableTabs.length - 1) retrySetFocus(`tab-${availableTabs[idx + 1]}`);
+                      }}
                     />
                   )}
                   {hasMoreLikeThisTab && (
                     <FocusableTabButton
                       label={t("more_like_this")}
                       isActive={effectiveTab === "more_like_this"}
-                      onClick={() => setActiveTab("more_like_this")}
+                      onActivate={() => setActiveTab("more_like_this")}
                       focusKeyPrefix="tab-more_like_this"
                       assetId={assetId}
                       onArrowUp={closeContentOverlay}
                       downTargetFocusKey={firstRelatedFocusKey}
+                      isFirst={availableTabs[0] === "more_like_this"}
+                      isLast={availableTabs[availableTabs.length - 1] === "more_like_this"}
+                      onArrowLeft={() => {
+                        const idx = availableTabs.indexOf("more_like_this");
+                        if (idx > 0) retrySetFocus(`tab-${availableTabs[idx - 1]}`);
+                      }}
+                      onArrowRight={() => {
+                        const idx = availableTabs.indexOf("more_like_this");
+                        if (idx < availableTabs.length - 1) retrySetFocus(`tab-${availableTabs[idx + 1]}`);
+                      }}
                     />
                   )}
                 </div>
@@ -2008,6 +2065,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   <div className="relative group/cast-rail w-full">
                     {canCastScrollLeft && (
                       <button
+                        tabIndex={-1}
                         onClick={() => {
                           if (castListRef.current) {
                             castListRef.current.scrollBy({ left: -400, behavior: "smooth" });
@@ -2022,6 +2080,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
                     {canCastScrollRight && (
                       <button
+                        tabIndex={-1}
                         onClick={() => {
                           if (castListRef.current) {
                             castListRef.current.scrollBy({ left: 400, behavior: "smooth" });
@@ -2037,7 +2096,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                     <div
                       ref={castListRef}
                       onScroll={checkCastScroll}
-                      className={`flex gap-6 sm:gap-8 overflow-x-auto pt-4 pb-8 px-2 scrollbar-none ${
+                      className={`flex gap-6 sm:gap-8 overflow-x-auto pt-8 pb-12 px-8 scrollbar-none ${
                         isCastDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"
                       }`}
                     >
@@ -2046,9 +2105,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                           key={idx}
                           castItem={castItem}
                           idx={idx}
+                          total={castList.length}
+                          castList={castList}
                           asset={asset}
                           assetId={assetId}
                           setSelectedProfessionalId={setSelectedProfessionalId}
+                          onFocused={handleCastFocused}
                         />
                       ))}
                     </div>
@@ -2138,7 +2200,13 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         {selectedProfessionalId && (
           <CastDetailsPopup
             professionalId={selectedProfessionalId}
-            onClose={() => setSelectedProfessionalId(null)}
+            onClose={() => {
+              setSelectedProfessionalId(null);
+              const restoreKey = lastFocusedCastKeyRef.current || firstCastFocusKey;
+              if (restoreKey) {
+                retrySetFocus(restoreKey, 8, 80);
+              }
+            }}
             openAssetDetail={openAssetDetail}
             // Same modal-vs-standalone distinction as FocusableRelatedItem above —
             // `onClose` here refers to this AssetDetailView instance's own prop
@@ -2263,7 +2331,16 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
   );
 }
 
-function FocusableCastItem({ castItem, idx, asset, assetId, setSelectedProfessionalId }: any) {
+function FocusableCastItem({
+  castItem,
+  idx,
+  total,
+  castList,
+  asset,
+  assetId,
+  setSelectedProfessionalId,
+  onFocused
+}: any) {
   const cast = castItem as any;
   const avatarUrl = cast.image || cast.avatar || "";
 
@@ -2280,7 +2357,7 @@ function FocusableCastItem({ castItem, idx, asset, assetId, setSelectedProfessio
     }
   };
 
-  const castFocusKey = `cast-${cast.id || idx}`;
+  const castFocusKey = `cast-${cast.id ?? idx}`;
   const { ref, focused } = useFocusable({
     focusKey: castFocusKey,
     onEnterPress: handleCastClick,
@@ -2289,7 +2366,28 @@ function FocusableCastItem({ castItem, idx, asset, assetId, setSelectedProfessio
         retrySetFocus("tab-cast");
         return false;
       }
+      if (direction === "left") {
+        if (idx > 0 && castList?.[idx - 1]) {
+          const prev = castList[idx - 1];
+          retrySetFocus(`cast-${prev.id ?? idx - 1}`);
+        }
+        return false; // Boundary: do not escape left
+      }
+      if (direction === "right") {
+        if (idx < total - 1 && castList?.[idx + 1]) {
+          const next = castList[idx + 1];
+          retrySetFocus(`cast-${next.id ?? idx + 1}`);
+        }
+        return false; // Boundary: do not escape right
+      }
+      if (direction === "down") {
+        return false; // Boundary: do not escape down
+      }
       return true;
+    },
+    onFocus: () => {
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      onFocused?.(castFocusKey);
     }
   });
 
@@ -2297,10 +2395,18 @@ function FocusableCastItem({ castItem, idx, asset, assetId, setSelectedProfessio
     <div
       ref={ref as any}
       onClick={handleCastClick}
-      className={`flex flex-col items-center shrink-0 w-[130px] sm:w-[155px] text-center cursor-pointer group transition-transform duration-300 ${focused ? "scale-110" : ""}`}
+      className={`flex flex-col items-center shrink-0 w-[130px] sm:w-[155px] text-center cursor-pointer group transition-all duration-300 ${
+        focused ? "scale-105 z-20" : "hover:scale-105"
+      }`}
     >
       {/* Circle Avatar wrapper */}
-      <div className={`relative w-[115px] h-[115px] sm:w-[140px] sm:h-[140px] rounded-full overflow-hidden mb-3.5 flex items-center justify-center bg-neutral-900 shrink-0 border-2 border-white/15 transition-all duration-300 ${focused ? "border-white ring-4 ring-white ring-offset-4 ring-offset-[#191919] shadow-2xl" : "group-hover:border-white/40"}`}>
+      <div
+        className={`relative w-[115px] h-[115px] sm:w-[140px] sm:h-[140px] rounded-full overflow-hidden mb-3.5 flex items-center justify-center bg-neutral-900 shrink-0 border-2 transition-all duration-300 ${
+          focused
+            ? "border-white ring-4 ring-white ring-offset-4 ring-offset-[#191919] shadow-2xl"
+            : "border-white/15 group-hover:border-white/40"
+        }`}
+      >
         {avatarUrl ? (
           <JOJOCommonImage
             src={avatarUrl}
@@ -2317,7 +2423,11 @@ function FocusableCastItem({ castItem, idx, asset, assetId, setSelectedProfessio
         )}
       </div>
       {/* Name */}
-      <span className={`text-sm sm:text-base font-bold line-clamp-1 leading-tight w-full transition-colors ${focused ? "text-theme_13_samecolour" : "text-white group-hover:text-theme_13_samecolour"}`}>
+      <span
+        className={`text-sm sm:text-base font-bold line-clamp-2 leading-tight w-full transition-colors min-h-[2.5rem] flex items-center justify-center ${
+          focused ? "text-theme_13_samecolour" : "text-white group-hover:text-theme_13_samecolour"
+        }`}
+      >
         {cast.name}
       </span>
       {/* Role */}
@@ -2446,12 +2556,21 @@ function FocusablePreviewNextButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function FocusableTabButton({ label, isActive, onClick, focusKeyPrefix, assetId, downTargetFocusKey, onArrowUp }: any) {
+function FocusableTabButton({
+  label,
+  isActive,
+  onActivate,
+  focusKeyPrefix,
+  assetId,
+  downTargetFocusKey,
+  onArrowUp,
+  isFirst,
+  isLast,
+  onArrowLeft,
+  onArrowRight
+}: any) {
   const handleActivate = () => {
-    onClick();
-    // Switching tabs unmounts the old tab's content and mounts the new one in
-    // the same commit, which can drop norigin's focus pointer entirely (see
-    // retrySetFocus above) — reassert focus on this same tab button.
+    onActivate?.();
     retrySetFocus(focusKeyPrefix);
   };
   const { ref, focused } = useFocusable({
@@ -2466,31 +2585,40 @@ function FocusableTabButton({ label, isActive, onClick, focusKeyPrefix, assetId,
         }
         return false;
       }
-      if (direction === "down" && downTargetFocusKey) {
-        retrySetFocus(downTargetFocusKey);
-        return false;
+      if (direction === "down") {
+        if (downTargetFocusKey) {
+          retrySetFocus(downTargetFocusKey);
+        }
+        return false; // Prevent escaping downwards if target is not ready
+      }
+      if (direction === "left") {
+        if (isFirst) return false; // Boundary: do not escape left
+        if (onArrowLeft) {
+          onArrowLeft();
+          return false;
+        }
+      }
+      if (direction === "right") {
+        if (isLast) return false; // Boundary: do not escape right
+        if (onArrowRight) {
+          onArrowRight();
+          return false;
+        }
       }
       return true;
     },
     onFocus: () => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Fluid Smart TV navigation: auto-activate tab when remote focuses it
+      onActivate?.();
+      ref.current?.closest("#asset-detail-content-sheet")?.scrollTo({ top: 0, behavior: "smooth" });
     }
   });
+
   return (
     <button
       ref={ref as any}
       onClick={handleActivate}
-      // No scale-on-focus here (unlike most other focusables in this app):
-      // onFocus above pins this button flush against the TOP of its scrollable
-      // ancestor (#asset-detail-content-sheet, block:"start"). A scale transform
-      // expands the box from its center in every direction, including upward —
-      // past that container's own overflow-y-auto edge — so on a live TV
-      // screenshot the top of the focus border (and the tops of the letters
-      // themselves) were getting clipped clean off the moment focus landed here.
-      // The border-color change alone is already an unambiguous focus signal,
-      // so scale isn't needed and isn't worth the clipping it causes in this
-      // one scroll-pinned spot.
-      className={`relative pb-3 text-base sm:text-lg lg:text-xl font-bold transition-all outline-none shrink-0 cursor-pointer ${
+      className={`relative pt-1 pb-3 text-base sm:text-lg lg:text-xl font-bold transition-all outline-none shrink-0 cursor-pointer ${
         isActive
           ? "text-theme_13_samecolour"
           : focused
@@ -2498,36 +2626,18 @@ function FocusableTabButton({ label, isActive, onClick, focusKeyPrefix, assetId,
             : "text-neutral-400 hover:text-white"
       }`}
     >
-      {/* The focus border lives on this inner span, tight around the label only
-          — not on the outer <button>, whose own box extends down through pb-3
-          to make room for the underline below. A border spanning that full
-          height would end its bottom edge right where the underline sits,
-          and the two colliding there produced a stray corner artifact (visible
-          in an on-device screenshot: a detached white square right where the
-          border and underline overlapped). Keeping the border scoped to just
-          the text keeps it fully clear of the underline's own space.
-          border-transparent by default reserves the same box so focusing
-          never shifts layout. (A ring/box-shadow here would get clipped by
-          this row's ancestor overflow-x-auto — see the sibling fix history —
-          which is why this is a real border, not a ring.) py-0.5 gives the
-          border a little breathing room above/below the glyphs themselves
-          (it was sitting with zero vertical padding, right against cap-height
-          and descenders). */}
       <span
-        className={`relative inline-block rounded-md border-2 px-1.5 py-0.5 -mx-1.5 -my-0.5 ${
-          focused ? "border-white" : "border-transparent"
+        className={`relative inline-flex items-center justify-center px-4 py-1.5 rounded-xl border-2 transition-all ${
+          focused
+            ? "border-white bg-white/20 text-white shadow-lg"
+            : "border-transparent"
         }`}
       >
         {label}
       </span>
       {isActive && (
         <span
-          className="absolute -bottom-3 left-0 right-0 h-[3px] bg-theme_13_samecolour rounded-full shadow-[0_0_10px_rgba(255,102,0,0.5)]"
-        />
-      )}
-      {focused && !isActive && (
-        <span
-          className="absolute -bottom-3 left-0 right-0 h-[2px] bg-white/70 rounded-full"
+          className="absolute bottom-0 left-2 right-2 h-[3px] bg-theme_13_samecolour rounded-full shadow-[0_0_10px_rgba(255,102,0,0.6)]"
         />
       )}
     </button>

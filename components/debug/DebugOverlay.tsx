@@ -58,14 +58,9 @@ function readInitialEnabled(): boolean {
     const params = new URLSearchParams(window.location.search);
     const fromUrl = params.get("debug");
     if (fromUrl === "1") {
-      localStorage.setItem(STORAGE_KEY, "1");
       return true;
     }
-    if (fromUrl === "0") {
-      localStorage.setItem(STORAGE_KEY, "0");
-      return false;
-    }
-    return localStorage.getItem(STORAGE_KEY) === "1";
+    return false;
   } catch {
     return false;
   }

@@ -7,7 +7,7 @@ import { ChevronLeft, X, Play } from "lucide-react";
 import { getAssetTypeSlug, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { motion } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
-import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, setFocus, doesFocusableExist, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useTranslations } from "next-intl";
@@ -125,6 +125,13 @@ export function CastDetailsPopup({
     };
   }, [onClose]);
 
+  // Boundary focus for popup so remote navigation cannot leak behind it
+  const { ref: popupFocusRef, focusKey: popupFocusKey } = useFocusable({
+    focusKey: "cast-details-popup",
+    isFocusBoundary: true,
+    preferredChildFocusKey: "cast-popup-close-btn",
+  });
+
   // Auto-focus the close button so the remote has somewhere to land on open.
   useEffect(() => {
     retrySetFocus("cast-popup-close-btn");
@@ -154,40 +161,41 @@ export function CastDetailsPopup({
   };
 
   return (
-    <div className="fixed inset-0 z-[100000] overflow-hidden">
-      {/* Backdrop Blur Overlay */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.28, ease: "easeInOut" }}
-        className="absolute inset-0 bg-black/45"
-        style={{ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
-        onClick={onClose}
-      />
-
-      {/* Scrollable Container */}
-      <div
-        ref={scrollContainerRef}
-        onClick={handleBackdropClick}
-        className="absolute inset-0 overflow-y-auto flex items-start justify-center p-4 sm:p-6 overscroll-contain"
-      >
+    <FocusContext.Provider value={popupFocusKey}>
+      <div ref={popupFocusRef as any} className="fixed inset-0 z-[100000] overflow-hidden">
+        {/* Backdrop Blur Overlay */}
         <motion.div
-          initial={{ y: "100vh", opacity: 0.9, scale: 0.98 }}
-          animate={{ y: 0, opacity: 1, scale: 1 }}
-          exit={{ y: "100vh", opacity: 0.9, scale: 0.98 }}
-          transition={{ type: "spring", damping: 26, stiffness: 200, mass: 0.85 }}
-          className="relative w-full max-w-[1100px] lg:max-w-[1300px] my-8 bg-theme_10 text-white rounded-2xl overflow-hidden p-8 sm:p-10 lg:p-12 flex flex-col gap-8 z-10"
-        >
-          {/* Header Navigation */}
-          <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
-            <div className="flex items-center gap-2 text-white text-lg sm:text-xl font-bold">
-              <ChevronLeft size={22} />
-              <span>{t("cast_details")}</span>
-            </div>
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.28, ease: "easeInOut" }}
+          className="absolute inset-0 bg-black/45"
+          style={{ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
+          onClick={onClose}
+        />
 
-            <FocusableCastPopupCloseButton onClose={onClose} />
-          </div>
+        {/* Scrollable Container */}
+        <div
+          ref={scrollContainerRef}
+          onClick={handleBackdropClick}
+          className="absolute inset-0 overflow-y-auto flex items-start justify-center p-4 sm:p-6 overscroll-contain"
+        >
+          <motion.div
+            initial={{ y: "100vh", opacity: 0.9, scale: 0.98 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: "100vh", opacity: 0.9, scale: 0.98 }}
+            transition={{ type: "spring", damping: 26, stiffness: 200, mass: 0.85 }}
+            className="relative w-full max-w-[1100px] lg:max-w-[1300px] my-14 sm:my-16 bg-theme_10 text-white rounded-2xl overflow-hidden p-8 sm:p-10 lg:p-12 flex flex-col gap-8 z-10"
+          >
+            {/* Header Navigation */}
+            <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
+              <div className="flex items-center gap-2 text-white text-lg sm:text-xl font-bold">
+                <ChevronLeft size={22} />
+                <span>{t("cast_details")}</span>
+              </div>
+
+              <FocusableCastPopupCloseButton onClose={onClose} hasAssets={assets.length > 0} />
+            </div>
 
           {isLoading ? (
             <div className="flex min-h-[300px] items-center justify-center">
@@ -318,26 +326,27 @@ export function CastDetailsPopup({
         </motion.div>
       </div>
     </div>
+  </FocusContext.Provider>
   );
 }
 
-function FocusableCastPopupCloseButton({ onClose }: { onClose: () => void }) {
+function FocusableCastPopupCloseButton({ onClose, hasAssets }: { onClose: () => void; hasAssets?: boolean }) {
   const { ref, focused } = useFocusable({
     focusKey: "cast-popup-close-btn",
     onEnterPress: onClose,
     onArrowPress: (direction) => {
-      if (direction === "down") {
+      if (direction === "down" && hasAssets) {
         retrySetFocus("cast-popup-asset-0");
         return false;
       }
-      return true;
+      return false; // Trap focus within close button if no assets or up/left/right pressed
     },
   });
   return (
     <button
       ref={ref as any}
       onClick={onClose}
-      className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/60 hover:bg-neutral-800/80 border transition-all flex items-center justify-center cursor-pointer text-neutral-300 hover:text-white outline-none ${focused ? "ring-4 ring-white border-white bg-neutral-800 scale-110" : "border-white/10"}`}
+      className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/60 hover:bg-neutral-800/80 border transition-all flex items-center justify-center cursor-pointer text-neutral-300 hover:text-white outline-none ${focused ? "ring-4 ring-white border-white bg-neutral-800 scale-110 shadow-xl" : "border-white/10"}`}
       aria-label="Close professional details"
     >
       <X size={22} />
@@ -360,19 +369,25 @@ function FocusableCastPopupAssetItem({ idx, total, title, imgUrl, onSelect }: an
         }
         return false;
       }
-      if (direction === "down" && idx + GRID_COLS < total) {
-        retrySetFocus(`cast-popup-asset-${idx + GRID_COLS}`);
-        return false;
+      if (direction === "down") {
+        if (idx + GRID_COLS < total) {
+          retrySetFocus(`cast-popup-asset-${idx + GRID_COLS}`);
+        }
+        return false; // Prevent escaping below bottom row
       }
-      if (direction === "left" && col > 0) {
-        retrySetFocus(`cast-popup-asset-${idx - 1}`);
-        return false;
+      if (direction === "left") {
+        if (col > 0) {
+          retrySetFocus(`cast-popup-asset-${idx - 1}`);
+        }
+        return false; // Prevent escaping to the left
       }
-      if (direction === "right" && col < GRID_COLS - 1 && idx + 1 < total) {
-        retrySetFocus(`cast-popup-asset-${idx + 1}`);
-        return false;
+      if (direction === "right") {
+        if (col < GRID_COLS - 1 && idx + 1 < total) {
+          retrySetFocus(`cast-popup-asset-${idx + 1}`);
+        }
+        return false; // Prevent escaping to the right
       }
-      return true;
+      return false;
     },
     onFocus: () => {
       ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
