@@ -34,11 +34,20 @@ interface AssetDetailState {
   activeAssetId: string | null;
   activeContentType: string | null;
   activeTitle: string | null;
+  /**
+   * The already-known content-rail item the user clicked, if any — lets the
+   * detail view's loading skeleton show the real poster/title instantly
+   * instead of pure shimmer while the full asset details fetch in the
+   * background. Purely cosmetic (see AssetDetailView's skeleton branch): never
+   * read by any gating/focus/button logic, so a partial/missing field here
+   * can't affect anything beyond that one loading frame.
+   */
+  activePreviewItem: any | null;
   isOpen: boolean;
   originalPath: string | null;
   historyCount: number;
   shouldScrollToBottom: boolean;
-  openAssetDetail: (id: string, contentType: string | number, title: string) => void;
+  openAssetDetail: (id: string, contentType: string | number, title: string, previewItem?: any) => void;
   closeAssetDetail: () => void;
   navigateBackToAsset: (id: string, contentType: string | number, title: string) => void;
   resetScrollFlag: () => void;
@@ -49,12 +58,13 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
   activeAssetId: null,
   activeContentType: null,
   activeTitle: null,
+  activePreviewItem: null,
   isOpen: false,
   originalPath: null,
   historyCount: 0,
   shouldScrollToBottom: false,
 
-  openAssetDetail: (id, contentType, title) => {
+  openAssetDetail: (id, contentType, title, previewItem) => {
     if (typeof window === "undefined") return;
 
     // Reset global card hover state when modal opens
@@ -81,6 +91,7 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
       activeAssetId: id,
       activeContentType: typeSlug,
       activeTitle: title,
+      activePreviewItem: previewItem ?? null,
       isOpen: true,
       originalPath,
       // Increment historyCount if we were already open
@@ -104,6 +115,7 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
       activeAssetId: null,
       activeContentType: null,
       activeTitle: null,
+      activePreviewItem: null,
       isOpen: false,
       originalPath: null,
       historyCount: 0,
@@ -154,6 +166,7 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
       activeAssetId: null,
       activeContentType: null,
       activeTitle: null,
+      activePreviewItem: null,
       isOpen: false,
       originalPath: null,
       historyCount: 0,

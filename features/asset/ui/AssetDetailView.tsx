@@ -287,12 +287,19 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // A 403 means the WebSocket socket handshake hasn't finished — treat as transient loading.
   const isTransient403 = isError && ((error as any)?.status === 403 || String(error).includes('socket'));
   
-  const currentAsset = (clientAsset || initialAsset) as typeof clientAsset;
-  
+  // Deliberately clientAsset only, NOT `|| initialAsset` — every piece of gating,
+  // button, and focus logic below reads `asset`/`currentAsset`, and initialAsset
+  // is only ever a partial content-rail item (no seasons/cast/pricing/entitlements),
+  // so treating it as a real asset here would let all that logic run against
+  // incomplete data. initialAsset is used ONLY inside the skeleton branch below,
+  // purely to paint the already-known poster/title instantly — real `asset` still
+  // waits for the actual fetch, exactly as before this prop existed.
+  const currentAsset = clientAsset;
+
   // Auth is loading if bootstrap isn't done, session isn't loaded, or socket handshake is failing
   const isAuthLoading = !isAppReady || !sessionId || isTransient403;
 
-  // We only show the full-page skeleton if we have NO asset data at all (not even initialAsset)
+  // We only show the full-page skeleton if we have NO asset data at all
   // AND the data is currently loading/waiting to load
   const isDataLoading = assetLoading || (!clientAsset && queryNotStarted);
   const showSkeleton = !currentAsset && (isAuthLoading || isDataLoading);
@@ -636,6 +643,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   }, []);
 
   useEffect(() => {
+    // castListRef.current is only non-null once the Cast tab panel is actually
+    // mounted (it's now lazily mounted per active tab — see the tab panels'
+    // render guards below), so this must also re-run when the tab becomes
+    // active, not just when castList's data changes, or the ResizeObserver
+    // never attaches and the scroll arrows never initialize.
     checkCastScroll();
     window.addEventListener("resize", checkCastScroll);
 
@@ -653,7 +665,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         observer.disconnect();
       }
     };
-  }, [castList, checkCastScroll]);
+  }, [castList, checkCastScroll, activeTab]);
 
   useEffect(() => {
     if (!showSkeleton) {
@@ -726,7 +738,18 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     setCurrentSlideIndex((prev) => (prev + 1) % previewsList.length);
   }, [previewsList]);
 
-  // Handle slide progress and auto-advancing for image / fallback slides
+  // Handle slide progress and auto-advancing for image / fallback slides.
+  //
+  // This used to re-render setSlideProgress(pct) every 16ms (60x/second) for
+  // the full 2s an image slide is shown — on-device profiling (long tasks up
+  // to 787ms, recurring continuously, not just at a single "open" moment)
+  // confirmed this 60fps state update was re-rendering this entire ~800-node
+  // component tree the whole time an image slide was active, including the
+  // entire time a user was browsing the tabs/episodes overlay further down
+  // the same page (the hero area is only visually hidden behind it, not
+  // paused). Now the fill is a single CSS transition — target width flips
+  // once, the browser's compositor animates it with zero JS involvement per
+  // frame, and a single setTimeout (not a 16ms interval) advances the slide.
   useEffect(() => {
     setSlideProgress(0);
     if (previewsList.length <= 1) return;
@@ -734,21 +757,17 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     const isImage = activePreview?.type === "image" || !activePreview?.videoUrl || videoError;
 
     if (isImage) {
-      const startTime = Date.now();
-      const duration = 2000; // 2 seconds
+      const duration = 2000; // 2 seconds — must match the CSS transition-duration below
+      // Needs a real prior frame painted at 0% before the transition to 100%
+      // is a genuine animation instead of an instant snap (same rAF-reveal
+      // pattern used elsewhere in this codebase for crossfades).
+      const raf = requestAnimationFrame(() => setSlideProgress(100));
+      const timer = setTimeout(autoNextSlide, duration);
 
-      const interval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const pct = Math.min((elapsed / duration) * 100, 100);
-        setSlideProgress(pct);
-
-        if (elapsed >= duration) {
-          clearInterval(interval);
-          autoNextSlide();
-        }
-      }, 16);
-
-      return () => clearInterval(interval);
+      return () => {
+        cancelAnimationFrame(raf);
+        clearTimeout(timer);
+      };
     }
   }, [currentSlideIndex, activePreview, previewsList.length, videoError, autoNextSlide]);
 
@@ -1283,6 +1302,14 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   ]);
 
   if (showSkeleton) {
+    // Cosmetic only (see currentAsset above) — already-known poster/title from
+    // the card the user just clicked, painted instantly behind the shimmer
+    // placeholders instead of a flat gray box, while the real fetch is still
+    // in flight. Never used for anything but this background/heading.
+    const previewImage =
+      initialAsset?.heroImage || initialAsset?.landscapeImage || initialAsset?.posterImage || initialAsset?.image || "";
+    const previewTitle = initialAsset?.title || "";
+
     return (
       <div
         className={
@@ -1299,8 +1326,24 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
               : "relative w-full h-[280px] sm:h-[450px] bg-neutral-900 flex flex-col justify-end p-6 gap-4"
           }
         >
-          {/* Logo/Title block */}
-          <div className="h-8 sm:h-16 w-[180px] sm:w-[320px] bg-neutral-800 rounded-lg z-20" />
+          {previewImage && (
+            <img
+              src={previewImage}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover object-top pointer-events-none select-none"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              loading="eager"
+            />
+          )}
+
+          {/* Logo/Title block — real title if already known, otherwise shimmer */}
+          {previewTitle ? (
+            <h1 className="relative z-20 line-clamp-1 text-2xl sm:text-4xl font-bold drop-shadow-lg">
+              {previewTitle}
+            </h1>
+          ) : (
+            <div className="h-8 sm:h-16 w-[180px] sm:w-[320px] bg-neutral-800 rounded-lg z-20" />
+          )}
 
           {/* Badges block */}
           <div className="flex gap-3 mt-2 z-20">
@@ -1604,7 +1647,15 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                           : idx < currentSlideIndex
                             ? "100%"
                             : "0%",
-                        transition: currentSlideIndex === idx ? "none" : "width 300ms ease",
+                        // Image slides: a real CSS transition drives the fill (see the
+                        // slide-progress effect above) — "none" would make the 0%→100%
+                        // flip an instant snap instead of a smooth 2s animation. Video
+                        // slides still snap directly since their width tracks native
+                        // timeupdate events in real time, where an added transition
+                        // would just make the bar visibly lag behind actual playback.
+                        transition: currentSlideIndex === idx
+                          ? ((activePreview?.type === "image" || !activePreview?.videoUrl || videoError) ? "width 2000ms linear" : "none")
+                          : "width 300ms ease",
                         boxShadow: "0 0 4px rgba(255,255,255,0.8)",
                       }}
                     />
@@ -1867,6 +1918,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         ref={contentOverlayRef as any}
         data-overlay-open={contentOverlayOpen ? "true" : "false"}
         className={`fixed inset-0 z-30 overflow-y-auto bg-neutral-950 transition-transform duration-500 ease-out ${contentOverlayOpen ? "translate-y-0" : "translate-y-full"}`}
+        style={{ willChange: "transform" }}
       >
       <FocusContext.Provider value={contentOverlayFocusKey}>
       {
@@ -1967,9 +2019,17 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 </div>
               </div>
 
-              {/* Episodes Tab Panel */}
-              {hasEpisodesTab && (
-                <div className={effectiveTab === "episodes" ? "flex gap-6 sm:gap-8 pb-8" : "hidden"}>
+              {/* Episodes Tab Panel — only mounted while active. All 4 tab panels used to
+                  be built into the DOM as soon as the asset loaded (just hidden via CSS),
+                  which meant opening any asset paid the cost of rendering episodes AND
+                  trailers AND cast AND related content at once, whether you'd look at 3 of
+                  them or not — confirmed via on-device profiling as a major source of the
+                  freeze right when the page opens. Underlying data (useEpisodes' loaded
+                  pages, etc.) lives in hooks above, not in this JSX, so switching tabs away
+                  and back just rebuilds cheap presentational DOM from data already in memory
+                  — no re-fetch, no lost state. */}
+              {hasEpisodesTab && effectiveTab === "episodes" && (
+                <div className="flex gap-6 sm:gap-8 pb-8">
                     {/* Left Column: Season List */}
                     {seasonsOption.length > 0 && (
                       <div className="flex flex-col gap-2.5 w-[220px] sm:w-[260px] shrink-0">
@@ -2048,9 +2108,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   </div>
               )}
 
-              {/* Trailers Tab Panel */}
-              {hasTrailersTab && (
-                <div className={effectiveTab === "trailers" ? "pb-8" : "hidden"}>
+              {/* Trailers Tab Panel — only mounted while active, see Episodes panel above. */}
+              {hasTrailersTab && effectiveTab === "trailers" && (
+                <div className="pb-8">
                     {asset.trailers && asset.trailers.length > 0 ? (
                       <div className="flex gap-5 overflow-x-auto pt-4 pb-6 scrollbar-none">
                         {asset.trailers.map((tr: any, idx: number) => (
@@ -2071,9 +2131,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   </div>
               )}
 
-              {/* Cast & Crew Tab Panel */}
-              {hasCastTab && (
-                <div className={effectiveTab === "cast" ? "pb-8" : "hidden"}>
+              {/* Cast & Crew Tab Panel — only mounted while active, see Episodes panel above. */}
+              {hasCastTab && effectiveTab === "cast" && (
+                <div className="pb-8">
                     <div className="relative group/cast-rail w-full">
                       {canCastScrollLeft && (
                         <button
@@ -2130,9 +2190,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   </div>
               )}
 
-              {/* More Like This Tab Panel */}
-              {hasMoreLikeThisTab && (
-                <div className={effectiveTab === "more_like_this" ? "pb-16 pt-2" : "hidden"}>
+              {/* More Like This Tab Panel — only mounted while active, see Episodes panel above. */}
+              {hasMoreLikeThisTab && effectiveTab === "more_like_this" && (
+                <div className="pb-16 pt-2">
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5 lg:gap-6 w-full">
                       {railsLoading ? (
                         Array.from({ length: 12 }).map((_, i) => (
@@ -2271,8 +2331,13 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
           // fetch is (still) in flight; once it lands, the newly appended
           // episodes just extend this same list and a subsequent Down works
           // normally, matching how loading is only ever triggered by focus,
-          // not mount, above.
+          // not mount, above. Must return false here too (not fall through to
+          // norigin's default nearest-neighbor search) — there's nothing below
+          // the last episode in the DOM yet, so letting the default search run
+          // while the fetch is in flight sends focus somewhere unpredictable
+          // instead of holding still until the new page actually lands.
           onLoadMore?.();
+          return false;
         }
       }
       if (direction === "left" && seasonsCount > 0) {
@@ -2616,6 +2681,16 @@ function FocusableTabButton({
         return false;
       }
       if (direction === "down") {
+        // Tab panels are now only mounted while active (see the panels' render
+        // guards above) — Left/Right can focus a tab button without activating
+        // it (that only happens on Enter), so a bare Down press here used to
+        // jump into another, already-active tab's content by coincidence. Now
+        // it must activate this tab first — which is what a user pressing Down
+        // from an unfocused tab actually wants anyway — so the panel exists
+        // for retrySetFocus's brief poll to actually find.
+        if (!isActive) {
+          onActivate?.();
+        }
         if (downTargetFocusKey) {
           retrySetFocus(downTargetFocusKey);
         }
@@ -2791,7 +2866,7 @@ function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback
             alt={title || ""}
             className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            loading="eager"
+            loading="lazy"
           />
         </div>
       ) : (

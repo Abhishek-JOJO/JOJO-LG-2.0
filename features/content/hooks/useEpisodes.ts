@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@store/useAuthStore';
 import { useLocaleStore } from '@store/useLocaleStore';
 import { getEpisodes } from '../api/getEpisodes';
@@ -39,6 +39,12 @@ export function useEpisodes({ seasons, initialSeasonIndex = 0 }: UseEpisodesOpti
 
   const [selectedSeasonIndex, setSelectedSeasonIndex] = useState(initialSeasonIndex);
   const [isLoading, setIsLoading] = useState(false);
+  // Fast D-pad scrolling through the last few episodes can fire loadMoreEpisodes
+  // twice (Down-arrow's own call + the onFocus-triggered lookahead) before React
+  // commits the setIsLoading(true) from the first call — a plain state read is
+  // stale within that same synchronous tick, so a ref closes that race window
+  // immediately instead of one render late.
+  const isLoadingRef = useRef(false);
   const locale = useLocaleStore((s) => s.locale);
 
   // Synchronize state when seasons list or locale changes (e.g. from empty to loaded, switching shows, or language change)
@@ -115,9 +121,10 @@ export function useEpisodes({ seasons, initialSeasonIndex = 0 }: UseEpisodesOpti
   // ── Load more ──────────────────────────────────────────────────────────────
 
   const loadMoreEpisodes = useCallback(async () => {
-    if (!hasMore || isLoading) return;
+    if (!hasMore || isLoadingRef.current) return;
 
     const nextPage = loadedPageCount + 1;
+    isLoadingRef.current = true;
     setIsLoading(true);
 
     try {
@@ -129,9 +136,10 @@ export function useEpisodes({ seasons, initialSeasonIndex = 0 }: UseEpisodesOpti
     } catch (err) {
       logger.error('[useEpisodes] Failed to load more', { selectedSeasonIndex, nextPage, err });
     } finally {
+      isLoadingRef.current = false;
       setIsLoading(false);
     }
-  }, [hasMore, isLoading, loadedPageCount, fetchPage, selectedSeasonIndex]);
+  }, [hasMore, loadedPageCount, fetchPage, selectedSeasonIndex]);
 
   return {
     selectedSeasonIndex,

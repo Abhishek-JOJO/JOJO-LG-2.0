@@ -159,7 +159,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     if (item?.redirectUrl) {
       router.push(item?.redirectUrl);
     } else if (item?.id) {
-      openAssetDetail(item.id, item.assetTypeCode || item.assetType || "movies", item.title);
+      openAssetDetail(item.id, item.assetTypeCode || item.assetType || "movies", item.title, item);
     }
   };
 

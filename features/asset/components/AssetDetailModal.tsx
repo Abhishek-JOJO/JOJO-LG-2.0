@@ -11,7 +11,7 @@ import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spat
 import { restorePageFocus } from "@/src/navigation/focusUtils";
 
 export function AssetDetailModal() {
-  const { activeAssetId, isOpen, closeAssetDetail, resetAssetDetailModal } = useAssetDetailStore();
+  const { activeAssetId, isOpen, closeAssetDetail, resetAssetDetailModal, activePreviewItem } = useAssetDetailStore();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
@@ -111,6 +111,7 @@ export function AssetDetailModal() {
           closeAssetDetail={closeAssetDetail}
           scrollContainerRef={scrollContainerRef}
           onBackdropClick={handleBackdropClick}
+          initialAsset={activePreviewItem}
         />
       )}
     </AnimatePresence>
@@ -141,11 +142,13 @@ function AssetDetailModalBoundary({
   closeAssetDetail,
   scrollContainerRef,
   onBackdropClick,
+  initialAsset,
 }: {
   activeAssetId: string;
   closeAssetDetail: () => void;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
   onBackdropClick: (e: React.MouseEvent) => void;
+  initialAsset?: any;
 }) {
   const { ref: focusRef, focusKey } = useFocusable({
     focusKey: 'MODAL_ASSET_DETAIL',
@@ -168,7 +171,7 @@ function AssetDetailModalBoundary({
             transition={{ duration: 0.3 }}
             className="relative w-full min-h-screen m-0 z-10"
           >
-            <AssetDetailView assetId={activeAssetId} onClose={closeAssetDetail} isStandalone={true} />
+            <AssetDetailView assetId={activeAssetId} onClose={closeAssetDetail} isStandalone={true} initialAsset={initialAsset} />
           </motion.div>
         </div>
       </div>
