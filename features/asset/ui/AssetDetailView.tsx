@@ -66,12 +66,17 @@ import { WEBOS_KEYS } from "@/src/navigation/RemoteManager";
 // a batch of new focusable items) can easily get clobbered by that churn and
 // silently do nothing. Retry a few times over a short window instead of
 // hoping one attempt lands.
-function retrySetFocus(focusKey: string, attempts = 6, intervalMs = 90) {
+function retrySetFocus(focusKey: string, attempts = 4, intervalMs = 40) {
+  if (doesFocusableExist(focusKey)) {
+    setFocus(focusKey);
+    return;
+  }
   let tries = 0;
   const attempt = () => {
     tries += 1;
     if (doesFocusableExist(focusKey)) {
       setFocus(focusKey);
+      return;
     }
     if (tries < attempts) {
       setTimeout(attempt, intervalMs);
@@ -1861,7 +1866,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         id="asset-detail-content-sheet"
         ref={contentOverlayRef as any}
         data-overlay-open={contentOverlayOpen ? "true" : "false"}
-        className={`fixed inset-0 z-30 overflow-y-auto bg-neutral-950/95 backdrop-blur-md transition-transform duration-500 ease-out ${contentOverlayOpen ? "translate-y-0" : "translate-y-full"}`}
+        className={`fixed inset-0 z-30 overflow-y-auto bg-neutral-950 transition-transform duration-500 ease-out ${contentOverlayOpen ? "translate-y-0" : "translate-y-full"}`}
       >
       <FocusContext.Provider value={contentOverlayFocusKey}>
       {
@@ -1888,11 +1893,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                       isLast={availableTabs[availableTabs.length - 1] === "episodes"}
                       onArrowLeft={() => {
                         const idx = availableTabs.indexOf("episodes");
-                        if (idx > 0) retrySetFocus(`tab-${availableTabs[idx - 1]}`);
+                        if (idx > 0) setFocus(`tab-${availableTabs[idx - 1]}`);
                       }}
                       onArrowRight={() => {
                         const idx = availableTabs.indexOf("episodes");
-                        if (idx < availableTabs.length - 1) retrySetFocus(`tab-${availableTabs[idx + 1]}`);
+                        if (idx < availableTabs.length - 1) setFocus(`tab-${availableTabs[idx + 1]}`);
                       }}
                     />
                   )}
@@ -1909,11 +1914,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                       isLast={availableTabs[availableTabs.length - 1] === "trailers"}
                       onArrowLeft={() => {
                         const idx = availableTabs.indexOf("trailers");
-                        if (idx > 0) retrySetFocus(`tab-${availableTabs[idx - 1]}`);
+                        if (idx > 0) setFocus(`tab-${availableTabs[idx - 1]}`);
                       }}
                       onArrowRight={() => {
                         const idx = availableTabs.indexOf("trailers");
-                        if (idx < availableTabs.length - 1) retrySetFocus(`tab-${availableTabs[idx + 1]}`);
+                        if (idx < availableTabs.length - 1) setFocus(`tab-${availableTabs[idx + 1]}`);
                       }}
                     />
                   )}
@@ -1930,11 +1935,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                       isLast={availableTabs[availableTabs.length - 1] === "cast"}
                       onArrowLeft={() => {
                         const idx = availableTabs.indexOf("cast");
-                        if (idx > 0) retrySetFocus(`tab-${availableTabs[idx - 1]}`);
+                        if (idx > 0) setFocus(`tab-${availableTabs[idx - 1]}`);
                       }}
                       onArrowRight={() => {
                         const idx = availableTabs.indexOf("cast");
-                        if (idx < availableTabs.length - 1) retrySetFocus(`tab-${availableTabs[idx + 1]}`);
+                        if (idx < availableTabs.length - 1) setFocus(`tab-${availableTabs[idx + 1]}`);
                       }}
                     />
                   )}
@@ -1951,212 +1956,221 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                       isLast={availableTabs[availableTabs.length - 1] === "more_like_this"}
                       onArrowLeft={() => {
                         const idx = availableTabs.indexOf("more_like_this");
-                        if (idx > 0) retrySetFocus(`tab-${availableTabs[idx - 1]}`);
+                        if (idx > 0) setFocus(`tab-${availableTabs[idx - 1]}`);
                       }}
                       onArrowRight={() => {
                         const idx = availableTabs.indexOf("more_like_this");
-                        if (idx < availableTabs.length - 1) retrySetFocus(`tab-${availableTabs[idx + 1]}`);
+                        if (idx < availableTabs.length - 1) setFocus(`tab-${availableTabs[idx + 1]}`);
                       }}
                     />
                   )}
                 </div>
               </div>
 
-              {effectiveTab === "episodes" ? (
-                <div className="flex gap-6 sm:gap-8 pb-8">
-                  {/* Left Column: Season List */}
-                  {seasonsOption.length > 0 && (
-                    <div className="flex flex-col gap-2.5 w-[220px] sm:w-[260px] shrink-0">
-                      {seasonsOption.map((s, idx) => (
-                        <FocusableSeasonListItem
-                          key={s.assetId || idx}
-                          idx={idx}
-                          isSelected={idx === selectedSeasonIndex}
-                          label={t("season", { number: idx + 1 })}
-                          subtitle={
-                            typeof s.episodes?.length === "number" && s.episodes.length > 0
-                              ? `${s.episodes.length} ${t("episodes")}`
-                              : undefined
-                          }
-                          onClick={() => handleSeasonChange(idx)}
-                          seasonsCount={seasonsOption.length}
-                          firstEpisodeAssetId={
-                            idx === selectedSeasonIndex
-                              ? displayedEpisodes?.[0]?.assetId
-                              : s.episodes?.[0]?.assetId
-                          }
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Right Column: Episodes List */}
-                  <div className="flex flex-col gap-4 flex-1 min-w-0">
-                    {activeSeason && (
-                      <div className="flex items-center gap-2 text-xs text-neutral-400 font-semibold mb-1">
-                        <span className="uppercase text-theme_13_samecolour">{t("season", { number: selectedSeasonIndex + 1 })}:</span>
-                        {asset.certification && <span>{asset.certification}</span>}
-                        <span>•</span>
-                        <span>{t("gujarati")}</span>
-                        {asset.classifications && asset.classifications.length > 0 && (
-                          <span className="text-neutral-400 text-[11px] sm:text-xs font-normal">
-                            ({asset.classifications.join(", ")})
-                          </span>
-                        )}
+              {/* Episodes Tab Panel */}
+              {hasEpisodesTab && (
+                <div className={effectiveTab === "episodes" ? "flex gap-6 sm:gap-8 pb-8" : "hidden"}>
+                    {/* Left Column: Season List */}
+                    {seasonsOption.length > 0 && (
+                      <div className="flex flex-col gap-2.5 w-[220px] sm:w-[260px] shrink-0">
+                        {seasonsOption.map((s, idx) => (
+                          <FocusableSeasonListItem
+                            key={s.assetId || idx}
+                            idx={idx}
+                            isSelected={idx === selectedSeasonIndex}
+                            label={t("season", { number: idx + 1 })}
+                            subtitle={
+                              typeof s.episodes?.length === "number" && s.episodes.length > 0
+                                ? `${s.episodes.length} ${t("episodes")}`
+                                : undefined
+                            }
+                            onClick={() => handleSeasonChange(idx)}
+                            seasonsCount={seasonsOption.length}
+                            firstEpisodeAssetId={
+                              idx === selectedSeasonIndex
+                                ? displayedEpisodes?.[0]?.assetId
+                                : s.episodes?.[0]?.assetId
+                            }
+                          />
+                        ))}
                       </div>
                     )}
 
-                    {displayedEpisodes?.length > 0 ? (
-                      <div className="flex flex-col gap-4 sm:gap-5">
-                        {displayedEpisodes.map((ep, index) => {
+                    {/* Right Column: Episodes List */}
+                    <div className="flex flex-col gap-4 flex-1 min-w-0">
+                      {activeSeason && (
+                        <div className="flex items-center gap-2 text-xs text-neutral-400 font-semibold mb-1">
+                          <span className="uppercase text-theme_13_samecolour">{t("season", { number: selectedSeasonIndex + 1 })}:</span>
+                          {asset.certification && <span>{asset.certification}</span>}
+                          <span>•</span>
+                          <span>{t("gujarati")}</span>
+                          {asset.classifications && asset.classifications.length > 0 && (
+                            <span className="text-neutral-400 text-[11px] sm:text-xs font-normal">
+                              ({asset.classifications.join(", ")})
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {displayedEpisodes?.length > 0 ? (
+                        <div className="flex flex-col gap-4 sm:gap-5">
+                          {displayedEpisodes.map((ep, index) => {
+                            return (
+                              <FocusableEpisodeItem
+                                key={ep.assetId}
+                                ep={ep}
+                                index={index}
+                                episodes={displayedEpisodes}
+                                asset={asset}
+                                selectedSeasonIndex={selectedSeasonIndex}
+                                seasonsCount={seasonsOption.length}
+                                t={t}
+                                onWatch={() => handleWatch(ep.assetId)}
+                                hasMore={hasMore}
+                                isLoadingMore={episodesLoading}
+                                onLoadMore={loadMoreEpisodes}
+                              />
+                            );
+                          })}
+
+                          {episodesLoading && hasMore && (
+                            <div className="flex items-center justify-center py-6">
+                              <Loader size="sm" />
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 text-neutral-500 text-sm">
+                          {t("no_episodes_found")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+              )}
+
+              {/* Trailers Tab Panel */}
+              {hasTrailersTab && (
+                <div className={effectiveTab === "trailers" ? "pb-8" : "hidden"}>
+                    {asset.trailers && asset.trailers.length > 0 ? (
+                      <div className="flex gap-5 overflow-x-auto pt-4 pb-6 scrollbar-none">
+                        {asset.trailers.map((tr: any, idx: number) => (
+                          <FocusableTrailerItem
+                            key={tr.assetId || tr.id || idx}
+                            trailer={tr}
+                            idx={idx}
+                            asset={asset}
+                            onWatch={(id: any) => handleWatch(id)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 text-neutral-400 text-sm border border-white/5 rounded-2xl bg-white/[0.02] mb-4">
+                        {t("no_trailers_found")}
+                      </div>
+                    )}
+                  </div>
+              )}
+
+              {/* Cast & Crew Tab Panel */}
+              {hasCastTab && (
+                <div className={effectiveTab === "cast" ? "pb-8" : "hidden"}>
+                    <div className="relative group/cast-rail w-full">
+                      {canCastScrollLeft && (
+                        <button
+                          tabIndex={-1}
+                          onClick={() => {
+                            if (castListRef.current) {
+                              castListRef.current.scrollBy({ left: -400, behavior: "smooth" });
+                            }
+                          }}
+                          className="absolute left-2 top-[75px] sm:top-[90px] -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/cast-rail:opacity-100 shadow-xl cursor-pointer"
+                          aria-label="Scroll left"
+                        >
+                          <ChevronLeft size={24} />
+                        </button>
+                      )}
+
+                      {canCastScrollRight && (
+                        <button
+                          tabIndex={-1}
+                          onClick={() => {
+                            if (castListRef.current) {
+                              castListRef.current.scrollBy({ left: 400, behavior: "smooth" });
+                            }
+                          }}
+                          className="absolute right-2 top-[75px] sm:top-[90px] -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/cast-rail:opacity-100 shadow-xl cursor-pointer"
+                          aria-label="Scroll right"
+                        >
+                          <ChevronRight size={24} />
+                        </button>
+                      )}
+
+                      <div
+                        ref={castListRef}
+                        onScroll={checkCastScroll}
+                        className={`flex gap-6 sm:gap-8 overflow-x-auto pt-8 pb-12 px-8 scrollbar-none ${
+                          isCastDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"
+                        }`}
+                      >
+                        {castList.map((castItem, idx) => (
+                          <FocusableCastItem
+                            key={idx}
+                            castItem={castItem}
+                            idx={idx}
+                            total={castList.length}
+                            castList={castList}
+                            asset={asset}
+                            assetId={assetId}
+                            setSelectedProfessionalId={setSelectedProfessionalId}
+                            onFocused={handleCastFocused}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+              )}
+
+              {/* More Like This Tab Panel */}
+              {hasMoreLikeThisTab && (
+                <div className={effectiveTab === "more_like_this" ? "pb-16 pt-2" : "hidden"}>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5 lg:gap-6 w-full">
+                      {railsLoading ? (
+                        Array.from({ length: 12 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="relative w-full aspect-[2/3] rounded-2xl overflow-hidden bg-neutral-900 animate-pulse"
+                          />
+                        ))
+                      ) : (
+                        displayRelated.map((item: any, idx: number) => {
+                          const isFallback = !item.asset && !item.details && !item.id && !item.asset_id && item.image;
+                          const mapped = !isFallback ? mapApiRailItem(item, idx) : null;
+                          const title = isFallback ? item.title : (mapped?.title || resolveTitle(item));
+                          const img = isFallback ? item.image : (mapped?.posterImageRatio4 || mapped?.portraitImage || resolvePortraitImage(item));
+                          const id = isFallback ? "" : (mapped?.id || resolveId(item));
+                          const assetType = isFallback ? "" : (mapped?.assetType || item?.asset?.asset_type || item?.details?.asset_type || item?.asset_type || item?.assetTypeCode);
+
                           return (
-                            <FocusableEpisodeItem
-                              key={ep.assetId}
-                              ep={ep}
-                              index={index}
-                              episodes={displayedEpisodes}
-                              asset={asset}
-                              selectedSeasonIndex={selectedSeasonIndex}
-                              seasonsCount={seasonsOption.length}
-                              t={t}
-                              onWatch={() => handleWatch(ep.assetId)}
-                              hasMore={hasMore}
-                              isLoadingMore={episodesLoading}
-                              onLoadMore={loadMoreEpisodes}
+                            <FocusableRelatedItem
+                              key={id || idx}
+                              item={item}
+                              idx={idx}
+                              id={id}
+                              title={title}
+                              img={img}
+                              assetType={assetType}
+                              isFallback={isFallback}
+                              isStandalone={isStandalone && !onClose}
+                              router={router}
+                              openAssetDetail={openAssetDetail}
+                              assetId={assetId}
+                              upTargetFocusKey="tab-more_like_this"
                             />
                           );
-                        })}
-
-                        {episodesLoading && hasMore && (
-                          <div className="flex items-center justify-center py-6">
-                            <Loader size="sm" />
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center py-10 text-neutral-500 text-sm">
-                        {t("no_episodes_found")}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : effectiveTab === "trailers" ? (
-                <div className="pb-8">
-                  {asset.trailers && asset.trailers.length > 0 ? (
-                    <div className="flex gap-5 overflow-x-auto pt-4 pb-6 scrollbar-none">
-                      {asset.trailers.map((tr: any, idx: number) => (
-                        <FocusableTrailerItem
-                          key={tr.assetId || tr.id || idx}
-                          trailer={tr}
-                          idx={idx}
-                          asset={asset}
-                          onWatch={(id: any) => handleWatch(id)}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 text-neutral-400 text-sm border border-white/5 rounded-2xl bg-white/[0.02] mb-4">
-                      {t("no_trailers_found")}
-                    </div>
-                  )}
-                </div>
-              ) : effectiveTab === "cast" ? (
-                <div className="pb-8">
-                  <div className="relative group/cast-rail w-full">
-                    {canCastScrollLeft && (
-                      <button
-                        tabIndex={-1}
-                        onClick={() => {
-                          if (castListRef.current) {
-                            castListRef.current.scrollBy({ left: -400, behavior: "smooth" });
-                          }
-                        }}
-                        className="absolute left-2 top-[75px] sm:top-[90px] -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/cast-rail:opacity-100 shadow-xl cursor-pointer"
-                        aria-label="Scroll left"
-                      >
-                        <ChevronLeft size={24} />
-                      </button>
-                    )}
-
-                    {canCastScrollRight && (
-                      <button
-                        tabIndex={-1}
-                        onClick={() => {
-                          if (castListRef.current) {
-                            castListRef.current.scrollBy({ left: 400, behavior: "smooth" });
-                          }
-                        }}
-                        className="absolute right-2 top-[75px] sm:top-[90px] -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/cast-rail:opacity-100 shadow-xl cursor-pointer"
-                        aria-label="Scroll right"
-                      >
-                        <ChevronRight size={24} />
-                      </button>
-                    )}
-
-                    <div
-                      ref={castListRef}
-                      onScroll={checkCastScroll}
-                      className={`flex gap-6 sm:gap-8 overflow-x-auto pt-8 pb-12 px-8 scrollbar-none ${
-                        isCastDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"
-                      }`}
-                    >
-                      {castList.map((castItem, idx) => (
-                        <FocusableCastItem
-                          key={idx}
-                          castItem={castItem}
-                          idx={idx}
-                          total={castList.length}
-                          castList={castList}
-                          asset={asset}
-                          assetId={assetId}
-                          setSelectedProfessionalId={setSelectedProfessionalId}
-                          onFocused={handleCastFocused}
-                        />
-                      ))}
+                        })
+                      )}
                     </div>
                   </div>
-                </div>
-              ) : (
-                /* effectiveTab === "more_like_this" - Responsive TV Grid Layout */
-                <div className="pb-16 pt-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5 lg:gap-6 w-full">
-                    {railsLoading ? (
-                      Array.from({ length: 12 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="relative w-full aspect-[2/3] rounded-2xl overflow-hidden bg-neutral-900 animate-pulse"
-                        />
-                      ))
-                    ) : (
-                      displayRelated.map((item: any, idx: number) => {
-                        const isFallback = !item.asset && !item.details && !item.id && !item.asset_id && item.image;
-                        const mapped = !isFallback ? mapApiRailItem(item, idx) : null;
-                        const title = isFallback ? item.title : (mapped?.title || resolveTitle(item));
-                        const img = isFallback ? item.image : (mapped?.posterImageRatio4 || mapped?.portraitImage || resolvePortraitImage(item));
-                        const id = isFallback ? "" : (mapped?.id || resolveId(item));
-                        const assetType = isFallback ? "" : (mapped?.assetType || item?.asset?.asset_type || item?.details?.asset_type || item?.asset_type || item?.assetTypeCode);
-
-                        return (
-                          <FocusableRelatedItem
-                            key={id || idx}
-                            item={item}
-                            idx={idx}
-                            id={id}
-                            title={title}
-                            img={img}
-                            assetType={assetType}
-                            isFallback={isFallback}
-                            isStandalone={isStandalone && !onClose}
-                            router={router}
-                            openAssetDetail={openAssetDetail}
-                            assetId={assetId}
-                            upTargetFocusKey="tab-more_like_this"
-                          />
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
               )}
             </div>
           </div>
@@ -2243,7 +2257,7 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
           setFocus(`episode-${prevEp.assetId}`);
           return false;
         } else {
-          retrySetFocus("tab-episodes");
+          setFocus("tab-episodes");
           return false;
         }
       }
@@ -2262,7 +2276,7 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
         }
       }
       if (direction === "left" && seasonsCount > 0) {
-        retrySetFocus(`season-item-${selectedSeasonIndex}`);
+        setFocus(`season-item-${selectedSeasonIndex}`);
         return false;
       }
       return true;
@@ -2285,13 +2299,16 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
     <div
       ref={ref as any}
       onClick={onWatch}
-      className={`group flex flex-col sm:flex-row gap-4 sm:gap-6 p-3 sm:p-4 bg-neutral-900/20 hover:bg-neutral-900/60 border rounded-2xl cursor-pointer transition-all duration-300 ${
-        focused
-          ? "border-white ring-2 ring-white/60 bg-neutral-900/80 scale-[1.01] shadow-2xl"
-          : "border-transparent hover:border-neutral-800/40"
-      }`}
+      className="group flex flex-col sm:flex-row items-center gap-4 sm:gap-6 p-2 sm:p-3 rounded-2xl cursor-pointer transition-colors duration-200"
     >
-      <div className="relative w-full sm:w-[260px] lg:w-[320px] aspect-video rounded-xl overflow-hidden shrink-0 bg-neutral-900">
+      {/* Thumbnail Container: Only this gets the TV focus ring, scale & glow */}
+      <div
+        className={`relative w-full sm:w-[260px] lg:w-[320px] aspect-video rounded-xl overflow-hidden shrink-0 bg-neutral-900 transition-all duration-200 ${
+          focused
+            ? "border-2 border-white ring-4 ring-white shadow-2xl scale-105 z-10"
+            : "border-2 border-transparent group-hover:border-white/30"
+        }`}
+      >
         {epPosterUrl ? (
           <JOJOCommonImage
             src={epPosterUrl}
@@ -2303,15 +2320,28 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
         ) : (
           <div className="w-full h-full bg-neutral-800" />
         )}
-        <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-          <div className="w-12 h-12 rounded-full bg-theme_13_samecolour/90 text-white flex items-center justify-center shadow-lg">
+        <div
+          className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-200 ${
+            focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          }`}
+        >
+          <div
+            className={`w-12 h-12 rounded-full bg-theme_13_samecolour text-white flex items-center justify-center shadow-xl transition-transform duration-200 ${
+              focused ? "scale-110" : ""
+            }`}
+          >
             <Play size={20} fill="currentColor" className="ml-0.5" />
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col flex-1 justify-center">
-        <h4 className={`text-base sm:text-lg lg:text-xl font-bold transition-colors line-clamp-1 mb-1 ${focused ? "text-theme_13_samecolour" : "text-white group-hover:text-theme_13_samecolour"}`}>
+      {/* Episode Details */}
+      <div className="flex flex-col flex-1 justify-center min-w-0">
+        <h4
+          className={`text-base sm:text-lg lg:text-xl font-bold transition-colors line-clamp-1 mb-1 ${
+            focused ? "text-theme_13_samecolour" : "text-white group-hover:text-theme_13_samecolour"
+          }`}
+        >
           {ep.title}
         </h4>
         <div className="text-xs sm:text-sm font-semibold text-neutral-400 mb-2 flex items-center gap-2">
@@ -2363,20 +2393,20 @@ function FocusableCastItem({
     onEnterPress: handleCastClick,
     onArrowPress: (direction) => {
       if (direction === "up") {
-        retrySetFocus("tab-cast");
+        setFocus("tab-cast");
         return false;
       }
       if (direction === "left") {
         if (idx > 0 && castList?.[idx - 1]) {
           const prev = castList[idx - 1];
-          retrySetFocus(`cast-${prev.id ?? idx - 1}`);
+          setFocus(`cast-${prev.id ?? idx - 1}`);
         }
         return false; // Boundary: do not escape left
       }
       if (direction === "right") {
         if (idx < total - 1 && castList?.[idx + 1]) {
           const next = castList[idx + 1];
-          retrySetFocus(`cast-${next.id ?? idx + 1}`);
+          setFocus(`cast-${next.id ?? idx + 1}`);
         }
         return false; // Boundary: do not escape right
       }
@@ -2449,7 +2479,7 @@ function FocusableTrailerItem({ trailer, idx, asset, onWatch }: any) {
     onEnterPress: () => onWatch(trailerId),
     onArrowPress: (direction) => {
       if (direction === "up") {
-        retrySetFocus("tab-trailers");
+        setFocus("tab-trailers");
         return false;
       }
       return true;
@@ -2571,7 +2601,7 @@ function FocusableTabButton({
 }: any) {
   const handleActivate = () => {
     onActivate?.();
-    retrySetFocus(focusKeyPrefix);
+    setFocus(focusKeyPrefix);
   };
   const { ref, focused } = useFocusable({
     focusKey: focusKeyPrefix,
@@ -2610,7 +2640,10 @@ function FocusableTabButton({
     onFocus: () => {
       // Fluid Smart TV navigation: auto-activate tab when remote focuses it
       onActivate?.();
-      ref.current?.closest("#asset-detail-content-sheet")?.scrollTo({ top: 0, behavior: "smooth" });
+      const sheet = ref.current?.closest("#asset-detail-content-sheet");
+      if (sheet && sheet.scrollTop > 5) {
+        sheet.scrollTop = 0;
+      }
     }
   });
 
@@ -2651,21 +2684,21 @@ function FocusableSeasonListItem({ idx, isSelected, label, subtitle, onClick, se
     onArrowPress: (direction) => {
       if (direction === "up") {
         if (idx > 0) {
-          retrySetFocus(`season-item-${idx - 1}`);
+          setFocus(`season-item-${idx - 1}`);
         } else {
-          retrySetFocus("tab-episodes");
+          setFocus("tab-episodes");
         }
         return false;
       }
       if (direction === "down") {
         if (idx < seasonsCount - 1) {
-          retrySetFocus(`season-item-${idx + 1}`);
+          setFocus(`season-item-${idx + 1}`);
         }
         return false;
       }
       if (direction === "right") {
         if (firstEpisodeAssetId) {
-          retrySetFocus(`episode-${firstEpisodeAssetId}`);
+          setFocus(`episode-${firstEpisodeAssetId}`);
         }
         return false;
       }
