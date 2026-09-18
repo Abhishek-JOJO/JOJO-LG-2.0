@@ -5,13 +5,10 @@ import JOJOCommonImage, {
   JOJOImagePreset,
   JOJOImageRadius
 } from "@/components/ui/JOJOCommonImage";
-import { useProfiles } from "@/features/profile/hooks/useProfiles";
-import { useSelectProfile } from "@/features/profile/hooks/useSelectProfile";
-import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
 import { ROUTES } from "@/lib/constants/routes";
 import { cn } from "@/lib/utils";
 import { useProfileStore } from "@/store/useProfileStore";
-import { Check, UserCircle } from "lucide-react";
+import { UserCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -20,7 +17,7 @@ import { ProfileMenuLink } from "../ui/ProfileDropdownList";
 import { LogoutModal } from "./LogoutModal";
 import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 
-// The dropdown mounts ~13 focusables at once (profile list + menu links) the
+// The dropdown mounts several focusables at once (menu links + logout) the
 // moment it opens, via a React portal. norigin's setFocus/addFocusable share a
 // single-slot scheduler ("a new task replaces the pending next task"), so a
 // single setFocus call racing that mount storm can get clobbered and silently
@@ -39,61 +36,6 @@ function retrySetFocus(focusKey: string, attempts = 6, intervalMs = 90) {
     }
   };
   setTimeout(attempt, intervalMs);
-}
-
-function FocusableProfileItem({ profile, isSelected, onSwitch }: any) {
-  const { ref, focused } = useFocusable({
-    focusKey: `profile-item-${profile.profile_id}`,
-    onEnterPress: () => onSwitch(profile),
-  });
-
-  return (
-    <div
-      ref={ref as any}
-      onClick={() => onSwitch(profile)}
-      className={cn(
-        "group flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer w-full text-left body_xs_regular text-theme_5",
-        isSelected ? "" : "hover:bg-theme_11_samecolour",
-        focused ? "bg-theme_11_samecolour border-2 border-white" : "border-2 border-transparent"
-      )}
-    >
-      <div className="flex items-center gap-3.5">
-        {profile?.avatar && (profile.avatar.startsWith("http") || profile.avatar.startsWith("/")) ? (
-          <div className={cn(
-            "w-[30px] h-[30px] p-[2px] rounded-full overflow-hidden shrink-0 bg-[#1a1a1a]",
-            isSelected && "border-theme_13_samecolour"
-          )}>
-            <JOJOCommonImage
-              src={profile?.avatar}
-              alt={profile?.profile_name}
-              preset={JOJOImagePreset.Avatar}
-              radius={JOJOImageRadius.Full}
-              contentMode={JOJOImageContentMode.Cover}
-              wrapperClassName="w-full h-full"
-            />
-          </div>
-        ) : (
-          <div className={cn(
-            "w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-bold text-theme_5 shrink-0 border-2 body_xs_regular",
-            isSelected ? "border-theme_13_samecolour bg-theme_13_samecolour" : "border-theme_13_samecolour bg-theme_13_samecolour"
-          )}>
-            {profile?.profile_name?.charAt(0)?.toUpperCase()}
-          </div>
-        )}
-        <span
-          className={cn(
-            "body_xs_regular transition-all duration-200",
-            isSelected ? "text-theme_13_samecolour" : "text-theme_5 group-hover:text-theme_13_samecolour"
-          )}
-        >
-          {profile?.profile_name}
-        </span>
-      </div>
-      {isSelected && (
-        <Check className="w-4 h-4 text-theme_13_samecolour" />
-      )}
-    </div>
-  );
 }
 
 function FocusableDropdownLogout({ onLogout, t }: any) {
@@ -124,9 +66,6 @@ interface ProfileDropdownProps {
 export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDropdownProps) {
   const pathname = usePathname();
   const selectedProfile = useProfileStore((state) => state.selectedProfile);
-  const { isAppReady } = useBootstrap();
-  const { data: profilesData } = useProfiles(isAppReady);
-  const selectProfileMutation = useSelectProfile();
   const triggerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -181,17 +120,6 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  const allProfiles = profilesData?.profiles || [];
-
-  const handleProfileSwitch = (profile: any) => {
-    if (profile?.profile_id === selectedProfile?.profile_id) {
-      closeDropdown();
-      return;
-    }
-    closeDropdown();
-    selectProfileMutation.mutate(profile);
-  };
-
   const handleDropdownLogout = () => {
     closeDropdown();
     setIsLogoutModalOpen(true);
@@ -220,9 +148,6 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       dropdownRef={dropdownRef}
       dropdownPos={dropdownPos}
       isVisible={isVisible}
-      allProfiles={allProfiles}
-      selectedProfile={selectedProfile}
-      handleProfileSwitch={handleProfileSwitch}
       handleDropdownLogout={handleDropdownLogout}
       t={t}
     />
@@ -300,9 +225,6 @@ function ProfileDropdownMenu({
   dropdownRef,
   dropdownPos,
   isVisible,
-  allProfiles,
-  selectedProfile,
-  handleProfileSwitch,
   handleDropdownLogout,
   t,
 }: any) {
@@ -339,17 +261,6 @@ function ProfileDropdownMenu({
       >
         <div className="absolute right-[18px] -top-1.5 w-3 h-3 rotate-45 z-[1]" />
 
-        {allProfiles?.map((profile: any) => (
-          <FocusableProfileItem
-            key={profile?.profile_id}
-            profile={profile}
-            isSelected={profile?.profile_id === selectedProfile?.profile_id}
-            onSwitch={handleProfileSwitch}
-          />
-        ))}
-
-        {allProfiles?.length > 0 && <div className="h-px bg-theme_7 my-1" />}
-
         <ProfileMenuLink href={ROUTES.MANAGE_PROFILE}>
           {t("manage_profiles")}
         </ProfileMenuLink>
@@ -362,16 +273,8 @@ function ProfileDropdownMenu({
           {t("subscription")}
         </ProfileMenuLink>
 
-        <ProfileMenuLink href={ROUTES.TV_LOGIN}>
-          {t("tv_login")}
-        </ProfileMenuLink>
-
         <ProfileMenuLink href={ROUTES.ACCOUNT_SETTINGS}>
           {t("account_settings")}
-        </ProfileMenuLink>
-
-        <ProfileMenuLink href="https://help.jojoapp.in/" target="_blank">
-          {t("help_and_support")}
         </ProfileMenuLink>
 
         <div className="h-px bg-theme_7 my-1" />

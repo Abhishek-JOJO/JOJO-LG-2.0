@@ -11,10 +11,10 @@ import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 import { ContentRailSection } from "@/components/content-rail/ContentRailSection";
 import { RailCardVariant } from "@/components/content-rail/config/contentRail.types";
-import { mapApiRail } from "@/components/content-rail/utils/contentRail.mapper";
+import { getPortraitImage, getPosterImage, mapApiRail } from "@/components/content-rail/utils/contentRail.mapper";
 import { NoResults } from "@/components/search/NoResults";
 import { SearchPagination } from "@/components/search/SearchPagination";
-import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
+import JOJOCommonImage, { JOJOImageContentMode, JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { JOJOCustomInput, JOJOInputSize, JOJOInputState } from "@/components/ui/JOJOInput";
 import { JOJOSkeleton } from "@/components/ui/JOJOSkeleton";
 import { slugify, useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
@@ -35,22 +35,34 @@ import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
 import { useBrowseHiddenStore } from "@/store/useBrowseHiddenStore";
 
 // ─── shared grid ──────────────────────────────────────────────────────────────
+// Fixed at 5 columns from md up (never more) so every poster keeps a large,
+// consistent 2:3 size — was previously stretching up to 10 columns and
+// shrinking cards down before that.
 const POSTER_GRID =
-  "grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2.5";
+  "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-5";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
+// Prefers a genuinely portrait-ratio image (ratio_id aware, same helpers
+// mapApiRailItem uses for every other portrait card in the app) before ever
+// falling back to a landscape thumbnail — picking is_default/[0] without
+// checking ratio_id could grab a landscape-shaped entry and force-crop it
+// into this 2:3 card, cutting off title art and faces.
 function resolveImage(asset: any): string {
-  const pick = (arr: any[]) => {
-    if (!Array.isArray(arr) || !arr.length) return "";
-    return (arr.find((x: any) => x.is_default) || arr[0])?.url || "";
-  };
+  if (!asset) return "";
+  const portraitArr = Array.isArray(asset?.portrait) ? asset.portrait : undefined;
+  const posterArr = Array.isArray(asset?.poster) ? asset.poster : undefined;
+  const landscapeArr = Array.isArray(asset?.landscape) ? asset.landscape : undefined;
+
   return (
-    pick(asset?.portrait) ||
-    pick(asset?.poster) ||
-    pick(asset?.landscape) ||
-    asset?.image ||
-    asset?.thumbnail ||
+    getPortraitImage(portraitArr) ||
+    posterArr?.find((img: any) => Number(img?.ratio_id) === 4)?.url ||
+    getPosterImage(posterArr) ||
+    portraitArr?.[0]?.url ||
+    posterArr?.[0]?.url ||
+    landscapeArr?.[0]?.url ||
+    (typeof asset?.image === "string" ? asset.image : undefined) ||
+    (typeof asset?.thumbnail === "string" ? asset.thumbnail : undefined) ||
     ""
   );
 }
@@ -96,16 +108,46 @@ function PosterCard({ item, onClick }: { item: any; onClick: () => void }) {
       ref={ref as any}
       data-focuskey={focusKey}
       onClick={onClick}
-      className={`aspect-[2/3] relative rounded-lg overflow-hidden cursor-pointer group transition-transform duration-200 hover:scale-105 ${focused ? "scale-105 z-10" : ""}`}
+      className={`aspect-[2/3] relative rounded-lg overflow-hidden bg-neutral-900 cursor-pointer group transition-transform duration-200 hover:scale-105 ${focused ? "scale-105 z-10" : ""}`}
     >
       {img ? (
-        <JOJOCommonImage
-          src={img}
-          alt={title}
-          fill
-          preset={JOJOImagePreset.Product}
-          wrapperClassName="w-full h-full"
-        />
+        <>
+          {/* Blurred `cover` backdrop fills the whole frame so the contain-mode
+              artwork on top never sits against flat empty letterbox bars —
+              many of these items only have landscape-shaped art, and cover-
+              cropping that straight into this 2:3 card cuts off titles/faces.
+              Positioning lives on this outer plain div, NOT wrapperClassName —
+              JOJOCommonImage's own wrapper always includes a hardcoded
+              "relative" class that beats an "absolute" passed via
+              wrapperClassName in Tailwind's generated stylesheet order, so
+              the image silently stayed in normal document flow instead of
+              overlaying, pushing the second (sharp) layer below the fold and
+              out of view under this card's overflow-hidden. */}
+          <div className="absolute inset-0 w-full h-full scale-110 blur-xl opacity-70">
+            <JOJOCommonImage
+              src={img}
+              alt=""
+              fill
+              contentMode={JOJOImageContentMode.Cover}
+              optimizeRequestURL={false}
+              wrapperClassName="w-full h-full"
+            />
+          </div>
+          {/* Full, uncropped artwork on top — never cut, whatever its ratio.
+              optimizeRequestURL disabled here too: the CDN's resize endpoint
+              doesn't support a "contain" fit param, so that request 404s and
+              only the blurred backdrop layer (raw URL) was ever showing. */}
+          <div className="absolute inset-0 w-full h-full">
+            <JOJOCommonImage
+              src={img}
+              alt={title}
+              fill
+              contentMode={JOJOImageContentMode.Contain}
+              optimizeRequestURL={false}
+              wrapperClassName="w-full h-full"
+            />
+          </div>
+        </>
       ) : (
         <div className="w-full h-full bg-theme_1/8 flex items-center justify-center p-2 text-center caption-xs-regular text-theme_5">
           {title}
