@@ -33,6 +33,20 @@ export function preloadImageUrl(
 
   try {
     const img = new Image();
+    // Confirmed live via CDP network trace: this preloading was competing
+    // directly with the asset-detail API call for the TV's limited
+    // concurrent-connection pool — opening a card while dozens of these
+    // preloads were still in flight measured the API response itself
+    // taking ~3.6s (vs. a normal fast JSON response), matching the
+    // reported "2-3 second delay before real content shows." fetchPriority
+    // is a browser-level hint (silently ignored where unsupported, so safe
+    // regardless of this TV's exact Chromium version) that lets the
+    // network scheduler correctly favor small, critical requests like that
+    // API call over these speculative background image fetches, instead of
+    // treating everything as equally urgent.
+    if ('fetchPriority' in img) {
+      (img as HTMLImageElement & { fetchPriority: string }).fetchPriority = 'low';
+    }
     activePreloadMap.set(resolvedUrl, img);
     img.src = resolvedUrl;
     // Pre-decode the bitmap so the browser can composite it instantly

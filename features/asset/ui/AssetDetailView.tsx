@@ -19,9 +19,6 @@ import {
   ChevronRight,
   Play,
   Plus,
-  ThumbsUp,
-  Volume2,
-  VolumeX,
   X,
 } from "lucide-react";
 import { socketClient } from "@/lib/socket/socket.client";
@@ -325,7 +322,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [interactionData, setInteractionData] = useState<any>(null);
 
-  // Sync isLiked state (defaults to false when interactions API is removed)
+  // Fetches resume-progress data (progress/isCompleted) for the Resume button.
   useEffect(() => {
     if (!assetId || !sessionId || !isAppReady) return;
 
@@ -375,19 +372,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       socketClient.off('res', handleInteractionResponse);
     };
   }, [assetId, sessionId, isAppReady]);
-
-  // Sync isLiked state with interactionData when received
-  useEffect(() => {
-    if (interactionData) {
-      const liked = interactionData.reaction === 'like' ||
-        interactionData.reaction === 1 ||
-        interactionData.is_liked ||
-        interactionData.isLiked;
-      if (liked !== undefined) {
-        setIsLiked(!!liked);
-      }
-    }
-  }, [interactionData]);
 
   const previewsList = useMemo(() => {
     const list: Array<{
@@ -681,7 +665,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const inWatchlist = watchlistAssets.some(
     (a) => Number(a.asset_id ?? a.assetId) === Number(asset?.assetId ?? assetId)
   );
-  const [isLiked, setIsLiked] = useState(false);
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string | null>(null);
   const lastFocusedCastKeyRef = useRef<string | null>(null);
   const [lastFocusedCastKey, setLastFocusedCastKey] = useState<string | null>(null);
@@ -697,9 +680,8 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const [shouldPassSrcNatively, setShouldPassSrcNatively] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Mute State & Controls
+  // Mute State (hero preview video only — the mute/unmute button was removed)
   const isMuted = usePlayerStore((s) => s.isMuted);
-  const toggleMuted = usePlayerStore((s) => s.toggleMuted);
 
   // State to track the progress percentage (0 to 100) of the current active slide
   const [slideProgress, setSlideProgress] = useState(0);
@@ -1048,6 +1030,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     focusKey: `asset-watchlist-${assetId}`,
     onArrowPress: (direction) => {
       if (direction === 'up') { navigateUpFromActions(); return false; }
+      // Was the middle button of four (Watch Now, Watchlist, Like, Mute),
+      // relying on norigin's default nearest-neighbor search to reach Like
+      // on the right — now that Like/Mute are gone, it's the last button in
+      // the row, so this needs the same explicit "nothing further right"
+      // boundary the old Mute button had.
+      if (direction === 'right') return false;
       if (direction === 'down') {
         navigateDownFromActions();
         return false;
@@ -1077,59 +1065,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     }
   });
 
-  const { ref: likeRef, focused: likeFocused } = useFocusable({
-    focusKey: `asset-like-${assetId}`,
-    onArrowPress: (direction) => {
-      if (direction === 'up') { navigateUpFromActions(); return false; }
-      if (direction === 'down') {
-        navigateDownFromActions();
-        return false;
-      }
-      return true;
-    },
-    onEnterPress: () => {
-      if (isGuest) {
-        useGuestPopupStore.getState().openGuestPopup();
-        return;
-      }
-      const nextLiked = !isLiked;
-      setIsLiked(nextLiked);
-      analyticsService.track(nextLiked ? EVENT_NAMES.CONTENT_LIKED : EVENT_NAMES.CONTENT_DISLIKED, {
-        asset_id: String(asset?.assetId ?? assetId),
-        asset_title: asset?.title ?? '',
-        content_type: asset?.assetType === 'SHOW' ? 'show' : 'movie',
-      });
-    },
-    onFocus: () => {
-      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  });
-
-  const { ref: muteRef, focused: muteFocused } = useFocusable({
-    focusKey: `asset-mute-${assetId}`,
-    onArrowPress: (direction) => {
-      if (direction === 'up') { navigateUpFromActions(); return false; }
-      if (direction === 'right') return false;
-      if (direction === 'down') {
-        navigateDownFromActions();
-        return false;
-      }
-      return true;
-    },
-    onEnterPress: () => {
-      toggleMuted();
-      analyticsService.track(EVENT_NAMES.PLAYER_MUTE_TOGGLED, {
-        asset_id: String(asset?.assetId ?? assetId),
-        asset_title: asset?.title ?? '',
-        is_muted: !isMuted,
-        source: 'content_detail_card',
-      });
-    },
-    onFocus: () => {
-      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  });
-
   // 1. Initial Focus Trigger: Set focus to primary Watch Now button as soon as skeleton finishes loading
   useEffect(() => {
     if (!showSkeleton && asset && !isAuthLoading && !isDataLoading) {
@@ -1150,9 +1085,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
       const isAnyActionFocused =
         watchNowFocused ||
-        watchlistFocused ||
-        likeFocused ||
-        muteFocused;
+        watchlistFocused;
 
       if (!isAnyActionFocused) {
         const container = document.getElementById("asset-detail-container");
@@ -1192,8 +1125,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     asset,
     watchNowFocused,
     watchlistFocused,
-    likeFocused,
-    muteFocused,
     videoStarted,
     videoReady
   ]);
@@ -1770,13 +1701,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
           <div className="flex items-center gap-3 sm:gap-4">
             {isAuthLoading ? (
-              <>
-                <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
-                <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
-                {activePreview?.videoUrl && videoStarted && videoReady && !videoError && (
-                  <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
-                )}
-              </>
+              <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
             ) : (
               <>
                 {/* Add to list */}
@@ -1806,47 +1731,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
               {inWatchlist ? <Check size={20} className="text-theme_13_samecolour" /> : <Plus size={20} />}
             </button>
 
-            {/* Like */}
-            <button
-              ref={likeRef as any}
-              onClick={() => {
-                if (isGuest) {
-                  useGuestPopupStore.getState().openGuestPopup();
-                  return;
-                }
-                const nextLiked = !isLiked;
-                setIsLiked(nextLiked);
-                analyticsService.track(nextLiked ? EVENT_NAMES.CONTENT_LIKED : EVENT_NAMES.CONTENT_DISLIKED, {
-                  asset_id: String(asset?.assetId ?? assetId),
-                  asset_title: asset?.title ?? '',
-                  content_type: asset?.assetType === 'SHOW' ? 'show' : 'movie',
-                });
-              }}
-              className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all cursor-pointer shrink-0 ${likeFocused ? "bg-white text-black border-white scale-110 shadow-lg ring-4 ring-white/40 z-50" : "bg-white/10 text-white/80 border-white/15 hover:bg-white/20 hover:text-white"}`}
-              title={t("like")}
-            >
-              <ThumbsUp size={20} fill={isLiked ? "currentColor" : "none"} />
-            </button>
-
-            {/* Mute/Unmute */}
-            {activePreview?.videoUrl && videoStarted && videoReady && !videoError && (
-              <button
-                ref={muteRef as any}
-                onClick={() => {
-                  toggleMuted();
-                  analyticsService.track(EVENT_NAMES.PLAYER_MUTE_TOGGLED, {
-                    asset_id: String(asset?.assetId ?? assetId),
-                    asset_title: asset?.title ?? '',
-                    is_muted: !isMuted,
-                    source: 'content_detail_card',
-                  });
-                }}
-                className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all cursor-pointer shrink-0 ${muteFocused ? "bg-white text-black border-white scale-110 shadow-lg ring-4 ring-white/40 z-50" : "bg-white/10 text-white/80 border-white/15 hover:bg-white/20 hover:text-white"}`}
-                title={isMuted ? t("unmute") : t("mute")}
-              >
-                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-              </button>
-            )}
               </>
             )}
           </div>
