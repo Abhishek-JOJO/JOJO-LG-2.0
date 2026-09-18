@@ -74,12 +74,19 @@ export const deepLinkManager = {
    * `useDeepLinkHandler`'s "Flow A: TV/QR Pairing Link" already parses
    * (`payload.qr_code`) — scanning this on a phone hands the code straight
    * to that existing pairing flow.
+   *
+   * Always points at the real public domain, NOT the TV's own current
+   * origin (unlike generateEncryptedShareUrl above, which intentionally
+   * preserves origin for its own UTM tracking). This QR is scanned by an
+   * external phone camera — on a dev machine `window.location.origin` is
+   * `localhost`, which no phone can ever reach, and even in production the
+   * TV app's own serving origin isn't guaranteed to be the public site.
    */
-  async generatePairingQrUrl(code: string, origin: string): Promise<string> {
+  async generatePairingQrUrl(code: string): Promise<string> {
     const payload: DeepLinkPayload = { path: "", type: "", qr_code: code };
     try {
       const encryptedHex = await encrypt(JSON.stringify(payload), true);
-      return `${origin}/?data=${encryptedHex}`;
+      return `https://jojoapp.in/?data=${encryptedHex}`;
     } catch (error) {
       return "";
     }

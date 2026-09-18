@@ -12,57 +12,78 @@ export interface PairApiResponse {
     };
 }
 
-const PAIRING_CODE_CHARSET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L — avoid visual ambiguity on a TV screen
-const PAIRING_CODE_LENGTH = 6;
-
-/**
- * Generates a random pairing code for the TV to display as a QR code / unique
- * code. Purely client-side — the code only becomes meaningful once a mobile
- * device calls `pairDevice(code, sessionId)` against it.
- */
-export function generatePairingCode(): string {
-  let code = "";
-  for (let i = 0; i < PAIRING_CODE_LENGTH; i++) {
-    code += PAIRING_CODE_CHARSET[Math.floor(Math.random() * PAIRING_CODE_CHARSET.length)];
-  }
-  return code;
+export interface GenerateQrResult {
+  code: string;
+  qrUrl?: string;
 }
 
-export interface PairStatusResult {
-  paired: boolean;
+/**
+ * Requests an official pairing code from the backend for the "Use Phone" QR
+ * login flow on the login page. This is a *different* flow from
+ * pairDevice()/PAIR below (which links a second device to an already
+ * logged-in account, from /account-settings) — this one is how an
+ * unauthenticated TV signs in at all.
+ *
+ * Replaces the old client-only random code generator: a code the backend has
+ * never heard of can never be claimed by anything, which is why "Use Phone"
+ * silently never completed — see USE_PHONE_FEATURE.md for the confirmed
+ * contract this now matches.
+ */
+export async function generateQrCode(signal?: AbortSignal): Promise<GenerateQrResult | null> {
+  try {
+    const response = await apiClient.get<PairApiResponse>(ApiEndpoint.GENERATE_QR, { signal });
+    const payload = (response?.data as any)?.data ?? response?.data ?? {};
+    if (!payload?.code) return null;
+    return { code: String(payload.code), qrUrl: payload.qr_url ?? payload.qrUrl };
+  } catch {
+    return null;
+  }
+}
+
+export interface VerifyQrResult {
+  verified: boolean;
   sessionId?: string;
   userId?: string;
+  token?: string;
   phone?: string;
 }
 
 /**
- * Polls whether a TV-displayed pairing `code` has been claimed by a mobile
- * device yet.
- *
- * TODO(backend): `ApiEndpoint.PAIR_STATUS` and this response shape are a
- * best guess pending backend confirmation — adjust once the real contract
- * is known. Designed to fail closed (treated as "not yet paired") on any
- * error so an unconfirmed/missing endpoint doesn't break the QR/code display.
+ * Verifies a QR login `code` against the backend. Called from two places
+ * against the *same* endpoint, which is what actually lets them meet:
+ *  - the phone, once it opens the scanned deep link, with its own session
+ *    attached (see useDeepLinkHandler.ts) — this is what "claims" the code.
+ *  - the TV (QrPairingPanel.tsx), polling with no session attached, to
+ *    discover once the phone has claimed it.
+ * Fails closed (`verified: false`) on any error, including a not-yet-claimed
+ * code — that's the expected/common case while the TV is still polling, not
+ * a real failure.
  */
-export async function checkPairStatus(code: string, signal?: AbortSignal): Promise<PairStatusResult> {
+export async function verifyQrCode(code: string, sessionId?: string, signal?: AbortSignal): Promise<VerifyQrResult> {
   try {
-    const response = await apiClient.get<PairApiResponse>(
-      `${ApiEndpoint.PAIR_STATUS}?code=${encodeURIComponent(code)}`,
-      { signal }
+    const response = await apiClient.post<PairApiResponse>(
+      ApiEndpoint.VERIFY_QR,
+      { code },
+      {
+        encrypt: true,
+        signal,
+        headers: sessionId ? { [HEADERS.SESSION_ID]: sessionId } : undefined,
+      }
     );
 
     const payload = (response?.data as any)?.data ?? response?.data ?? {};
-    const sessionId = payload?.session_id ?? payload?.sessionId;
+    const resultSessionId = payload?.session_id ?? payload?.sessionId;
     const userId = payload?.user_id ?? payload?.userId;
 
     return {
-      paired: Boolean(payload?.paired ?? (sessionId && userId)),
-      sessionId,
+      verified: Boolean(resultSessionId && userId),
+      sessionId: resultSessionId,
       userId,
+      token: payload?.token,
       phone: payload?.phone,
     };
   } catch {
-    return { paired: false };
+    return { verified: false };
   }
 }
 

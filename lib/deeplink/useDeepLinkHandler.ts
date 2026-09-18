@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@store/useAuthStore";
 import { useProfileStore } from "@store/useProfileStore";
-import { pairDevice } from "@/lib/api/pair";
+import { verifyQrCode } from "@/lib/api/pair";
 import { deepLinkManager, DeepLinkPayload, AdAttribution } from "./deepLinkManager";
 import { AttributionManager } from "./attributionManager";
 import { logger } from "@lib/logger/logger";
@@ -198,18 +198,25 @@ export function useDeepLinkHandler(isAppReady: boolean) {
 
       try {
         logger.info("[DeepLink] Process pending QR Code pairing", { qrCode });
-        const res = await pairDevice(qrCode, sessionId ?? undefined);
-        const d = res.data?.data;
-        if (d?.session_id && d?.user_id) {
+        // verifyQrCode, not pairDevice — this "claim" call and the TV's own
+        // poll (QrPairingPanel.tsx) must hit the same endpoint with the same
+        // code for them to ever actually meet. pairDevice() posts to a
+        // different endpoint (/pair) used by the unrelated "link a device to
+        // an already-signed-in account" flow on /account-settings — calling
+        // it here meant the phone claimed the code on one endpoint while the
+        // TV polled a different one, so pairing could never complete even
+        // once the TV's polling endpoint itself was fixed.
+        const result = await verifyQrCode(qrCode, sessionId ?? undefined);
+        if (result.verified && result.sessionId && result.userId) {
           setAuth(
             {
-              id: d.user_id,
-              phone: d.phone || "",
+              id: result.userId,
+              phone: result.phone || "",
               isGuest: false,
               createdAt: new Date().toISOString(),
             },
-            d.session_id,
-            ""
+            result.sessionId,
+            result.token || ""
           );
           sessionStorage.setItem("qr_code_processed", "1");
           logger.info("[DeepLink] TV Pairing successful. Redirecting to profile selection.");

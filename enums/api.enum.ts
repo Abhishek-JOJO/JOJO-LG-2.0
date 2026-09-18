@@ -48,11 +48,17 @@ export enum ApiEndpoint {
   GET_INVOICE = "/subscription/list-invoice",
   DOWNLOAD_INVOICE = "/subscription/download-invoice",
 
-  // Pairing
+  // Pairing — manual code entry on /account-settings' "TV Login" tab (an
+  // already-authenticated user linking a second device to their account).
   PAIR = "/pair",
-  // TODO(backend): confirm this path/response shape with backend — used to poll
-  // whether a TV-displayed pairing code has been claimed by a mobile device yet.
-  PAIR_STATUS = "/pair-status",
+
+  // QR Login ("Use Phone" on the login page) — a *different*, unauthenticated
+  // flow: the TV requests an official code from the backend, and both the
+  // phone (claiming it, with its own session) and the TV (polling for it)
+  // verify against the same code via the same endpoint. Confirmed contract —
+  // see USE_PHONE_FEATURE.md.
+  GENERATE_QR = "/generate-qr",
+  VERIFY_QR = "/verify-qr",
 
   //verify subscription 
   VERIFY_SUBSCRIPTION = "/subscription/verify-subscription",

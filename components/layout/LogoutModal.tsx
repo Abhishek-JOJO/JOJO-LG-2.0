@@ -139,10 +139,17 @@ function LogoutModalButtons({
         data-focuskey="logout-modal-cancel-btn"
         onClick={onCancel}
         disabled={isLoggingOut}
+        // Same resting/focused pair as ExitConfirmModal's two buttons — one
+        // neutral resting color, one "this is focused" color (theme orange),
+        // so focus is always unambiguous. This used to rest at solid
+        // bg-theme_13_samecolour (orange) by default, the same color Logout
+        // turns red *away* from on focus — with Logout unfocused (neutral)
+        // and Cancel always orange, it read backwards: the un-highlighted
+        // button looked like the active one.
         className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${
           cancelFocused
-            ? "bg-white text-black scale-105 shadow-xl ring-4 ring-white z-50"
-            : "bg-theme_13_samecolour text-white hover:opacity-90"
+            ? "bg-theme_13_samecolour text-white scale-105 shadow-xl ring-4 ring-white z-50"
+            : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
         }`}
       >
         {t("cancel")}

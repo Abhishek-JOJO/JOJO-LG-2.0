@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
-import { checkPairStatus, generatePairingCode } from "@/lib/api/pair";
+import { generateQrCode, verifyQrCode } from "@/lib/api/pair";
 import { deepLinkManager } from "@/lib/deeplink/deepLinkManager";
 import { ROUTES } from "@/lib/constants/routes";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -24,17 +24,32 @@ export function QrPairingPanel() {
   const [code, setCode] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
+  const [genError, setGenError] = useState(false);
   const generationRef = useRef(0);
 
   const generateCode = async () => {
     const myGeneration = ++generationRef.current;
-    const nextCode = generatePairingCode();
     setExpired(false);
-    setCode(nextCode);
+    setGenError(false);
+    setCode(null);
     setQrDataUrl(null);
 
-    if (typeof window === "undefined") return;
-    const qrUrl = await deepLinkManager.generatePairingQrUrl(nextCode, window.location.origin);
+    // Code must come from the backend, not be invented client-side — a code
+    // the backend has never heard of can never be claimed by a phone, which
+    // is why this silently never completed before (see generateQrCode's own
+    // comment + USE_PHONE_FEATURE.md for the confirmed contract).
+    const result = await generateQrCode();
+    if (generationRef.current !== myGeneration) return;
+    if (!result?.code) {
+      logger.error("[QrPairingPanel] Failed to get a pairing code from the backend");
+      setGenError(true);
+      return;
+    }
+    setCode(result.code);
+
+    // Always the real public domain (https://jojoapp.in), never the TV's own
+    // current origin — see generatePairingQrUrl's own comment.
+    const qrUrl = await deepLinkManager.generatePairingQrUrl(result.code);
     if (!qrUrl) return;
     if (generationRef.current !== myGeneration) return;
 
@@ -65,10 +80,10 @@ export function QrPairingPanel() {
         return;
       }
 
-      const result = await checkPairStatus(code, controller.signal);
+      const result = await verifyQrCode(code, undefined, controller.signal);
       if (cancelled) return;
 
-      if (result.paired && result.sessionId && result.userId) {
+      if (result.verified && result.sessionId && result.userId) {
         setAuth(
           {
             id: result.userId,
@@ -77,7 +92,7 @@ export function QrPairingPanel() {
             createdAt: new Date().toISOString(),
           },
           result.sessionId,
-          ""
+          result.token || ""
         );
         logger.info("[QrPairingPanel] TV pairing successful via polling");
         router.replace(ROUTES.WATCHING);
@@ -104,11 +119,18 @@ export function QrPairingPanel() {
           Scan the QR Code using your phone or tablet’s camera
         </h2>
         <div className="relative flex h-[280px] w-[280px] sm:h-[300px] sm:w-[300px] items-center justify-center rounded-[32px] bg-white p-5 shadow-2xl border border-white/20">
-          {qrDataUrl && !expired ? (
+          {qrDataUrl && !expired && !genError ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={qrDataUrl} alt="Pairing QR Code" className="h-full w-full object-contain rounded-2xl" />
           ) : expired ? (
             <FocusableRefreshButton onClick={generateCode} label={t("qr_get_new_code") || "Get New Code"} />
+          ) : genError ? (
+            <div className="flex flex-col items-center gap-3 px-4 text-center">
+              <span className="text-sm font-medium text-red-400">
+                {t("qr_generation_failed") || "Couldn't generate a code. Please try again."}
+              </span>
+              <FocusableRefreshButton onClick={generateCode} label={t("qr_get_new_code") || "Get New Code"} />
+            </div>
           ) : (
             <span className="text-base font-medium text-neutral-400">{t("qr_generating_code") || "Generating code..."}</span>
           )}
