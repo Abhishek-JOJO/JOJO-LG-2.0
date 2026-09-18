@@ -1,13 +1,47 @@
 "use client";
 
 /**
- * Captured once, the moment this module first evaluates. On webOS the packaged app is
- * always launched fresh at its root index.html (the "main" entry declared in
- * appinfo.json) — the OS doesn't deep-link into arbitrary routes — so this is a
- * reliable anchor for resolving other routes later, regardless of how deep the page
- * the user is currently on happens to be.
+ * The app root href, remembered across every subsequent hard navigation.
+ *
+ * This used to be a module-level `const` captured "once, when the module
+ * first evaluates" — but every file:// navigation this function performs is
+ * itself a *hard* `location.href` reload (there's no client-side router
+ * under file://), which tears down the whole document and re-executes every
+ * script fresh, including this module. So "once" didn't mean "once per app
+ * session" as intended — it meant "once per page", recapturing whatever
+ * page happened to be current as the new "root" on every single navigation.
+ * Two hops in (e.g. Home → a show's detail page → Next Episode from inside
+ * the player, which lives three path segments deep at
+ * /shows/<slug>/<id>/), that "root" was actually something like
+ * /watch/index.html?v=<current-episode> — resolving the next episode's
+ * relative path against THAT produced a doubly-nested, nonexistent path
+ * (".../watch/watch/index.html?v=<next-id>"), which is exactly what handed
+ * control to webOS's native "UNABLE TO LOAD" error screen.
+ *
+ * sessionStorage survives a hard reload (unlike a JS module's own state), so
+ * writing the root there the first time it's genuinely known — the true
+ * launch page webOS always starts the packaged app at, per appinfo.json's
+ * "main": "index.html" — and reading it back on every later call keeps this
+ * correct no matter how many hops deep the user has since navigated.
  */
-const APP_ROOT_HREF = typeof window !== "undefined" ? window.location.href : "";
+const APP_ROOT_HREF_KEY = "__jojo_app_root_href__";
+
+function getAppRootHref(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const stored = sessionStorage.getItem(APP_ROOT_HREF_KEY);
+    if (stored) return stored;
+  } catch {
+    // sessionStorage unavailable — fall through to capturing the current href
+  }
+  const current = window.location.href;
+  try {
+    sessionStorage.setItem(APP_ROOT_HREF_KEY, current);
+  } catch {
+    // ignore — worst case this falls back to the old per-page behavior
+  }
+  return current;
+}
 
 /**
  * Navigates to an absolute app route (e.g. "/genre?genre=comedy") safely under both
@@ -23,11 +57,19 @@ const APP_ROOT_HREF = typeof window !== "undefined" ? window.location.href : "";
  * the known-good app root captured above and does a plain, correctly-targeted
  * navigation instead of going through router.push().
  */
-export function safeNavigate(router: { push: (href: string) => void }, path: string): void {
+export function safeNavigate(
+  router: { push: (href: string) => void; replace?: (href: string) => void },
+  path: string,
+  options?: { replace?: boolean }
+): void {
   if (typeof window === "undefined") return;
 
   if (window.location.protocol !== "file:") {
-    router.push(path);
+    if (options?.replace && router.replace) {
+      router.replace(path);
+    } else {
+      router.push(path);
+    }
     return;
   }
 
@@ -40,6 +82,21 @@ export function safeNavigate(router: { push: (href: string) => void }, path: str
   const relativeFile = cleanRoute ? `${cleanRoute}/index.html` : "index.html";
   const relative = queryPart ? `${relativeFile}?${queryPart}` : relativeFile;
 
-  const target = new URL(relative, APP_ROOT_HREF).href;
-  window.location.href = target;
+  const target = new URL(relative, getAppRootHref()).href;
+
+  // This used to always be `location.href = target` under the assumption
+  // that push-vs-replace "doesn't apply" to a hard file:// reload — that
+  // was wrong. A hard reload still participates in normal browser session
+  // history exactly like it would under http://: `location.href = x` PUSHES
+  // a new entry, `location.replace(x)` swaps the current one out without
+  // adding one. Every "Next Episode" hop was a push, so watching episode
+  // 1 → 2 → 3 → 4 quietly built up four stacked history entries — Back then
+  // walked backwards through them (4 → 3 → 2 → 1) instead of leaving
+  // straight to the show's asset-detail page like it does after watching
+  // just one episode. `options.replace` now actually replaces here too.
+  if (options?.replace) {
+    window.location.replace(target);
+  } else {
+    window.location.href = target;
+  }
 }

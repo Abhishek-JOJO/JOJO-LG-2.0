@@ -40,6 +40,7 @@ export const useRemoteManager = () => {
       // Map webOS specific keys to actions
       switch (e.keyCode) {
         case WEBOS_KEYS.BACK:
+          const currentPathForBack = typeof window !== 'undefined' ? normalizePathname(window.location.pathname) : '';
           // A full-screen overlay (search, asset detail, the exit-confirm popup
           // itself) owns the Back key while it's open — its own listener closes
           // it. Registered later than this one, so without this check we'd
@@ -55,11 +56,27 @@ export const useRemoteManager = () => {
           if (contentSheet && contentSheet.getAttribute("data-overlay-open") === "true") {
             return;
           }
+          // The video player owns the Back key while it's mounted, same reason
+          // as the overlays above — it has its own multi-stage behavior (hide
+          // controls first, close an open submenu, THEN leave) and computes
+          // exactly where "leave" should go (reopening the show's asset-detail
+          // modal). This handler doesn't stopPropagation and stopImmediatePropagation
+          // is never called anywhere, so both listeners always fire for the
+          // same keypress regardless of which registered first — this bare
+          // `window.history.back()` was winning the race almost every time
+          // (it's registered at the app root, so it mounts, and therefore
+          // fires, before the player's own listener even attaches), landing
+          // wherever raw browser history happened to point — usually home —
+          // before the player's own intended navigation ever got a chance to
+          // run.
+          const isWatchPage = currentPathForBack === '/watch' || currentPathForBack.startsWith('/watch/');
+          if (isWatchPage) {
+            return;
+          }
           e.preventDefault();
           // If we're on the root page, ask for confirmation before minimizing the
           // app (platform convention) — otherwise go back in history.
-          const currentPath = normalizePathname(window.location.pathname);
-          if (currentPath === '/' || currentPath === '/landing' || currentPath === '/login') {
+          if (currentPathForBack === '/' || currentPathForBack === '/landing' || currentPathForBack === '/login') {
             useExitConfirmStore.getState().open();
           } else {
             window.history.back();

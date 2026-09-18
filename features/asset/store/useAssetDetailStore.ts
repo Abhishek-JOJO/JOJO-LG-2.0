@@ -30,6 +30,51 @@ export function getAssetTypeSlug(type: string | number | undefined): string {
   return "movies";
 }
 
+// A page that wants the asset-detail modal open again after a hard reload
+// (e.g. leaving the player) can't just navigate straight to a "/<type>/<slug>/<id>"
+// URL like openAssetDetail's own modal does internally — that URL has no
+// static file behind it in `output: "export"` (only the SSG placeholder
+// route exists), so a real `location.href` navigation there fails and hands
+// control to webOS's native "UNABLE TO LOAD" screen. openAssetDetail works
+// around this by only ever pushing shallow history state, never actually
+// changing the document's URL — but that only works from within the SAME
+// document; it can't reopen anything after a hard reload to a different one.
+// These two functions are the cross-reload equivalent: stash which asset to
+// reopen in sessionStorage (survives the reload) before navigating to a
+// route that's guaranteed to exist as a real static file (e.g. home), then
+// consume it once on that page's first mount and call openAssetDetail for
+// real, same as if the user had clicked the card themselves.
+const PENDING_OPEN_KEY = "jojo_pending_asset_detail";
+
+export function schedulePendingAssetDetailOpen(
+  id: string,
+  contentType: string | number,
+  title: string
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(PENDING_OPEN_KEY, JSON.stringify({ id, contentType, title }));
+  } catch {
+    // ignore — worst case the modal just doesn't reopen
+  }
+}
+
+export function consumePendingAssetDetailOpen(): {
+  id: string;
+  contentType: string | number;
+  title: string;
+} | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(PENDING_OPEN_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(PENDING_OPEN_KEY);
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 interface AssetDetailState {
   activeAssetId: string | null;
   activeContentType: string | null;

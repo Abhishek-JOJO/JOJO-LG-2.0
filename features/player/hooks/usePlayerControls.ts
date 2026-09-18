@@ -301,9 +301,19 @@ export function usePlayerControls({
 
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      
+
+      // Back/Escape is deliberately excluded from "activity" here — it's a
+      // two-stage key (first press hides controls, second press navigates
+      // away) owned entirely by OTTPlayer's own dedicated back-key handler,
+      // which decides what to do based on whether controls are CURRENTLY
+      // visible. This unconditional onActivity (which re-shows them) was
+      // racing that check on every single Back press, so the second press
+      // always found controls "still visible" and just re-hid them instead
+      // of ever reaching the actual navigation.
+      const isBackOrEscape = e.keyCode === 461 || e.key === 'Escape';
+
       // Always register activity to keep controls visible while navigating
-      onActivityRef.current();
+      if (!isBackOrEscape) onActivityRef.current();
 
       if (
         target.tagName === 'INPUT' ||
@@ -357,8 +367,9 @@ export function usePlayerControls({
 
       switch (e.key) {
         case 'Escape':
-          // Esc key on desktop
-          onActivityRef.current();
+          // Esc/Back is handled entirely by OTTPlayer's own back-key
+          // listener — see the isBackOrEscape exclusion above for why this
+          // must NOT also call onActivity.
           break;
         case ' ':
         case 'k':

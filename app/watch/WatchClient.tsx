@@ -16,7 +16,7 @@ import { Loader } from "@components/common/Loader";
 import { useToastStore } from "@store/useToastStore";
 import { ROUTES } from "@/lib/constants/routes";
 import { useBootstrap } from "@lib/bootstrap/BootstrapContext";
-import { useAssetDetailStore, getAssetTypeSlug, slugify } from "@/features/asset/store/useAssetDetailStore";
+import { useAssetDetailStore, getAssetTypeSlug, slugify, schedulePendingAssetDetailOpen } from "@/features/asset/store/useAssetDetailStore";
 import { logger } from "@/lib/logger/logger";
 import { useWatchPageGating } from "@/features/asset/hooks/useWatchPageGating";
 import { safeNavigate } from "@/lib/webos/safeNavigate";
@@ -49,45 +49,55 @@ function WatchContent() {
   const showToast = useToastStore((state) => state.show);
 
 
+  // Was building a "/<type>/<slug>/<id>" URL and hard-navigating straight to
+  // it — that URL has no static file behind it under `output: "export"`
+  // (only the SSG placeholder page for that dynamic route actually exists),
+  // so the navigation failed and handed control to webOS's native "UNABLE TO
+  // LOAD" screen — the reported crash. openAssetDetail's own comment already
+  // flags this exact trap for the same reason. The fix mirrors how this
+  // codebase already reopens things across a hard reload elsewhere (e.g.
+  // Next Episode's play_metadata_* sessionStorage hand-off): schedule which
+  // asset to reopen, then navigate to a route that's actually real (home),
+  // and let LayoutClientWrapper's mount effect open the modal for real once
+  // we land there.
   const handleBack = useCallback(() => {
-    const safeReplace = (url: string) => safeNavigate(router, url);
-
     if (video?.parentId && rawAsset) {
       const parentId = String(rawAsset.asset_id ?? video.parentId);
       const title = rawAsset.asset_title ?? "";
       const type = rawAsset.asset_type ?? "shows";
-
-      const typeSlug = getAssetTypeSlug(type);
-      const titleSlug = slugify(title);
-      const targetUrl = titleSlug ? `/${typeSlug}/${titleSlug}/${parentId}` : `/${typeSlug}/${parentId}`;
-
-      safeReplace(targetUrl);
+      schedulePendingAssetDetailOpen(parentId, type, title);
+      safeNavigate(router, ROUTES.HOME);
       return;
     }
 
     if (video?.parentId) {
       const parentId = video.parentId;
       const title = video.seriesInfo?.seriesTitle ?? "";
-      const typeSlug = "shows";
-      const titleSlug = slugify(title);
-      const targetUrl = titleSlug ? `/${typeSlug}/${titleSlug}/${parentId}` : `/${typeSlug}/${parentId}`;
-
-      safeReplace(targetUrl);
+      schedulePendingAssetDetailOpen(parentId, "shows", title);
+      safeNavigate(router, ROUTES.HOME);
       return;
     }
 
     if (video) {
       const contentId = video.contentId;
       const title = video.title ?? "";
-      const typeSlug = getAssetTypeSlug(video.contentType);
-      const titleSlug = slugify(title);
-      const targetUrl = titleSlug ? `/${typeSlug}/${titleSlug}/${contentId}` : `/${typeSlug}/${contentId}`;
-
-      safeReplace(targetUrl);
+      schedulePendingAssetDetailOpen(contentId, video.contentType, title);
+      safeNavigate(router, ROUTES.HOME);
       return;
     }
 
-    router.back();
+    // video/rawAsset can transiently be unset here even after playback has
+    // visibly started — confirmed live: `video.duration` on the actual
+    // <video> element was already populated while this still fired, meaning
+    // WatchClient's own query data hadn't (yet, or again) settled at that
+    // exact instant, most likely from a background refetch (staleTime: 0).
+    // This used to fall back to a raw router.back() — exactly the pattern
+    // safeNavigate exists to route around under file://, so hitting it here
+    // reproduced the very crash this whole rewrite was meant to fix, just
+    // intermittently instead of every time. There's nothing to schedule a
+    // reopen for without asset data, but landing cleanly on home beats
+    // crashing to webOS's native error screen.
+    safeNavigate(router, ROUTES.HOME);
   }, [video, rawAsset, router]);
 
   // Automatically reset asset detail modal state on mount

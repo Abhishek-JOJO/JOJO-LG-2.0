@@ -424,7 +424,6 @@ interface PlayerControlsProps {
   onCaptionBgOpacityChange: (opacity: number) => void;
   onFullscreenToggle: () => void;
   onPipToggle: () => void;
-  onEpisodes?: () => void;
   onNextEpisode?: () => void;
 }
 
@@ -465,7 +464,6 @@ export function PlayerControls({
   onCaptionBgColorChange,
   onCaptionBgOpacityChange,
   onPipToggle,
-  onEpisodes,
   onNextEpisode,
   onMenuOpenChange,
   forceCloseMenus,
@@ -630,14 +628,6 @@ export function PlayerControls({
               isVisible={isVisible}
             />
 
-
-            {/* Episodes */}
-            {onEpisodes && (
-              <IconBtn onClick={onEpisodes} label="Episodes" isVisible={isVisible}>
-                <PlayerIcon name="episodes" size={26} />
-                <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Episodes</span>
-              </IconBtn>
-            )}
 
             {/* Next episode */}
             {onNextEpisode && (

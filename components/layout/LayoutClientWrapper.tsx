@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useActivePathname } from "@/hooks/useActivePathname";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -7,6 +8,7 @@ import { ROUTES } from "@/lib/constants/routes";
 import { appConfig } from "@/lib/config/app.config";
 import { CookieBanner } from "@components/common/CookieBanner";
 import { AssetDetailModal } from "@/features/asset/components/AssetDetailModal";
+import { useAssetDetailStore, consumePendingAssetDetailOpen } from "@/features/asset/store/useAssetDetailStore";
 import { GuestLoginPopup } from "@/features/auth/ui/GuestLoginPopup";
 import { SessionExpiredModal } from "@/features/auth/ui/SessionExpiredModal";
 import { StatusLine } from "@/components/common/StatusLine";
@@ -17,6 +19,20 @@ import { usePlayerStore } from "@/store/usePlayerStore";
 export function LayoutClientWrapper({ children }: { children: React.ReactNode }) {
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
   const setSearchOpen = usePlayerStore((s) => s.setSearchOpen);
+
+  // Reopens the asset-detail modal for whatever show/movie a page scheduled
+  // before doing a hard navigation away from itself — see
+  // schedulePendingAssetDetailOpen's own comment for why this two-step
+  // hand-off exists instead of navigating straight to the asset's URL.
+  // This wrapper mounts fresh exactly once per real page load, which is
+  // exactly the "did we just land here from that kind of navigation?" check
+  // this needs — a no-op on every load that didn't schedule anything.
+  useEffect(() => {
+    const pending = consumePendingAssetDetailOpen();
+    if (pending) {
+      useAssetDetailStore.getState().openAssetDetail(pending.id, pending.contentType, pending.title);
+    }
+  }, []);
   const { showNavbar, showFooter } = appConfig?.flags;
   const pathname = useActivePathname();
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;

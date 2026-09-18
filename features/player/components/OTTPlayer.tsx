@@ -15,6 +15,7 @@ import React, {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { safeNavigate } from '@/lib/webos/safeNavigate';
 import { VideoElement } from './VideoElement';
 import { PlayerControls } from './PlayerControls';
 import { LoadingScreen } from './LoadingScreen';
@@ -56,7 +57,6 @@ import type {
   CaptionSize,
   NextEpisodeInfo,
 } from '../model/types';
-import { EpisodesPanel } from './EpisodesPanel';
 import type { AssetSeason, AssetEpisode } from '@features/asset/model/types';
 import { logger } from '@lib/logger/logger';
 import { analyticsService } from '@/shared/analytics';
@@ -248,8 +248,20 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   // called showControls itself) could let the 3s timer expire and hide the
   // controls mid-scrub. Capture phase so it fires before any individual
   // control's own handler might stop propagation.
+  //
+  // Back/Escape is deliberately excluded — it's a two-stage key (first
+  // press hides controls, second press navigates away) handled entirely by
+  // handlePlayerBackKey below, which decides what to do based on whether
+  // controls are CURRENTLY visible. Showing controls back on that same
+  // keypress raced that check — confirmed via a live CDP trace where this
+  // handler's showControls() landed just before handlePlayerBackKey read
+  // controlsVisibleRef, so it saw "still visible" every single time and the
+  // second Back press kept re-hiding controls instead of ever navigating.
   useEffect(() => {
-    const handleAnyKey = () => showControls();
+    const handleAnyKey = (e: KeyboardEvent) => {
+      if (e.keyCode === 461 || e.key === 'Escape') return;
+      showControls();
+    };
     window.addEventListener('keydown', handleAnyKey, { capture: true });
     return () => window.removeEventListener('keydown', handleAnyKey, { capture: true });
   }, [showControls]);
@@ -362,9 +374,6 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
 
   // Next episode
   const [showNextEpisode, setShowNextEpisode] = useState(false);
-
-  // Episodes panel
-  const [showEpisodesPanel, setShowEpisodesPanel] = useState(false);
 
   const [isAdPaused, setIsAdPaused] = useState(false);
   const [isAdMuted, setIsAdMuted] = useState(false);
@@ -531,7 +540,17 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       triggeredBy: 'auto',
       nextContentId: nextId,
     });
-    router.replace(ROUTES.WATCH(nextId));
+    // Was a raw router.replace() — works fine on the web (a real server,
+    // fetch() available for Next's client-router RSC request), but on
+    // webOS's file:// static export that RSC fetch can never succeed, and
+    // the router's absolute-path fallback resolves against the filesystem
+    // root rather than the app's install directory, so webOS's Web App
+    // Manager takes over with its own "UNABLE TO LOAD" error screen — the
+    // exact "works on web, errors on TV" symptom. safeNavigate is this
+    // codebase's established fix for that (see its own comments); `replace`
+    // keeps the same intent as before — Back shouldn't return to the
+    // episode that just finished.
+    safeNavigate(router, ROUTES.WATCH(nextId), { replace: true });
   }, [router, video, nextEpisodeFromList, seasons]);
 
   useEffect(() => {
@@ -564,22 +583,6 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     }
   }, [currentTime, video.nextTitle, nextEpisodeFromList, hasTriggeredNextEpisodeAuto, isNextEpisodePromptDismissed, handleNextEpisodePlay]);
 
-  const handleEpisodesToggle = useCallback(() => {
-    setShowEpisodesPanel((v) => !v);
-    showControls();
-  }, [showControls]);
-
-  const handleEpisodesPanelClose = useCallback(() => {
-    setShowEpisodesPanel(false);
-  }, []);
-
-  const handleEpisodePanelSelect = useCallback(
-    (episode: AssetEpisode, season: AssetSeason) => {
-      setShowEpisodesPanel(false);
-      onEpisodeSelect?.(episode, season);
-    },
-    [onEpisodeSelect]
-  );
 
   // ── Zustand store ─────────────────────────────────────────────────────────
   const {
@@ -692,7 +695,6 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     setShowResumePrompt(false);
     setHasDismissedResume(false);
     setShowNextEpisode(false);
-    setShowEpisodesPanel(false);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
@@ -1169,7 +1171,17 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
 
   const handleBack = useCallback(() => {
     logger.info('[OTTPlayer] handleBack called — emitting watch-end');
-    emitWatchEnd();
+    // emitWatchEnd is a side-effecting analytics/socket call, not something
+    // the actual navigation should ever depend on — if it throws (e.g. a
+    // socket/network hiccup), it must not be able to silently swallow the
+    // Back press entirely. logger.* calls are no-ops in this production
+    // build (console/logger both disabled), so a thrown error here had no
+    // visible trace at all — it would just look like Back did nothing.
+    try {
+      emitWatchEnd();
+    } catch (err) {
+      logger.warn('[OTTPlayer] emitWatchEnd threw — continuing with navigation anyway', err);
+    }
     if (onBack) {
       onBack();
     } else {
@@ -1266,18 +1278,35 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     }
   }, [controlsVisible]);
 
+  // handlePlayerBackKey below used to depend on [controlsVisible, handleBack],
+  // re-subscribing the whole window listener every time either changed.
+  // handleBack's own identity depends on emitWatchEnd (from
+  // usePlayerHeartbeat) and the onBack prop, both of which can get a fresh
+  // reference more often than the visible-controls state itself changes —
+  // confirmed live via a CDP trace: a second real Back press, ~2.5s after
+  // the first (plenty of time for a normal re-subscribe), simply produced no
+  // response at all (e.defaultPrevented stayed false — the listener genuinely
+  // wasn't there to run), exactly the kind of gap a dependency-driven
+  // teardown/re-add cycle can produce if it races a render triggered by one
+  // of those upstream values changing right as the keypress arrives. Reading
+  // "latest" values from refs instead — and registering the listener exactly
+  // once, on mount — removes the re-subscribe cycle (and that gap) entirely.
+  const controlsVisibleRef = useRef(controlsVisible);
+  useEffect(() => {
+    controlsVisibleRef.current = controlsVisible;
+  }, [controlsVisible]);
+
+  const handleBackRef = useRef(handleBack);
+  useEffect(() => {
+    handleBackRef.current = handleBack;
+  }, [handleBack]);
+
   // Handle webOS Back key (461) and Escape key for player overlay dismissal / exit
   useEffect(() => {
     const handlePlayerBackKey = (e: KeyboardEvent) => {
       if (e.keyCode === 461 || e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-
-        if (showEpisodesPanel) {
-          setShowEpisodesPanel(false);
-          setFocus('ott-player-main');
-          return;
-        }
 
         // Close an open Settings/Subtitle submenu first, without touching
         // controlsVisible — Back used to only ever hide the whole control
@@ -1290,19 +1319,23 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
           return;
         }
 
-        if (controlsVisible) {
+        if (controlsVisibleRef.current) {
           setControlsVisible(false);
           setFocus('ott-player-main');
           return;
         }
 
-        handleBack();
+        try {
+          handleBackRef.current();
+        } catch (err) {
+          logger.warn('[OTTPlayer] handleBack threw on Back key press', err);
+        }
       }
     };
 
     window.addEventListener("keydown", handlePlayerBackKey);
     return () => window.removeEventListener("keydown", handlePlayerBackKey);
-  }, [controlsVisible, showEpisodesPanel, handleBack]);
+  }, []);
 
   const handleVolumeChange = useCallback((v: number) => {
     storeSetVolume(v);
@@ -2035,16 +2068,6 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
             </div>
           )}
 
-        {/* ── Episodes panel overlay ── */}
-        {showEpisodesPanel && seasons.length > 0 && (
-          <EpisodesPanel
-            seasons={seasons}
-            currentEpisodeId={currentEpisodeId ?? null}
-            onEpisodeSelect={handleEpisodePanelSelect}
-            onClose={handleEpisodesPanelClose}
-          />
-        )}
-
         {/* ── Controls — always mounted, fades in/out like Hotstar ── */}
         {!error && !showResumePrompt && (
           <div
@@ -2101,7 +2124,6 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
               onCaptionSizeChange={handleCaptionSizeChange}
               onFullscreenToggle={toggleFullscreen}
               onPipToggle={togglePip}
-              onEpisodes={seasons.length > 0 ? handleEpisodesToggle : undefined}
               onNextEpisode={nextEpisodeFromList ? handleNextEpisodePlay : undefined}
               onMenuOpenChange={handleMenuOpenChange}
               forceCloseMenus={closeMenusSignal}
