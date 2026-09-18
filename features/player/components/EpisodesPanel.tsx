@@ -66,25 +66,6 @@ function FocusableSeasonOption({
   );
 }
 
-function FocusableCloseBtn({ onClick }: { onClick: () => void }) {
-  const { ref, focused } = useFocusable({ focusKey: 'episodes-close-btn', onEnterPress: onClick });
-  return (
-    <button
-      ref={ref}
-      onClick={onClick}
-      aria-label="Close episodes panel"
-      className={`flex items-center justify-center w-8 h-8 rounded-full bg-theme_1/[0.04] hover:bg-theme_1/[0.12] border border-theme_1/5 hover:border-theme_1/10 transition-all text-theme_1/70 hover:text-theme_1 active:scale-95 outline-none ${
-        focused ? 'ring-2 ring-white bg-theme_1/[0.12] text-theme_1' : ''
-      }`}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-      </svg>
-    </button>
-  );
-}
-
 function FocusableLoadMoreBtn({ isLoading, onClick }: { isLoading: boolean; onClick: () => void }) {
   const { ref, focused } = useFocusable({ focusable: !isLoading, onEnterPress: onClick });
   return (
@@ -433,7 +414,14 @@ export const EpisodesPanel = memo(function EpisodesPanel({
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="flex items-start justify-between px-5 pt-5 pb-4 shrink-0 border-b border-theme_1/10">
+        {/* No on-screen close (X) button — this is a TV remote-first app, and
+            the panel already closes on the remote's Back key (webOS keyCode
+            461, handled in OTTPlayer's global key listener) or a click
+            outside on mouse/pointer input. A focusable X here would just be
+            a redundant extra D-pad stop for something Back already does
+            instantly — real OTT apps (Netflix, Hotstar, Disney+) don't show
+            one on TV either. */}
+        <div className="flex items-start px-5 pt-5 pb-4 shrink-0 border-b border-theme_1/10">
           <div className="relative">
             {seasons.length > 1 ? (
               <>
@@ -482,8 +470,6 @@ export const EpisodesPanel = memo(function EpisodesPanel({
               {displayedEpisodes.length} episode{displayedEpisodes.length === 1 ? '' : 's'}
             </p>
           </div>
-
-          <FocusableCloseBtn onClick={requestClose} />
         </div>
 
         {/* ── Episode list ────────────────────────────────────────────────── */}

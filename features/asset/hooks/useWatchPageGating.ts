@@ -73,19 +73,42 @@ export function useWatchPageGating(id: string): WatchPageGateResult {
     storedMeta?.isSvodSubscribed ??
     (isAuthenticated && !user?.isGuest && verifyData?.data?.planType === "SVOD");
 
-  // 2. Fetch raw details of the current asset
+  // 2. Fetch raw details of the current asset.
+  // Always enabled off `id` alone — NOT `&& !storedMeta`. storedMeta is a
+  // client-supplied cache written by whichever "play" entry point sent the
+  // user here (HoverCard, ContentRailsView, WatchClient's onEpisodeSelect,
+  // OTTPlayer's handleNextEpisodePlay, AssetDetailView's Watch Now), and not
+  // every one of them reliably fills in `seriesInfo` — HoverCard's quick-play
+  // button, for one, writes `seriesInfo: null` unconditionally even when the
+  // item is a show. Deriving `parentId` below from that inconsistent client
+  // cache instead of this authoritative backend record was silently breaking
+  // Next Episode / the Episodes list for any playback path that didn't
+  // happen to populate it. `gateDecision` (below) never waits on this query,
+  // so fetching it always doesn't delay playback start — it only means the
+  // Episodes/Next Episode buttons populate a beat after the video does.
   const { data: currentAsset, isLoading: isCurrentAssetLoading } = useQuery({
     queryKey: ["current-asset-gating", id, token],
     queryFn: async () => {
       const response = await getAsset(id, token ?? undefined);
       return response?.data ?? null;
     },
-    enabled: !!id && !storedMeta,
+    enabled: !!id,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
-  // 3. Fetch parent asset if it is an episode of a show
+  // 3. Fetch parent asset if it is an episode of a show.
+  // Always enabled off parentId alone — NOT `&& !storedMeta`. storedMeta (set
+  // by every "play episode" entry point: HoverCard, ContentRailsView,
+  // WatchClient's onEpisodeSelect, OTTPlayer's own handleNextEpisodePlay)
+  // only carries a flat seriesInfo stub (seriesId/seasonNumber/episodeNumber),
+  // never the full seasons/episodes list — it can supply parentId as a
+  // fallback (see below) but it can't substitute for this fetch. Gating it on
+  // `!storedMeta` skipped rawAsset (and with it, WatchClient's showAsset/
+  // seasonsData) on effectively every real episode-playback path, since
+  // storedMeta is present almost every time a show is opened — silently
+  // starving OTTPlayer's `seasons` prop and breaking both the Next Episode
+  // button and end-of-episode auto-advance for shows.
   const parentId = (currentAsset as any)?.parent_id || (currentAsset as any)?.parentId || storedMeta?.seriesInfo?.seriesId;
   const { data: rawAsset, isLoading: isRawAssetLoading, isFetching: isRawAssetFetching, isError: isRawAssetError } = useQuery({
     queryKey: ["raw-parent-asset", parentId, token],
@@ -93,7 +116,7 @@ export function useWatchPageGating(id: string): WatchPageGateResult {
       const response = await getAsset(parentId!, token ?? undefined);
       return response?.data ?? null;
     },
-    enabled: !!parentId && !storedMeta,
+    enabled: !!parentId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });

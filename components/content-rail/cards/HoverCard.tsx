@@ -347,6 +347,21 @@ export function HoverCard({
     return null;
   }, [assetDetails]);
 
+  // Season/episode number for the first episode above — needed so the
+  // play_metadata below can carry a real seriesInfo instead of null (see
+  // handleWatchNow), which is what OTTPlayer's Episodes/Next Episode
+  // buttons need to find their way back to this show's season list.
+  const firstEpisodeSeasonInfo = useMemo(() => {
+    if (!assetDetails?.seasons || assetDetails.seasons.length === 0) return null;
+    for (const season of assetDetails.seasons) {
+      if (season.episodes && season.episodes.length > 0) {
+        const sorted = [...season.episodes].sort((a, b) => a.episodeNumber - b.episodeNumber);
+        return { seasonNumber: season.seasonNumber, episodeNumber: sorted[0]?.episodeNumber };
+      }
+    }
+    return null;
+  }, [assetDetails]);
+
   const handleWatchNow = (e?: React.MouseEvent) => {
     e?.stopPropagation?.();
 
@@ -363,7 +378,19 @@ export function HoverCard({
       sessionStorage.setItem(`play_metadata_${targetId}`, JSON.stringify({
         title: item.title,
         description: item.description || "",
-        seriesInfo: null,
+        // Was hardcoded null even for shows — OTTPlayer/useWatchPageGating
+        // use this to find the parent show's season/episode list, so a
+        // show played from here (hover "Play", not the episode list) never
+        // showed Episodes or Next Episode. useWatchPageGating now also
+        // fetches the episode's own asset record as a fallback, but this
+        // is the authoritative value when we already have it here.
+        seriesInfo: isShowAsset ? {
+          seriesId: String(item.id),
+          seriesTitle: item.title,
+          seasonNumber: firstEpisodeSeasonInfo?.seasonNumber ?? 1,
+          episodeNumber: firstEpisodeSeasonInfo?.episodeNumber ?? 1,
+          nextEpisode: null,
+        } : null,
         certification: item.certification || null,
         classifications: null,
         assetCategoryCode: item.isSVOD ? 2 : item.isTVOD ? 3 : 1,
