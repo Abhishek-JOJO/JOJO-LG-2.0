@@ -190,6 +190,7 @@ export function Navbar() {
     visibleNavItems,
     isLanding,
     isHome,
+    isWatching,
     isCreateAccount,
     isAddProfile,
     showActions,
@@ -331,13 +332,13 @@ export function Navbar() {
                   )}
                 </>
               )}
-              {isAuthenticated && !isGuest && (isCreateAccount || isAddProfile || isHome) && (
+              {isAuthenticated && !isGuest && !isWatching && (isCreateAccount || isAddProfile || isHome) && (
                 <>
                   <LogoutButton />
                 </>
               )}
               <div className="relative z-50 flex items-center gap-1 sm:gap-2 overflow-visible">
-                {showLanguageDropdown && !isLanding && (
+                {showLanguageDropdown && !isLanding && !isWatching && (
                   <LanguageSwitcher className="relative z-[9999] overflow-visible" />
                 )}
               </div>

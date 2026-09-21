@@ -119,6 +119,7 @@ export function useNavbar() {
     visibleNavItems,
     isLanding,
     isHome,
+    isWatching,
     isCreateAccount,
     isAddProfile,
     showActions,
