@@ -14,10 +14,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ProfileMenuLink } from "../ui/ProfileDropdownList";
-import { LogoutModal } from "./LogoutModal";
 import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 
-// The dropdown mounts several focusables at once (menu links + logout) the
+// The dropdown mounts several focusables at once (menu links) the
 // moment it opens, via a React portal. norigin's setFocus/addFocusable share a
 // single-slot scheduler ("a new task replaces the pending next task"), so a
 // single setFocus call racing that mount storm can get clobbered and silently
@@ -38,26 +37,6 @@ function retrySetFocus(focusKey: string, attempts = 6, intervalMs = 90) {
   setTimeout(attempt, intervalMs);
 }
 
-function FocusableDropdownLogout({ onLogout, t }: any) {
-  const { ref, focused } = useFocusable({
-    focusKey: 'profile-dropdown-logout',
-    onEnterPress: onLogout,
-  });
-
-  return (
-    <div
-      ref={ref as any}
-      onClick={onLogout}
-      className={cn(
-        "w-full text-left px-3 py-2 body_xs_regular text-theme_5 rounded-xl border-2 border-transparent transition-all duration-200 cursor-pointer hover:text-theme_13_samecolour",
-        focused ? "bg-theme_11_samecolour border-white text-theme_13_samecolour" : ""
-      )}
-    >
-      {t("logout")}
-    </div>
-  );
-}
-
 interface ProfileDropdownProps {
   totalNavItems?: number;
   isGold?: boolean;
@@ -74,7 +53,6 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
   const [isVisible, setIsVisible] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
   const t = useTranslations("profile-dropdown");
 
@@ -120,11 +98,6 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  const handleDropdownLogout = () => {
-    closeDropdown();
-    setIsLogoutModalOpen(true);
-  };
-
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -134,11 +107,20 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
         closeDropdown();
       }
     };
+    const handleBackKey = (e: KeyboardEvent) => {
+      if (e.keyCode === 461 || e.key === "Back" || e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        closeDropdown();
+      }
+    };
     if (isDropdownOpen) {
       document.addEventListener("mousedown", handleClickOutside);
+      window.addEventListener("keydown", handleBackKey, { capture: true });
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleBackKey, { capture: true });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDropdownOpen]);
@@ -148,7 +130,6 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       dropdownRef={dropdownRef}
       dropdownPos={dropdownPos}
       isVisible={isVisible}
-      handleDropdownLogout={handleDropdownLogout}
       t={t}
     />
   ) : null;
@@ -214,8 +195,6 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
 
         {/* Portal: renders outside any overflow/transform ancestor so backdrop-filter works */}
         {typeof document !== "undefined" && createPortal(dropdownContent, document.body)}
-
-        <LogoutModal isOpen={isLogoutModalOpen} onClose={() => setIsLogoutModalOpen(false)} />
       </div>
     </>
   );
@@ -225,7 +204,6 @@ function ProfileDropdownMenu({
   dropdownRef,
   dropdownPos,
   isVisible,
-  handleDropdownLogout,
   t,
 }: any) {
   const { ref: dropdownBoundaryRef, focusKey: dropdownBoundaryKey } = useFocusable({
@@ -265,21 +243,9 @@ function ProfileDropdownMenu({
           {t("manage_profiles")}
         </ProfileMenuLink>
 
-        <ProfileMenuLink href={ROUTES.WATCHLIST}>
-          {t("watch_list")}
-        </ProfileMenuLink>
-
-        <ProfileMenuLink href={ROUTES.SUBSCRIPTION}>
-          {t("subscription")}
-        </ProfileMenuLink>
-
         <ProfileMenuLink href={ROUTES.ACCOUNT_SETTINGS}>
           {t("account_settings")}
         </ProfileMenuLink>
-
-        <div className="h-px bg-theme_7 my-1" />
-
-        <FocusableDropdownLogout onLogout={handleDropdownLogout} t={t} />
       </div>
     </FocusContext.Provider>
   );

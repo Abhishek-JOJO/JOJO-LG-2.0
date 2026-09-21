@@ -33,13 +33,27 @@ const SUPPRESS_HOME_ROUTES = [
     ROUTES.APP_INSTALL
 ];
 
-import { normalizePathname } from "@/lib/utils/pathname";
+import { useActivePathname } from "@/hooks/useActivePathname";
+import { useNavStore } from "@/store/useNavStore";
+import { getQueryClient } from "@/lib/react-query/queryClient";
+import { getContentRails } from "@/features/content-rail/api/getContentRails";
+import { useLocaleStore } from "@/store/useLocaleStore";
+import NataksClient from "@/app/nataks/nataks-client";
 
-export default function ParentPage() {
-    const rawPathname = usePathname();
-    const pathname = normalizePathname(rawPathname);
+interface ParentPageProps {
+  initialRoute?: string;
+}
+
+export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
+    const pathname = useActivePathname();
     const [hasScrolled, setHasScrolled] = useState(false);
     const [successData, setSuccessData] = useState<any>(null);
+
+    useEffect(() => {
+        if (initialRoute) {
+            useNavStore.getState().setActiveBrowseTab(initialRoute);
+        }
+    }, [initialRoute]);
 
     const { isAppReady } = useBootstrap();
     const sessionId = useAuthStore(state => state.token);
@@ -96,6 +110,24 @@ export default function ParentPage() {
         return () => window.removeEventListener("scroll", onScroll);
     }, [hasScrolled]);
 
+    // Background pre-warm for remaining tabs (Movies, Shows, Natak) after initial load
+    useEffect(() => {
+        if (!isAppReady || !sessionId) return;
+        const queryClient = getQueryClient();
+        const locale = useLocaleStore.getState().locale || "en";
+        const timer = setTimeout(() => {
+            [2, 3, 4].forEach((subnavId) => {
+                queryClient.prefetchInfiniteQuery({
+                    queryKey: ["contentRails", subnavId, sessionId, locale, 20],
+                    queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
+                    initialPageParam: 1,
+                    staleTime: appConfig.STALE_TIME,
+                }).catch(() => {});
+            });
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, [isAppReady, sessionId]);
+
     // Completely suppress render when on a non-home route
     if (isSuppressed) {
         return null;
@@ -107,7 +139,11 @@ export default function ParentPage() {
 
     return (
         <div className="min-h-screen" style={{ background: "var(--theme_12)" }}>
-            <ContentRailsView />
+            {pathname === ROUTES.NATAK || pathname === "/nataks" ? (
+                <NataksClient />
+            ) : (
+                <ContentRailsView />
+            )}
             {successData && (
                 successData.matchedType === "TVOD" || successData.paymentType === "TVOD" ? (
                     <TVODSuccessPopup

@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { motion } from "framer-motion";
 import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { useNavStore } from "@/store/useNavStore";
+import { normalizePathname } from "@/lib/utils/pathname";
+import { BROWSE_ROUTES } from "@/hooks/useActivePathname";
 
 interface FocusableNavLinkProps {
   item: any;
@@ -66,28 +69,47 @@ export const FocusableNavLink = React.memo(({
     return true;
   }, [index, totalNavItems, isGold, isAuthenticated]);
 
-  const handleEnterPress = useCallback(() => {
+  const navigateTab = useCallback(() => {
+    const normTarget = normalizePathname(targetUrl);
+    const normCurrent = typeof window !== "undefined" ? normalizePathname(window.location.pathname) : "";
+    const isTargetBrowse = BROWSE_ROUTES.includes(normTarget);
+    const isCurrentBrowse = BROWSE_ROUTES.includes(normCurrent);
+
+    if (isTargetBrowse && isCurrentBrowse) {
+      useNavStore.getState().setActiveBrowseTab(normTarget);
+      window.scrollTo({ top: 0, behavior: "auto" });
+      try {
+        const hashTarget = normTarget === "/" ? "#/" : `#${normTarget}`;
+        window.history.pushState({ browseTab: normTarget }, "", hashTarget);
+      } catch (e) {}
+      return;
+    }
+
     safeNavigate(router, targetUrl);
   }, [router, targetUrl]);
 
   const { ref, focused } = useFocusable({
     focusKey: `nav-link-${index}`,
     onArrowPress: handleArrowPress,
-    onEnterPress: handleEnterPress
+    onEnterPress: navigateTab
   });
 
   useEffect(() => {
     if (isItemActive) {
       const timer = setTimeout(() => {
-        setFocus(`nav-link-${index}`);
-      }, 500);
+        const active = typeof document !== "undefined" ? document.activeElement : null;
+        const isBodyOrNull = !active || active === document.body || active.id === "root";
+        if (isBodyOrNull) {
+          setFocus(`nav-link-${index}`);
+        }
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [isItemActive, index]);
 
   const handleClick = useCallback(() => {
-    safeNavigate(router, targetUrl);
-  }, [router, targetUrl]);
+    navigateTab();
+  }, [navigateTab]);
 
   return (
     <motion.div

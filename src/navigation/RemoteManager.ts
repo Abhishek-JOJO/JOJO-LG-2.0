@@ -5,6 +5,7 @@ import { normalizePathname } from '@/lib/utils/pathname';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useAssetDetailStore } from '@/features/asset/store/useAssetDetailStore';
 import { useExitConfirmStore } from '@/store/useExitConfirmStore';
+import { useNavStore } from '@/store/useNavStore';
 import { tvSoundManager } from '@/lib/webos/tvSoundManager';
 
 // LG webOS Remote Key Codes
@@ -48,7 +49,8 @@ export const useRemoteManager = () => {
           if (
             usePlayerStore.getState().isSearchOpen ||
             useAssetDetailStore.getState().isOpen ||
-            useExitConfirmStore.getState().isOpen
+            useExitConfirmStore.getState().isOpen ||
+            (typeof document !== 'undefined' && !!document.querySelector('[data-focuskey="profile-dropdown-boundary"]'))
           ) {
             return;
           }
@@ -74,6 +76,15 @@ export const useRemoteManager = () => {
             return;
           }
           e.preventDefault();
+          const activeBrowseTab = useNavStore.getState().activeBrowseTab;
+          if (activeBrowseTab && activeBrowseTab !== '/' && activeBrowseTab !== '/home') {
+            useNavStore.getState().setActiveBrowseTab('/');
+            window.scrollTo({ top: 0, behavior: 'auto' });
+            try {
+              window.history.pushState({ browseTab: '/' }, '', '#/');
+            } catch (err) {}
+            return;
+          }
           // If we're on the root page, ask for confirmation before minimizing the
           // app (platform convention) — otherwise go back in history.
           if (currentPathForBack === '/' || currentPathForBack === '/landing' || currentPathForBack === '/login') {

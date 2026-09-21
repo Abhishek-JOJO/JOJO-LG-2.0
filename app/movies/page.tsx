@@ -1,6 +1,6 @@
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { prefetchRouteRails } from "@/lib/ssr/prefetchRails";
-import { ContentRailsView } from "@/features/content-rail/ui/ContentRailsView";
+import ParentPage from "@/app/parent-page";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -49,9 +49,7 @@ export default async function MoviesPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }}
       />
-      <main className="min-h-screen" style={{ background: "var(--theme_12)" }}>
-        <ContentRailsView />
-      </main>
+      <ParentPage initialRoute="/movies" />
     </HydrationBoundary>
   );
 }
