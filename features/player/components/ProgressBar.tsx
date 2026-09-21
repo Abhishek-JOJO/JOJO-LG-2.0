@@ -27,6 +27,7 @@ interface ProgressBarProps {
   adCuePoints?: number[];
   isVisible?: boolean;
   onSeek: (seconds: number) => void;
+  onPlayPause?: () => void;
 }
 
 export function ProgressBar({
@@ -39,6 +40,7 @@ export function ProgressBar({
   adCuePoints = [],
   isVisible = true,
   onSeek,
+  onPlayPause,
 }: ProgressBarProps) {
   const {
     trackRef,
@@ -115,6 +117,8 @@ export function ProgressBar({
 
   const handleArrowPress = useCallback(
     (direction: string) => {
+      if (direction === 'up') return false; // Prevent focus escaping upwards from seekbar
+      if (direction === 'down') return true; // Allow navigating down to controls row
       if (direction !== 'left' && direction !== 'right') return true;
       const duration = durationRef.current;
       if (duration <= 0) return false;
@@ -160,6 +164,7 @@ export function ProgressBar({
   const { ref: focusRef, focused } = useFocusable({
     focusKey: 'player-seekbar',
     focusable: isVisible,
+    onEnterPress: onPlayPause,
     onArrowPress: handleArrowPress,
   });
 

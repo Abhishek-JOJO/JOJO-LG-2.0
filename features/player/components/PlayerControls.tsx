@@ -55,7 +55,17 @@ function IconBtn({ onClick, label, children, active = false, disabled = false, i
   const { ref, focused } = useFocusable({
     focusKey,
     focusable: isVisible && !disabled,
-    onEnterPress: onClick
+    onEnterPress: onClick,
+    onArrowPress: (direction) => {
+      if (direction === 'up') {
+        setFocus('player-seekbar');
+        return false;
+      }
+      if (direction === 'down') {
+        return false;
+      }
+      return true;
+    }
   });
 
   return (
@@ -453,6 +463,7 @@ export function PlayerControls({
   thumbnailCues,
   isThumbnailEnabled,
   adCuePoints,
+  onPlayPause,
   onSeek,
   onSpeedChange,
   onQualityChange,
@@ -468,17 +479,15 @@ export function PlayerControls({
   onMenuOpenChange,
   forceCloseMenus,
 }: PlayerControlsProps) {
-  // Stable focus target for OTTPlayer's setFocus() calls that used to target
-  // the now-removed 'play-pause-btn' (e.g. when controls reappear). trackChildren
-  // + saveLastFocusedChild means setFocus('player-controls-row') resolves to
-  // whichever child was last focused, or the preferred one on first entry —
-  // same pattern used for ContentRailList's spotlight-rail boundary.
+  // Stable focus target for OTTPlayer's setFocus() calls.
+  // trackChildren + saveLastFocusedChild means setFocus('player-controls-row')
+  // resolves to whichever child was last focused, or the seekbar on first entry.
   const { ref: controlsRowRef } = useFocusable({
     focusKey: 'player-controls-row',
     focusable: false,
     trackChildren: true,
     saveLastFocusedChild: true,
-    preferredChildFocusKey: 'subtitles-trigger-btn',
+    preferredChildFocusKey: 'player-seekbar',
   });
 
   const [showSettings, setShowSettings] = useState(false);
@@ -518,27 +527,23 @@ export function PlayerControls({
       adCuePoints={adCuePoints}
       isVisible={isVisible}
       onSeek={onSeek}
+      onPlayPause={onPlayPause}
     />
   );
 
   return (
     <div className="absolute inset-0 z-20 flex flex-col">
-      {/* ── Top bar: gradient + back + title ───────────────────────────────── */}
+      {/* ── Top bar: gradient + back + title (placed comfortably within TV safe area) ── */}
       {!showCertificate && (
         <div
-          className="flex items-center gap-3 px-4 pt-4 pb-10"
+          className="flex items-center gap-3 px-8 sm:px-12 lg:px-16 pt-10 sm:pt-12 lg:pt-14 pb-12"
           style={{
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.80) 0%, transparent 100%)',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* No on-screen Back button here — this is a TV remote app, not a
-              mouse-driven web page. The physical/remote Back key already
-              closes the player (see OTTPlayer's handlePlayerBackKey), so a
-              clickable chevron here was just a redundant, web-convention
-              focus target sitting in the D-pad flow for no reason. */}
           {title && (
-            <span className="text-theme_1 font-semibold text-xl sm:text-2xl tracking-wide truncate drop-shadow">
+            <span className="text-theme_1 font-bold text-2xl sm:text-3xl lg:text-4xl tracking-wide truncate drop-shadow-md">
               {title}
             </span>
           )}
@@ -550,7 +555,7 @@ export function PlayerControls({
 
       {/* ── Bottom bar: progress + icons ────────────────────────────────────── */}
       <div
-        className="flex flex-col px-4 pb-4 pt-12"
+        className="flex flex-col px-8 sm:px-12 lg:px-16 pb-6 sm:pb-8 pt-12"
         style={{
           background: 'linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.5) 65%, transparent 100%)',
         }}

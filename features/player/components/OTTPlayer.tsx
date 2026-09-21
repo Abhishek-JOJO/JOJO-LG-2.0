@@ -203,6 +203,8 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   const isMenuOpenRef = useRef(false);
   const focusToControlsRef = useRef(false);
   const isPlayerFocusedRef = useRef(true);
+  const seekForwardRef = useRef<(() => void) | null>(null);
+  const seekBackwardRef = useRef<(() => void) | null>(null);
   // Bumped to force-close an open Settings/Subtitle submenu on Back/Escape —
   // see PlayerControls' forceCloseMenus prop and the back-key handler below.
   const [closeMenusSignal, setCloseMenusSignal] = useState(0);
@@ -260,6 +262,36 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   useEffect(() => {
     const handleAnyKey = (e: KeyboardEvent) => {
       if (e.keyCode === 461 || e.key === 'Escape') return;
+
+      // When controls are hidden, handle directional TV remote navigation:
+      if (!controlsVisibleRef.current) {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          e.stopPropagation();
+          showControls();
+          setFocus('player-seekbar');
+          return;
+        }
+
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          e.stopPropagation();
+          seekBackwardRef.current?.();
+          showControls();
+          setFocus('player-seekbar');
+          return;
+        }
+
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          e.stopPropagation();
+          seekForwardRef.current?.();
+          showControls();
+          setFocus('player-seekbar');
+          return;
+        }
+      }
+
       showControls();
     };
     window.addEventListener('keydown', handleAnyKey, { capture: true });
@@ -1269,10 +1301,10 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   // ── Control handlers ───────────────────────────────────────────────────────
   
   useEffect(() => {
-    if (controlsVisible && focusToControlsRef.current) {
+    if (controlsVisible) {
       const timer = setTimeout(() => {
-        setFocus('player-controls-row');
-      }, 100);
+        setFocus('player-seekbar');
+      }, 50);
       focusToControlsRef.current = false;
       return () => clearTimeout(timer);
     }
@@ -1582,6 +1614,9 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       onAdPlayPause: handleAdPlayPause,
     });
 
+  seekForwardRef.current = seekForward;
+  seekBackwardRef.current = seekBackward;
+
   // ── Wrapped play/pause that also fires pending ads on first press ─────────
   const handlePlayPause = useCallback(() => {
     // If an ad request is pending, fire it and DO NOT start content —
@@ -1598,13 +1633,8 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       if (!isPlayerFocusedRef.current) return true;
 
       handlePlayPause();
-      
-      if (controlsVisible) {
-        setFocus('player-controls-row');
-      } else {
-        showControls();
-        focusToControlsRef.current = true;
-      }
+      showControls();
+      setFocus('player-seekbar');
       return true;
     },
     onArrowPress: (direction) => {
@@ -1612,14 +1642,26 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         return true;
       }
 
-      showControls();
-      setFocus('player-controls-row');
-      // Must suppress norigin's own default nearest-neighbor search here —
-      // setFocus() is async (it awaits getNextFocusKey() before mutating
-      // focusKey), so returning anything other than false lets the library's
-      // own smartNavigate run immediately afterward from the stale prior
-      // focusKey, racing the explicit setFocus above and landing focus
-      // unpredictably depending on which resolves last.
+      if (direction === 'left') {
+        seekBackward();
+        showControls();
+        setFocus('player-seekbar');
+        return false;
+      }
+
+      if (direction === 'right') {
+        seekForward();
+        showControls();
+        setFocus('player-seekbar');
+        return false;
+      }
+
+      if (direction === 'up' || direction === 'down') {
+        showControls();
+        setFocus('player-seekbar');
+        return false;
+      }
+
       return false;
     }
   });
