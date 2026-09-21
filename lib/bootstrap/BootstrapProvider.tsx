@@ -143,7 +143,7 @@ export function BootstrapProvider({ children }: BootstrapProviderProps) {
   // During SSR and initial render, render children immediately to prevent hydration mismatch
   if (!isMounted) {
     return (
-      <BootstrapContext.Provider value={{ isAppReady: false }}>
+      <BootstrapContext.Provider value={{ isAppReady: hasCachedConfig }}>
         {children}
       </BootstrapContext.Provider>
     );

@@ -17,6 +17,10 @@ export function AssetDetailModal() {
 
   useEffect(() => {
     if (isOpen) {
+      const el = document.getElementById("early-asset-overlay");
+      if (el) el.remove();
+      const st = document.getElementById("early-asset-restore-style");
+      if (st) st.remove();
       setTimeout(() => setFocus('MODAL_ASSET_DETAIL'), 100);
     } else {
       restorePageFocus(useAssetDetailStore.getState().returnFocusKey);
@@ -63,7 +67,7 @@ export function AssetDetailModal() {
       if (state && state.type === "asset-detail" && state.id) {
         const { navigateBackToAsset } = useAssetDetailStore.getState();
         navigateBackToAsset(state.id, state.contentType || "movies", state.title || "");
-      } else {
+      } else if (state && state.type === "page") {
         // Reset historyCount to 0 to prevent closeAssetDetail calling history.back() again in a loop
         useAssetDetailStore.setState({ historyCount: 0 });
         closeAssetDetail();
@@ -165,10 +169,10 @@ function AssetDetailModalBoundary({
           className="absolute inset-0 overflow-y-auto flex items-start justify-start p-0 overscroll-contain"
         >
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={false}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.2 }}
             className="relative w-full min-h-screen m-0 z-10"
           >
             <AssetDetailView assetId={activeAssetId} onClose={closeAssetDetail} isStandalone={true} initialAsset={initialAsset} />

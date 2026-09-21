@@ -21,6 +21,7 @@ import { useAssetDetailStore, getAssetTypeSlug, slugify, schedulePendingAssetDet
 import { logger } from "@/lib/logger/logger";
 import { useWatchPageGating } from "@/features/asset/hooks/useWatchPageGating";
 import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { mapContentAsset } from "@/features/content/model/mapper";
 
 function WatchContent() {
   const searchParams = useSearchParams();
@@ -62,57 +63,75 @@ function WatchContent() {
   // and let LayoutClientWrapper's mount effect open the modal for real once
   // we land there.
   const handleBack = useCallback(() => {
-    const assetToCache = rawAsset || currentAsset;
+    // Determine the target asset ID to return to (parent show for episodes, or assetId for movies)
+    const parentId = video?.parentId || (rawAsset?.asset_id ? String(rawAsset.asset_id) : null) || (currentAsset?.parent_id ? String(currentAsset.parent_id) : null);
+    const returnId = String(parentId ?? video?.contentId ?? rawAsset?.asset_id ?? currentAsset?.asset_id ?? id);
+    const returnType = parentId ? "shows" : (rawAsset?.asset_type ?? currentAsset?.asset_type ?? video?.contentType ?? "movies");
+    const returnTitle = (
+      (parentId ? video?.seriesInfo?.seriesTitle : null) ||
+      video?.title ||
+      rawAsset?.asset_title ||
+      currentAsset?.asset_title ||
+      currentAsset?.title ||
+      ""
+    );
 
-    if (video?.parentId && rawAsset) {
-      const parentId = String(rawAsset.asset_id ?? video.parentId);
-      const title = rawAsset.asset_title ?? "";
-      const type = rawAsset.asset_type ?? "shows";
-      schedulePendingAssetDetailOpen(parentId, type, title, rawAsset);
-      safeNavigate(router, ROUTES.HOME);
-      return;
+    // Prefer already-cached mapped asset in sessionStorage; fallback to rawAsset or currentAsset
+    let assetToCache: any = null;
+    try {
+      const stored = sessionStorage.getItem(`asset_cache_${returnId}`);
+      if (stored) {
+        assetToCache = JSON.parse(stored);
+      }
+    } catch {}
+
+    if (!assetToCache) {
+      const candidate = (parentId ? rawAsset : (currentAsset || rawAsset));
+      if (candidate) {
+        if (!candidate.title && candidate.asset_title) {
+          try {
+            assetToCache = mapContentAsset({ data: candidate } as any);
+          } catch {
+            assetToCache = candidate;
+          }
+        } else {
+          assetToCache = candidate;
+        }
+      }
     }
 
-    if (video?.parentId) {
-      const parentId = video.parentId;
-      const title = video.seriesInfo?.seriesTitle ?? "";
-      schedulePendingAssetDetailOpen(parentId, "shows", title, assetToCache);
-      safeNavigate(router, ROUTES.HOME);
-      return;
+    // If still missing full metadata, build a rich fallback so the detail page never renders a blank skeleton
+    if (!assetToCache) {
+      let meta: any = null;
+      try {
+        const rawMeta = sessionStorage.getItem(`play_metadata_${id}`) || sessionStorage.getItem(`play_metadata_${returnId}`);
+        if (rawMeta) meta = JSON.parse(rawMeta);
+      } catch {}
+
+      const posterUrl = meta?.landscape || meta?.poster || video?.thumbnailUrl || "";
+      assetToCache = {
+        assetId: returnId,
+        id: returnId,
+        title: returnTitle || meta?.title || video?.title || "",
+        description: meta?.description || video?.description || "",
+        poster: { url: posterUrl },
+        landscape: { url: posterUrl },
+        heroImage: posterUrl,
+        landscapeImage: posterUrl,
+        posterImage: posterUrl,
+        image: posterUrl,
+        thumbnailUrl: posterUrl,
+        assetType: returnType === "shows" ? "SHOW" : "MOVIE",
+        assetTypeCode: returnType === "shows" ? 2 : 1,
+        assetCategoryCode: meta?.assetCategoryCode || 1,
+        certification: meta?.certification || "",
+        genres: meta?.genres || [],
+        seasons: (rawAsset?.seasons as any) || (currentAsset?.seasons as any) || [],
+      };
     }
 
-    if (video) {
-      const contentId = video.contentId;
-      const title = video.title ?? "";
-      schedulePendingAssetDetailOpen(contentId, video.contentType, title, assetToCache);
-      safeNavigate(router, ROUTES.HOME);
-      return;
-    }
-
-    // Back also works before the playback response arrives. Reopen the
-    // selected title (or its series) using the metadata already available.
-    if (assetToCache) {
-      const parentId = currentAsset?.parent_id || currentAsset?.parentId || currentAsset?.seriesInfo?.seriesId;
-      const returnId = String(rawAsset?.asset_id ?? parentId ?? id);
-      const title = rawAsset?.asset_title ?? currentAsset?.seriesInfo?.seriesTitle ?? currentAsset?.asset_title ?? currentAsset?.title ?? "";
-      const type = rawAsset?.asset_type ?? (parentId ? "shows" : currentAsset?.asset_type ?? currentAsset?.assetTypeName ?? "movies");
-      schedulePendingAssetDetailOpen(returnId, type, title, rawAsset || (parentId ? undefined : currentAsset));
-      safeNavigate(router, ROUTES.HOME);
-      return;
-    }
-
-    // video/rawAsset can transiently be unset here even after playback has
-    // visibly started — confirmed live: `video.duration` on the actual
-    // <video> element was already populated while this still fired, meaning
-    // WatchClient's own query data hadn't (yet, or again) settled at that
-    // exact instant, most likely from a background refetch (staleTime: 0).
-    // This used to fall back to a raw router.back() — exactly the pattern
-    // safeNavigate exists to route around under file://, so hitting it here
-    // reproduced the very crash this whole rewrite was meant to fix, just
-    // intermittently instead of every time. There's nothing to schedule a
-    // reopen for without asset data, but landing cleanly on home beats
-    // crashing to webOS's native error screen.
-    safeNavigate(router, ROUTES.HOME);
+    schedulePendingAssetDetailOpen(returnId, returnType, returnTitle, assetToCache);
+    safeNavigate(router, ROUTES.HOME, { replace: true });
   }, [video, rawAsset, currentAsset, id, router]);
 
   // Automatically reset asset detail modal state on mount

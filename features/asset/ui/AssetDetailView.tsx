@@ -6,6 +6,7 @@ import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImag
 import { useAsset } from "@/features/content/hooks/useAsset";
 import { useEpisodes } from "@/features/content/hooks/useEpisodes";
 import { ASSET_CATEGORY_CODE, Professional } from "@/features/content/model/types";
+import { mapContentAsset } from "@/features/content/model/mapper";
 import { isHlsUrl, VIDEO_CONSTANTS } from "@/lib/constants/video";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useGuestPopupStore } from "@/store/useGuestPopupStore";
@@ -284,10 +285,53 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // A 403 means the WebSocket socket handshake hasn't finished — treat as transient loading.
   const isTransient403 = isError && ((error as any)?.status === 403 || String(error).includes('socket'));
   
+  // Normalize initialAsset if passed in raw API format
+  const normalizedInitialAsset = useMemo(() => {
+    if (!initialAsset) return null;
+    if (!initialAsset.title && initialAsset.asset_title) {
+      try {
+        return mapContentAsset({ data: initialAsset } as any);
+      } catch {
+        return initialAsset;
+      }
+    }
+    return initialAsset;
+  }, [initialAsset]);
+
+  // Direct sessionStorage cache fallback for instant zero-skeleton paint on Back navigation
+  const cachedAssetFallback = useMemo(() => {
+    if (typeof window === "undefined" || !assetId) return null;
+    try {
+      const raw = sessionStorage.getItem(`asset_cache_${assetId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed) {
+          if (!parsed.title && parsed.asset_title) {
+            try {
+              return mapContentAsset({ data: parsed } as any);
+            } catch {
+              return parsed;
+            }
+          }
+          return parsed;
+        }
+      }
+    } catch {}
+    return null;
+  }, [assetId]);
+
   // If initialAsset is a full asset (passed back from the player or restored from cache),
   // use it immediately to render without delay or skeleton flashing.
-  const isFullAsset = initialAsset && (initialAsset.assetId || initialAsset.asset_id || (initialAsset.seasons && initialAsset.seasons.length > 0));
-  const currentAsset: NonNullable<typeof clientAsset> | null = clientAsset || (isFullAsset ? (initialAsset as NonNullable<typeof clientAsset>) : null);
+  const isFullAsset = normalizedInitialAsset && (
+    normalizedInitialAsset.assetId ||
+    normalizedInitialAsset.asset_id ||
+    normalizedInitialAsset.title ||
+    (normalizedInitialAsset.seasons && normalizedInitialAsset.seasons.length > 0)
+  );
+  const currentAsset: NonNullable<typeof clientAsset> | null =
+    clientAsset ||
+    (isFullAsset ? (normalizedInitialAsset as NonNullable<typeof clientAsset>) : null) ||
+    cachedAssetFallback;
 
   useEffect(() => {
     if (clientAsset && assetId) {
@@ -440,12 +484,26 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
     // 4. Last resort: static poster image
     if (list.length === 0) {
+      const fallbackPoster =
+        asset?.poster?.url ||
+        (typeof asset?.poster === "string" ? asset.poster : "") ||
+        asset?.landscape?.url ||
+        (typeof asset?.landscape === "string" ? asset.landscape : "") ||
+        asset?.heroImage ||
+        asset?.landscapeImage ||
+        asset?.posterImage ||
+        asset?.image ||
+        asset?.thumbnailUrl ||
+        (asset?.poster as any)?.path ||
+        (asset?.landscape as any)?.path ||
+        "";
+
       list.push({
         id: "main-poster",
         type: "image",
         videoUrl: null,
-        poster: asset?.poster?.url || asset?.landscape?.url || "",
-        title: asset?.title || "",
+        poster: fallbackPoster,
+        title: asset?.title || asset?.asset_title || "",
       });
     }
 
@@ -1243,8 +1301,17 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     // placeholders instead of a flat gray box, while the real fetch is still
     // in flight. Never used for anything but this background/heading.
     const previewImage =
-      initialAsset?.heroImage || initialAsset?.landscapeImage || initialAsset?.posterImage || initialAsset?.image || "";
-    const previewTitle = initialAsset?.title || "";
+      initialAsset?.heroImage ||
+      initialAsset?.landscapeImage ||
+      initialAsset?.posterImage ||
+      initialAsset?.image ||
+      initialAsset?.poster?.url ||
+      initialAsset?.landscape?.url ||
+      initialAsset?.thumbnailUrl ||
+      (typeof initialAsset?.poster === "string" ? initialAsset.poster : "") ||
+      (typeof initialAsset?.landscape === "string" ? initialAsset.landscape : "") ||
+      "";
+    const previewTitle = initialAsset?.title || initialAsset?.asset_title || "";
 
     return (
       <div
@@ -1261,6 +1328,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
               ? "relative w-full h-[350px] sm:h-[500px] md:h-[600px] lg:h-[70vh] bg-neutral-900 flex flex-col justify-end p-6 gap-4"
               : "relative w-full h-[280px] sm:h-[450px] bg-neutral-900 flex flex-col justify-end p-6 gap-4"
           }
+          style={{
+            backgroundImage: previewImage ? `url("${previewImage}")` : undefined,
+            backgroundSize: "cover",
+            backgroundPosition: "top",
+          }}
         >
           {previewImage && (
             <img
@@ -1430,7 +1502,20 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     Array.isArray(asset.asset_tags) &&
     asset.asset_tags.some((tag: any) => typeof tag === "string" && tag.toLowerCase().includes("coming soon"));
 
-  const bgPosterUrl = activePreview?.poster || asset.poster?.url || asset.landscape?.url || "";
+  const bgPosterUrl =
+    activePreview?.poster ||
+    asset.poster?.url ||
+    (typeof asset.poster === "string" ? asset.poster : "") ||
+    asset.landscape?.url ||
+    (typeof asset.landscape === "string" ? asset.landscape : "") ||
+    asset.heroImage ||
+    asset.landscapeImage ||
+    asset.posterImage ||
+    asset.image ||
+    asset.thumbnailUrl ||
+    (asset.poster as any)?.path ||
+    (asset.landscape as any)?.path ||
+    "";
 
   const titleBlock = (
     <div
@@ -1491,9 +1576,14 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       <div
         className={
           isStandalone
-            ? "relative w-full h-screen overflow-hidden group"
-            : "relative w-full h-[230px] sm:h-[320px] overflow-hidden group"
+            ? "relative w-full h-screen overflow-hidden group bg-neutral-950"
+            : "relative w-full h-[230px] sm:h-[320px] overflow-hidden group bg-neutral-950"
         }
+        style={{
+          backgroundImage: bgPosterUrl ? `url("${bgPosterUrl}")` : undefined,
+          backgroundSize: "cover",
+          backgroundPosition: "top",
+        }}
       >
         {/* Background preview video playing after static poster delay.
             Paused and covered by the static poster (below) while the
@@ -1522,7 +1612,8 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
               src={bgPosterUrl}
               alt={asset.title}
               fill
-              className="object-cover object-top transition-opacity duration-1000"
+              priority
+              className="object-cover object-top"
               wrapperClassName="w-full h-full"
             />
           ) : (

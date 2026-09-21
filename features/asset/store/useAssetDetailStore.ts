@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { usePlayerStore } from "@/store/usePlayerStore";
+import { mapContentAsset } from "@/features/content/model/mapper";
 
 export const slugify = (s: string): string =>
   typeof s === "string"
@@ -54,9 +55,31 @@ export function schedulePendingAssetDetailOpen(
 ): void {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(PENDING_OPEN_KEY, JSON.stringify({ id, contentType, title, cachedAsset }));
-    if (cachedAsset) {
-      sessionStorage.setItem(`asset_cache_${id}`, JSON.stringify(cachedAsset));
+    let assetToSave = cachedAsset;
+
+    // 1. If we already have a full mapped asset in sessionStorage for this ID, use that
+    try {
+      const existing = sessionStorage.getItem(`asset_cache_${id}`);
+      if (existing) {
+        const parsed = JSON.parse(existing);
+        if (parsed && (parsed.title || parsed.assetId) && (parsed.poster?.url || parsed.landscape?.url || parsed.seasons?.length)) {
+          assetToSave = parsed;
+        }
+      }
+    } catch {}
+
+    // 2. If assetToSave is raw API response (has asset_title but not title), map it
+    if (assetToSave && !assetToSave.title && assetToSave.asset_title) {
+      try {
+        assetToSave = mapContentAsset({ data: assetToSave } as any);
+      } catch (err) {
+        console.warn("[schedulePendingAssetDetailOpen] mapContentAsset failed", err);
+      }
+    }
+
+    sessionStorage.setItem(PENDING_OPEN_KEY, JSON.stringify({ id, contentType, title, cachedAsset: assetToSave }));
+    if (assetToSave) {
+      sessionStorage.setItem(`asset_cache_${id}`, JSON.stringify(assetToSave));
     }
   } catch {
     // ignore — worst case the modal just doesn't reopen
@@ -106,17 +129,40 @@ interface AssetDetailState {
   resetAssetDetailModal: () => void;
 }
 
-export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
-  activeAssetId: null,
-  activeContentType: null,
-  activeTitle: null,
-  activePreviewItem: null,
-  isOpen: false,
-  originalPath: null,
-  historyCount: 0,
-  shouldScrollToBottom: false,
-  returnFocusKey: null,
-  clearReturnFocusKey: () => set({ returnFocusKey: null }),
+export const useAssetDetailStore = create<AssetDetailState>((set, get) => {
+  // Check for pending reopen synchronously so the modal is open on the FIRST render frame
+  let initialPending: ReturnType<typeof consumePendingAssetDetailOpen> = null;
+  if (typeof window !== "undefined") {
+    try {
+      initialPending = consumePendingAssetDetailOpen();
+      if (initialPending) {
+        const typeSlug = getAssetTypeSlug(initialPending.contentType);
+        window.history.replaceState(
+          { type: "asset-detail", id: initialPending.id, contentType: typeSlug, title: initialPending.title },
+          "",
+          window.location.href
+        );
+      }
+    } catch {}
+  }
+
+  const initialAssetId = initialPending?.id || null;
+  const initialContentType = initialPending?.contentType ? getAssetTypeSlug(initialPending.contentType) : null;
+  const initialTitle = initialPending?.title || null;
+  const initialPreview = initialPending?.cachedAsset || null;
+  const initialIsOpen = !!initialPending;
+
+  return {
+    activeAssetId: initialAssetId,
+    activeContentType: initialContentType,
+    activeTitle: initialTitle,
+    activePreviewItem: initialPreview,
+    isOpen: initialIsOpen,
+    originalPath: initialIsOpen ? "/" : null,
+    historyCount: 0,
+    shouldScrollToBottom: false,
+    returnFocusKey: null,
+    clearReturnFocusKey: () => set({ returnFocusKey: null }),
 
   openAssetDetail: (id, contentType, title, previewItem) => {
     if (typeof window === "undefined") return;
@@ -239,4 +285,4 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
       shouldScrollToBottom: false,
     });
   },
-}));
+};});

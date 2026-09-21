@@ -18,12 +18,27 @@ interface AuthStore extends AuthState {
  * Manages authentication state globally
  * Persists tokens to localStorage
  */
-export const useAuthStore = create<AuthStore>((set, get) => ({
-  // Initial state
-  isAuthenticated: false,
-  user: null,
-  token: null,
-  refreshToken: null,
+export const useAuthStore = create<AuthStore>((set, get) => {
+  let initialToken: string | null = null;
+  let initialRefreshToken: string | null = null;
+  let initialUser: User | null = null;
+  let initialIsAuthenticated = false;
+
+  if (typeof window !== "undefined") {
+    try {
+      initialToken = localStorageManager.get<string>(StorageKey.AUTH_TOKEN) || null;
+      initialRefreshToken = localStorageManager.get<string>(StorageKey.REFRESH_TOKEN) || null;
+      initialUser = localStorageManager.get<User>(StorageKey.USER) || null;
+      initialIsAuthenticated = !!initialToken && !!initialUser;
+    } catch {}
+  }
+
+  return {
+    // Initial state
+    isAuthenticated: initialIsAuthenticated,
+    user: initialUser,
+    token: initialToken,
+    refreshToken: initialRefreshToken,
 
   /**
    * Set authenticated user
@@ -130,7 +145,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       user: updatedUser,
     });
   },
-}));
+};});
 
 /**
  * Initialize auth from localStorage on app start

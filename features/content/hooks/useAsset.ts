@@ -57,6 +57,11 @@ export function useAsset(assetId: string, enabled = true) {
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed && (String(parsed.assetId || parsed.asset_id || parsed.id) === String(assetId))) {
+            if (!parsed.title && parsed.asset_title) {
+              try {
+                return mapContentAsset({ data: parsed } as any);
+              } catch {}
+            }
             return parsed;
           }
         }

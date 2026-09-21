@@ -1,14 +1,24 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 
 export function AmbientBackground() {
+  const [mounted, setMounted] = useState(false);
   const layerA = useAmbientTintStore((s) => s.layerA);
   const layerB = useAmbientTintStore((s) => s.layerB);
   const activeLayer = useAmbientTintStore((s) => s.activeLayer);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const getGradient = (rgb: { r: number; g: number; b: number }) =>
     `linear-gradient(180deg, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.88) 0%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.80) 15%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.60) 40%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.30) 65%, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08) 85%, transparent 100%)`;
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div
