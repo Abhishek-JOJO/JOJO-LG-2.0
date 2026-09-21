@@ -92,6 +92,8 @@ interface AssetDetailState {
   originalPath: string | null;
   historyCount: number;
   shouldScrollToBottom: boolean;
+  returnFocusKey: string | null;
+  clearReturnFocusKey: () => void;
   openAssetDetail: (id: string, contentType: string | number, title: string, previewItem?: any) => void;
   closeAssetDetail: () => void;
   navigateBackToAsset: (id: string, contentType: string | number, title: string) => void;
@@ -108,12 +110,25 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
   originalPath: null,
   historyCount: 0,
   shouldScrollToBottom: false,
+  returnFocusKey: null,
+  clearReturnFocusKey: () => set({ returnFocusKey: null }),
 
   openAssetDetail: (id, contentType, title, previewItem) => {
     if (typeof window === "undefined") return;
 
     // Reset global card hover state when modal opens
     usePlayerStore.getState().setIsAnyCardHovered(false);
+
+    // If modal is not already open, capture the exact focused key to return to upon close
+    let currentKey: string | null = null;
+    try {
+      const spatialNav = require("@noriginmedia/norigin-spatial-navigation");
+      currentKey = spatialNav?.getCurrentFocusKey?.() || null;
+    } catch { }
+
+    const returnFocusKey = get().isOpen 
+      ? get().returnFocusKey 
+      : (currentKey || (document.activeElement?.getAttribute("data-focuskey") || null));
 
     const currentPath = window.location.pathname + window.location.search;
     const typeSlug = getAssetTypeSlug(contentType);
@@ -139,6 +154,7 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => ({
       activePreviewItem: previewItem ?? null,
       isOpen: true,
       originalPath,
+      returnFocusKey,
       // Increment historyCount if we were already open
       historyCount: state.isOpen ? state.historyCount + 1 : 0,
       shouldScrollToBottom: false,

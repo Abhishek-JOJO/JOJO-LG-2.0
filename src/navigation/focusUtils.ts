@@ -27,8 +27,10 @@ const POLL_INTERVAL_MS = 100;
  * testing, but on TV-class CPUs it reliably produced "no visible focus on the
  * first card". Now we only stop retrying once a focus ring is actually visible.
  */
-export function restorePageFocus() {
+export function restorePageFocus(preferredKey?: string | null) {
   if (typeof window === "undefined") return;
+
+  const originKey = preferredKey || useAssetDetailStore.getState().returnFocusKey;
 
   let attempts = 0;
   const interval = setInterval(() => {
@@ -39,39 +41,60 @@ export function restorePageFocus() {
     }
 
     // A full-screen modal (search, asset detail) owns its own focus while it's open.
-    // If one is currently open, this call must have been triggered by something
-    // unrelated to it — e.g. the home page behind it refetching its rails data and
-    // re-running its own restorePageFocus() effect — and proceeding would silently
-    // steal focus away from the modal's content without any visible cause.
-    if (usePlayerStore.getState().isSearchOpen || useAssetDetailStore.getState().isOpen) {
+    // However, if SearchModal IS open and AssetDetailModal just closed:
+    // Focus should be restored INSIDE SearchModal!
+    const isSearchOpen = usePlayerStore.getState().isSearchOpen;
+    const isAssetDetailOpen = useAssetDetailStore.getState().isOpen;
+
+    if (isAssetDetailOpen) {
       clearInterval(interval);
       return;
     }
 
-    // 1. Check if something already has spatial-nav focus. This library manages
-    // focus virtually — ordinary Left/Right/geometric navigation never calls the
-    // DOM's real .focus() (only a few explicit cross-section jumps elsewhere in
-    // this app do) — so document.activeElement almost never actually reflects
-    // it, and checking that was a near-permanent false negative. That silently
-    // let this function barrel past a perfectly valid, already-focused card and
-    // reassign focus to the hero instead — including when ContentRailsView's
-    // effect re-runs restorePageFocus() after any data refetch (e.g. the
-    // bottom-of-page pagination fetch a fast scroll triggers), which is exactly
-    // what made the hero appear to "pop back" mid-scroll. getCurrentFocusKey()
-    // is the library's own source of truth for this, regardless of native DOM
-    // focus.
+    if (isSearchOpen) {
+      if (originKey && doesFocusableExist(originKey)) {
+        const el = document.querySelector(`[data-focuskey="${originKey}"]`);
+        const insideSearch = el?.closest('[data-focuskey="MODAL_SEARCH"]');
+        if (insideSearch) {
+          setFocus(originKey);
+          if (el instanceof HTMLElement) el.focus({ preventScroll: true });
+          useAssetDetailStore.getState().clearReturnFocusKey();
+          clearInterval(interval);
+          return;
+        }
+      }
+      // If originKey isn't inside search, focus search-input
+      if (doesFocusableExist("search-input")) {
+        setFocus("search-input");
+        const inputEl = document.querySelector('[data-focuskey="search-input"]');
+        if (inputEl instanceof HTMLElement) inputEl.focus({ preventScroll: true });
+        useAssetDetailStore.getState().clearReturnFocusKey();
+        clearInterval(interval);
+        return;
+      }
+      return;
+    }
+
+    // 1. Try to restore exact origin card/key the user came from (e.g. spotlight-lead-fixed on their active Content Rail)
+    if (originKey && originKey !== ROOT_FOCUS_KEY && doesFocusableExist(originKey)) {
+      const originEl = document.querySelector(`[data-focuskey="${originKey}"]`);
+      const insideClosingModal = originEl?.closest(
+        '[data-focuskey="MODAL_ASSET_DETAIL"], [data-focuskey="MODAL_SEARCH"]'
+      );
+      if (!insideClosingModal) {
+        setFocus(originKey);
+        if (originEl instanceof HTMLElement) {
+          originEl.focus({ preventScroll: true });
+        }
+        useAssetDetailStore.getState().clearReturnFocusKey();
+        clearInterval(interval);
+        return;
+      }
+    }
+
+    // 2. Check if something already has spatial-nav focus outside any closing modal
     const currentKey = getCurrentFocusKey();
     if (currentKey && currentKey !== ROOT_FOCUS_KEY && doesFocusableExist(currentKey)) {
-      // doesFocusableExist() only proves the node is still registered — not that
-      // it's still relevant. AssetDetailModal/SearchModal wrap their content in
-      // AnimatePresence with a real exit transition (300ms), so every focusable
-      // inside a modal we just closed (isOpen already false, checked above) stays
-      // mounted and registered for the whole fade-out. Treating that as "focus is
-      // fine" means we never reassign focus to the page underneath at all — once
-      // the fade finishes and the modal is actually removed, norigin is left
-      // pointing at a focus key that no longer exists anywhere, and no further
-      // arrow press can recover from that. So a still-existing key only counts if
-      // it isn't sitting inside a modal we've already established is closed.
       const currentEl = document.querySelector(`[data-focuskey="${currentKey}"]`);
       const insideClosingModal = currentEl?.closest(
         '[data-focuskey="MODAL_ASSET_DETAIL"], [data-focuskey="MODAL_SEARCH"]'
@@ -82,16 +105,34 @@ export function restorePageFocus() {
       }
     }
 
-    // 2. Hero carousel, if present on this page — only commit once it's actually
+    // 3. If no valid originKey or active key:
+    // If the active spotlight lead card exists on the page (spotlight-lead-fixed):
+    // Prioritize the active spotlight rail lead card over hero carousel so we NEVER jump away from the active Content Rail!
+    if (document.querySelector('[data-focuskey="spotlight-lead-fixed"]')) {
+      if (doesFocusableExist("spotlight-lead-fixed")) {
+        setFocus("spotlight-lead-fixed");
+        const leadEl = document.querySelector('[data-focuskey="spotlight-lead-fixed"]');
+        if (leadEl instanceof HTMLElement) {
+          leadEl.focus({ preventScroll: true });
+        }
+        useAssetDetailStore.getState().clearReturnFocusKey();
+        clearInterval(interval);
+        return;
+      }
+    }
+
+    // 4. Hero carousel, if present on this page — only commit once it's actually
     // registered with the spatial-nav library; otherwise keep retrying.
     if (document.querySelector('[data-focuskey="hero-carousel"]')) {
       if (doesFocusableExist("hero-carousel")) {
         setFocus("hero-carousel");
+        useAssetDetailStore.getState().clearReturnFocusKey();
+        clearInterval(interval);
+        return;
       }
-      return;
     }
 
-    // 3. First focusable card on the main page (excluding modal & navbar nodes)
+    // 5. First focusable card on the main page (excluding modal & navbar nodes)
     const firstCardOnPage = document.querySelector(
       'main [data-focuskey]:not([data-focuskey^="MODAL"]):not([data-focuskey^="nav"]), section [data-focuskey]:not([data-focuskey^="MODAL"]):not([data-focuskey^="nav"])'
     );
@@ -99,16 +140,21 @@ export function restorePageFocus() {
       const key = firstCardOnPage.getAttribute("data-focuskey");
       if (key && doesFocusableExist(key)) {
         setFocus(key);
+        useAssetDetailStore.getState().clearReturnFocusKey();
+        clearInterval(interval);
+        return;
       }
-      return;
     }
 
-    // 4. Fallback: first navbar link if the page has no cards yet
+    // 6. Fallback: first navbar link if the page has no cards yet
     const navLink = document.querySelector('[data-focuskey^="nav-link"]');
     if (navLink) {
       const key = navLink.getAttribute("data-focuskey");
       if (key && doesFocusableExist(key)) {
         setFocus(key);
+        useAssetDetailStore.getState().clearReturnFocusKey();
+        clearInterval(interval);
+        return;
       }
     }
   }, POLL_INTERVAL_MS);

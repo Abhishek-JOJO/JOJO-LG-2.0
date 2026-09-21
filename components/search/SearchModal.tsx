@@ -85,21 +85,178 @@ function resolveId(item: any): string {
  */
 function useScrollIntoViewOnFocus(ref: React.RefObject<HTMLElement | null>, focused: boolean) {
   useEffect(() => {
-    if (focused) {
-      ref.current?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    if (focused && ref.current) {
+      ref.current.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });
     }
   }, [focused, ref]);
 }
 
+// ─── Focusable Search Input ───────────────────────────────────────────────────
+
+function FocusableSearchInput({
+  inputRef,
+  value,
+  onChange,
+  placeholder,
+  hasQuery,
+  hasResults,
+  hasRecents,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder: string;
+  hasQuery: boolean;
+  hasResults: boolean;
+  hasRecents: boolean;
+}) {
+  const { ref, focused, focusKey } = useFocusable({
+    focusKey: "search-input",
+    onEnterPress: () => {
+      inputRef.current?.focus();
+    },
+    onArrowPress: (direction) => {
+      if (direction === "right") {
+        if (hasQuery && doesFocusableExist("search-clear-btn")) {
+          setFocus("search-clear-btn");
+        } else if (doesFocusableExist("search-close-btn")) {
+          setFocus("search-close-btn");
+        }
+        return false;
+      }
+      if (direction === "down") {
+        if (hasQuery && hasResults && doesFocusableExist("search-poster-0")) {
+          setFocus("search-poster-0");
+          return false;
+        }
+        if (!hasQuery && hasRecents && doesFocusableExist("recent-chip-0")) {
+          setFocus("recent-chip-0");
+          return false;
+        }
+        return true;
+      }
+      if (direction === "up" || direction === "left") {
+        return false;
+      }
+      return true;
+    },
+  });
+
+  return (
+    <div
+      ref={ref as any}
+      data-focuskey={focusKey}
+      onClick={() => inputRef.current?.focus()}
+      className={`flex-1 flex items-center h-[42px] px-3 rounded-full transition-all duration-200 cursor-text ${
+        focused
+          ? "border-2 border-white ring-2 ring-white/60 bg-white/10 shadow-lg"
+          : "border-2 border-transparent hover:border-white/20 bg-transparent"
+      }`}
+    >
+      <JOJOCustomInput
+        ref={inputRef}
+        size={JOJOInputSize.S}
+        state={JOJOInputState.DEFAULT}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        autoComplete="off"
+        spellCheck={false}
+        aria-label={placeholder}
+        inputConfig={{
+          background: "transparent",
+          caretColor: "var(--theme_13_samecolour)",
+          placeholderColor: "theme_5",
+        }}
+        className="!bg-transparent !rounded-none !h-auto !px-0 border-none body-sm-regular w-full"
+      />
+    </div>
+  );
+}
+
+// ─── Search Clear Button ─────────────────────────────────────────────────────
+
+function SearchClearButton({ onClear, label }: { onClear: () => void; label: string }) {
+  const { ref, focused, focusKey } = useFocusable({
+    focusKey: "search-clear-btn",
+    onEnterPress: onClear,
+    onArrowPress: (direction) => {
+      if (direction === "left") {
+        setFocus("search-input");
+        return false;
+      }
+      if (direction === "right") {
+        if (doesFocusableExist("search-close-btn")) {
+          setFocus("search-close-btn");
+        }
+        return false;
+      }
+      if (direction === "down") {
+        if (doesFocusableExist("search-poster-0")) {
+          setFocus("search-poster-0");
+          return false;
+        }
+        return true;
+      }
+      if (direction === "up") {
+        return false;
+      }
+      return true;
+    },
+  });
+
+  return (
+    <div
+      ref={ref as any}
+      data-focuskey={focusKey}
+      role="button"
+      aria-label={label}
+      onClick={onClear}
+      className={`p-1.5 rounded-full transition-all cursor-pointer ${
+        focused
+          ? "bg-white text-black scale-110 ring-2 ring-white"
+          : "text-theme_5 hover:text-theme_1 hover:bg-white/10"
+      }`}
+    >
+      <X className="w-4 h-4" />
+    </div>
+  );
+}
+
 // ─── PosterCard ───────────────────────────────────────────────────────────────
 
-function PosterCard({ item, onClick }: { item: any; onClick: () => void }) {
+function PosterCard({
+  item,
+  index,
+  totalCols = 5,
+  hasRecents = false,
+  onClick,
+}: {
+  item: any;
+  index?: number;
+  totalCols?: number;
+  hasRecents?: boolean;
+  onClick: () => void;
+}) {
   const asset = item?.asset || item;
   const title = resolveTitle(item);
   const img = item?.genre ? item.genre.image || "" : resolveImage(asset);
+  const customFocusKey = typeof index === "number" ? `search-poster-${index}` : undefined;
 
   const { ref, focused, focusKey } = useFocusable({
+    focusKey: customFocusKey,
     onEnterPress: onClick,
+    onArrowPress: (direction) => {
+      if (direction === "up" && typeof index === "number" && index < totalCols) {
+        if (hasRecents && doesFocusableExist("recent-chip-0")) {
+          setFocus("recent-chip-0");
+        } else {
+          setFocus("search-input");
+        }
+        return false;
+      }
+      return true;
+    },
   });
   useScrollIntoViewOnFocus(ref, focused);
 
@@ -112,17 +269,6 @@ function PosterCard({ item, onClick }: { item: any; onClick: () => void }) {
     >
       {img ? (
         <>
-          {/* Blurred `cover` backdrop fills the whole frame so the contain-mode
-              artwork on top never sits against flat empty letterbox bars —
-              many of these items only have landscape-shaped art, and cover-
-              cropping that straight into this 2:3 card cuts off titles/faces.
-              Positioning lives on this outer plain div, NOT wrapperClassName —
-              JOJOCommonImage's own wrapper always includes a hardcoded
-              "relative" class that beats an "absolute" passed via
-              wrapperClassName in Tailwind's generated stylesheet order, so
-              the image silently stayed in normal document flow instead of
-              overlaying, pushing the second (sharp) layer below the fold and
-              out of view under this card's overflow-hidden. */}
           <div className="absolute inset-0 w-full h-full scale-110 blur-xl opacity-70">
             <JOJOCommonImage
               src={img}
@@ -133,10 +279,6 @@ function PosterCard({ item, onClick }: { item: any; onClick: () => void }) {
               wrapperClassName="w-full h-full"
             />
           </div>
-          {/* Full, uncropped artwork on top — never cut, whatever its ratio.
-              optimizeRequestURL disabled here too: the CDN's resize endpoint
-              doesn't support a "contain" fit param, so that request 404s and
-              only the blurred backdrop layer (raw URL) was ever showing. */}
           <div className="absolute inset-0 w-full h-full">
             <JOJOCommonImage
               src={img}
@@ -167,15 +309,33 @@ function PosterCard({ item, onClick }: { item: any; onClick: () => void }) {
 
 function RecentChip({
   term,
+  index,
+  totalCount,
   onSelect,
   onRemove,
 }: {
   term: string;
+  index: number;
+  totalCount: number;
   onSelect: () => void;
   onRemove: () => void;
 }) {
   const { ref, focused, focusKey } = useFocusable({
+    focusKey: `recent-chip-${index}`,
     onEnterPress: onSelect,
+    onArrowPress: (direction) => {
+      if (direction === "up") {
+        setFocus("search-input");
+        return false;
+      }
+      if (direction === "right" && index === totalCount - 1) {
+        if (doesFocusableExist("search-clear-all-btn")) {
+          setFocus("search-clear-all-btn");
+          return false;
+        }
+      }
+      return true;
+    },
   });
   useScrollIntoViewOnFocus(ref, focused);
 
@@ -203,19 +363,24 @@ function RecentChip({
   );
 }
 
-/**
- * Deliberately its own component, not an inline useFocusable() call inside SearchModal
- * itself: a component's hook calls read FocusContext from its OWN position in the tree
- * (i.e. wherever SearchModal itself sits), never from a <FocusContext.Provider> that same
- * component later renders in its own returned JSX — a provider only reaches descendant
- * components, not the component's own hooks. Keeping this inline previously registered it
- * under the app root instead of under MODAL_SEARCH, which broke preferredChildFocusKey
- * (nothing to descend into) and left focus stuck on the empty boundary node.
- */
-function SearchCloseButton({ onClose, label }: { onClose: () => void; label: string }) {
+function SearchCloseButton({ onClose, label, hasQuery }: { onClose: () => void; label: string; hasQuery?: boolean }) {
   const { ref, focused, focusKey } = useFocusable({
     focusKey: "search-close-btn",
     onEnterPress: onClose,
+    onArrowPress: (direction) => {
+      if (direction === "left") {
+        if (hasQuery && doesFocusableExist("search-clear-btn")) {
+          setFocus("search-clear-btn");
+        } else {
+          setFocus("search-input");
+        }
+        return false;
+      }
+      if (direction === "up") {
+        return false;
+      }
+      return true;
+    },
   });
 
   return (
@@ -225,16 +390,30 @@ function SearchCloseButton({ onClose, label }: { onClose: () => void; label: str
       role="button"
       aria-label={label}
       onClick={onClose}
-      className={`p-1.5 rounded-full transition-colors cursor-pointer ${focused ? "bg-white text-black" : "text-theme_5 hover:text-theme_1"}`}
+      className={`p-1.5 rounded-full transition-all cursor-pointer ${focused ? "bg-white text-black scale-110 ring-2 ring-white" : "text-theme_5 hover:text-theme_1 hover:bg-white/10"}`}
     >
       <X className="w-5 h-5" />
     </div>
   );
 }
 
-function ClearAllButton({ onClick, label }: { onClick: () => void; label: string }) {
+function ClearAllButton({ onClick, label, recentsCount }: { onClick: () => void; label: string; recentsCount: number }) {
   const { ref, focused, focusKey } = useFocusable({
+    focusKey: "search-clear-all-btn",
     onEnterPress: onClick,
+    onArrowPress: (direction) => {
+      if (direction === "up") {
+        setFocus("search-input");
+        return false;
+      }
+      if (direction === "left") {
+        if (recentsCount > 0 && doesFocusableExist(`recent-chip-${recentsCount - 1}`)) {
+          setFocus(`recent-chip-${recentsCount - 1}`);
+          return false;
+        }
+      }
+      return true;
+    },
   });
   useScrollIntoViewOnFocus(ref, focused);
 
@@ -244,7 +423,7 @@ function ClearAllButton({ onClick, label }: { onClick: () => void; label: string
       data-focuskey={focusKey}
       role="button"
       onClick={onClick}
-      className={`caption-xs-regular rounded-full px-2 py-1 transition-colors cursor-pointer ${focused ? "bg-white text-black" : "text-theme_5 hover:text-theme_1"}`}
+      className={`caption-xs-regular rounded-full px-2 py-1 transition-colors cursor-pointer ${focused ? "bg-white text-black scale-105" : "text-theme_5 hover:text-theme_1"}`}
     >
       {label}
     </div>
@@ -320,10 +499,12 @@ function GenreRow({
 function RecentlyAddedGrid({
   title,
   items,
+  hasRecents = false,
   onCardClick,
 }: {
   title: string;
   items: any[];
+  hasRecents?: boolean;
   onCardClick: (item: any, index: number) => void;
 }) {
   return (
@@ -334,6 +515,8 @@ function RecentlyAddedGrid({
           <PosterCard
             key={item.id ?? idx}
             item={item}
+            index={idx}
+            hasRecents={hasRecents}
             onClick={() => onCardClick(item, idx)}
           />
         ))}
@@ -450,48 +633,37 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
   const { ref: modalFocusRef, focusKey: modalFocusKey } = useFocusable({
     focusKey: "MODAL_SEARCH",
     isFocusBoundary: true,
-    preferredChildFocusKey: "search-close-btn",
+    preferredChildFocusKey: "search-input",
     focusable: isOpen,
   });
 
-  // Focus the close button directly (by its own key) rather than through
-  // preferredChildFocusKey resolution on the boundary — going through the boundary's
-  // container key proved unreliable in practice. Calling setFocus at most once (the
-  // moment the close button first exists) also means it can never re-fire later and
-  // fight the user's own navigation once they've moved elsewhere.
-  //
-  // Watches the DOM directly (MutationObserver) rather than polling on a timer: in
-  // theory the close button's own useFocusable() registration effect always completes
-  // before this effect runs (child effects commit before parent effects in the same
-  // render), so a synchronous check right here should always succeed immediately — but
-  // that didn't hold reliably in practice, and no fixed poll interval proved
-  // consistently fast enough either. Reacting to the actual DOM mutation removes the
-  // guesswork: it fires the instant the element genuinely appears, whatever the cause
-  // of the variable timing turns out to be.
   useEffect(() => {
     if (!isOpen) {
       restorePageFocus();
       return;
     }
 
-    const tryFocusCloseButton = () => {
-      if (doesFocusableExist("search-close-btn")) {
-        setFocus("search-close-btn");
+    const tryFocusSearchInput = () => {
+      if (doesFocusableExist("search-input")) {
+        setFocus("search-input");
         return true;
       }
       return false;
     };
 
-    if (tryFocusCloseButton()) return;
+    if (tryFocusSearchInput()) return;
 
     const observer = new MutationObserver(() => {
-      if (tryFocusCloseButton()) {
+      if (tryFocusSearchInput()) {
         observer.disconnect();
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
-    const timeoutId = setTimeout(() => observer.disconnect(), 5000);
+    const timeoutId = setTimeout(() => {
+      observer.disconnect();
+      tryFocusSearchInput();
+    }, 3000);
 
     return () => {
       observer.disconnect();
@@ -909,22 +1081,14 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                 animate={{ width: "100%", opacity: 1 }}
                 transition={{ delay: 0.1, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
               >
-                <JOJOCustomInput
-                  ref={inputRef}
-                  size={JOJOInputSize.S}
-                  state={JOJOInputState.DEFAULT}
+                <FocusableSearchInput
+                  inputRef={inputRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder={t("placeholder")}
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-label={t("placeholder")}
-                  inputConfig={{
-                    background: "transparent",
-                    caretColor: "var(--theme_13_samecolour)",
-                    placeholderColor: "theme_5",
-                  }}
-                  className="!bg-transparent !rounded-none !h-auto !px-0 border-none body-sm-regular"
+                  hasQuery={hasQuery}
+                  hasResults={searchResults.length > 0}
+                  hasRecents={recents?.length > 0}
                 />
               </motion.div>
 
@@ -932,7 +1096,17 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                 {showSpinner && hasQuery && (
                   <Loader2 className="w-4 h-4 text-theme_13_samecolour animate-spin" />
                 )}
-                <SearchCloseButton onClose={onClose} label={t("close")} />
+                {hasQuery && (
+                  <SearchClearButton
+                    onClear={() => {
+                      setInputValue("");
+                      setCurrentPage(1);
+                      setFocus("search-input");
+                    }}
+                    label={t("clear_all")}
+                  />
+                )}
+                <SearchCloseButton onClose={onClose} label={t("close")} hasQuery={hasQuery} />
               </div>
             </div>
 
@@ -955,13 +1129,15 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                         <h3 className="title-xs-semibold text-theme_1">
                           {t("recent_searches")}
                         </h3>
-                        <ClearAllButton onClick={clearAll} label={t("clear_all")} />
+                        <ClearAllButton onClick={clearAll} label={t("clear_all")} recentsCount={recents.length} />
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {recents.map((term) => (
+                        {recents.map((term, idx) => (
                           <RecentChip
                             key={term}
                             term={term}
+                            index={idx}
+                            totalCount={recents.length}
                             onRemove={() => removeRecent(term)}
                             onSelect={() => {
                               setInputValue(term);
@@ -997,6 +1173,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                             key={rail.id || idx}
                             title={rail.title}
                             items={rail.items}
+                            hasRecents={recents?.length > 0}
                             onCardClick={handleCardClick}
                           />
                         );
@@ -1010,6 +1187,16 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                           type={rail.type}
                           items={rail.items}
                           onItemClick={handleCardClick}
+                          onArrowUpDown={idx === 0 ? (direction) => {
+                            if (direction === "up") {
+                              if (recents?.length > 0 && doesFocusableExist("recent-chip-0")) {
+                                setFocus("recent-chip-0");
+                              } else {
+                                setFocus("search-input");
+                              }
+                              return true;
+                            }
+                          } : undefined}
                           onGenreClick={() => {
                             // NOTE: Do NOT call onClose() here.
                             // ContentRailSection internally calls router.push(genre) AFTER this callback.
@@ -1093,6 +1280,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                           <PosterCard
                             key={idx}
                             item={item}
+                            index={idx}
                             onClick={() => handleCardClick(item, idx)}
                           />
                         ))}

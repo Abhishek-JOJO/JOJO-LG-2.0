@@ -10,6 +10,7 @@ import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spat
 import { useEffect } from "react";
 
 import { restorePageFocus } from "@/src/navigation/focusUtils";
+import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 
 export default function AssetDetailPageClient({ initialAsset }: { initialAsset?: any }) {
   const params = useParams();
@@ -50,7 +51,7 @@ export default function AssetDetailPageClient({ initialAsset }: { initialAsset?:
 
   useEffect(() => {
     return () => {
-      restorePageFocus();
+      restorePageFocus(useAssetDetailStore.getState().returnFocusKey);
     };
   }, [assetId]);
 

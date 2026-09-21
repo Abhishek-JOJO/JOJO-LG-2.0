@@ -19,7 +19,7 @@ export function AssetDetailModal() {
     if (isOpen) {
       setTimeout(() => setFocus('MODAL_ASSET_DETAIL'), 100);
     } else {
-      restorePageFocus();
+      restorePageFocus(useAssetDetailStore.getState().returnFocusKey);
     }
   }, [isOpen]);
 
