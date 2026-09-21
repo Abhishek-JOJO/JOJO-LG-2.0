@@ -35,9 +35,22 @@ interface ProfileStore {
  * - BEFORE user selection → API can set profile
  * - AFTER user selection → STORE is source of truth
  */
-export const useProfileStore = create<ProfileStore>((set, get) => ({
-  selectedProfile: null,
-  hasUserSelectedProfile: false,
+export const useProfileStore = create<ProfileStore>((set, get) => {
+  let initialProfile: Profile | null = null;
+  let initialUserSelected = false;
+  if (typeof window !== "undefined") {
+    try {
+      const saved = localStorageManager.get<Profile>(StorageKey.SELECTED_PROFILE);
+      if (saved) {
+        initialProfile = saved;
+        initialUserSelected = true;
+      }
+    } catch {}
+  }
+
+  return {
+    selectedProfile: initialProfile,
+    hasUserSelectedProfile: initialUserSelected,
 
   /**
    * Set selected profile
@@ -132,7 +145,8 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
       hasUserSelectedProfile: false,
     });
   },
-}));
+  };
+});
 
 /**
  * Initialize profile from localStorage on app start

@@ -49,11 +49,15 @@ const PENDING_OPEN_KEY = "jojo_pending_asset_detail";
 export function schedulePendingAssetDetailOpen(
   id: string,
   contentType: string | number,
-  title: string
+  title: string,
+  cachedAsset?: any
 ): void {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(PENDING_OPEN_KEY, JSON.stringify({ id, contentType, title }));
+    sessionStorage.setItem(PENDING_OPEN_KEY, JSON.stringify({ id, contentType, title, cachedAsset }));
+    if (cachedAsset) {
+      sessionStorage.setItem(`asset_cache_${id}`, JSON.stringify(cachedAsset));
+    }
   } catch {
     // ignore — worst case the modal just doesn't reopen
   }
@@ -63,6 +67,7 @@ export function consumePendingAssetDetailOpen(): {
   id: string;
   contentType: string | number;
   title: string;
+  cachedAsset?: any;
 } | null {
   if (typeof window === "undefined") return null;
   try {

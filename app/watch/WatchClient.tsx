@@ -61,11 +61,13 @@ function WatchContent() {
   // and let LayoutClientWrapper's mount effect open the modal for real once
   // we land there.
   const handleBack = useCallback(() => {
+    const assetToCache = rawAsset || currentAsset;
+
     if (video?.parentId && rawAsset) {
       const parentId = String(rawAsset.asset_id ?? video.parentId);
       const title = rawAsset.asset_title ?? "";
       const type = rawAsset.asset_type ?? "shows";
-      schedulePendingAssetDetailOpen(parentId, type, title);
+      schedulePendingAssetDetailOpen(parentId, type, title, rawAsset);
       safeNavigate(router, ROUTES.HOME);
       return;
     }
@@ -73,7 +75,7 @@ function WatchContent() {
     if (video?.parentId) {
       const parentId = video.parentId;
       const title = video.seriesInfo?.seriesTitle ?? "";
-      schedulePendingAssetDetailOpen(parentId, "shows", title);
+      schedulePendingAssetDetailOpen(parentId, "shows", title, assetToCache);
       safeNavigate(router, ROUTES.HOME);
       return;
     }
@@ -81,7 +83,7 @@ function WatchContent() {
     if (video) {
       const contentId = video.contentId;
       const title = video.title ?? "";
-      schedulePendingAssetDetailOpen(contentId, video.contentType, title);
+      schedulePendingAssetDetailOpen(contentId, video.contentType, title, assetToCache);
       safeNavigate(router, ROUTES.HOME);
       return;
     }
@@ -98,7 +100,7 @@ function WatchContent() {
     // reopen for without asset data, but landing cleanly on home beats
     // crashing to webOS's native error screen.
     safeNavigate(router, ROUTES.HOME);
-  }, [video, rawAsset, router]);
+  }, [video, rawAsset, currentAsset, router]);
 
   // Automatically reset asset detail modal state on mount
   useEffect(() => {

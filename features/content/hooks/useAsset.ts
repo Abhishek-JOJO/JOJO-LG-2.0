@@ -50,6 +50,20 @@ export function useAsset(assetId: string, enabled = true) {
       return asset;
     },
     enabled: !!assetId && enabled,
+    initialData: () => {
+      if (typeof window === "undefined" || !assetId) return undefined;
+      try {
+        const cached = sessionStorage.getItem(`asset_cache_${assetId}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && (String(parsed.assetId || parsed.asset_id || parsed.id) === String(assetId))) {
+            return parsed;
+          }
+        }
+      } catch {}
+      return undefined;
+    },
+    initialDataUpdatedAt: () => Date.now(),
     staleTime: appConfig.STALE_TIME,
     retry: (failureCount, error: any) => {
       const isSocketError = error?.status === 403 || String(error).includes('socket');

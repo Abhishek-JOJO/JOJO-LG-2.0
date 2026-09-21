@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
-import { fetchConfig, setAppConfig } from "@lib/config/app.config";
+import { fetchConfig, setAppConfig, getCachedRuntimeConfig } from "@lib/config/app.config";
 import { env } from "@lib/config/env";
 import { fetchGeoData } from "@lib/geo/geo.service";
 import { getCachedGeo, setCachedGeo } from "@lib/geo/geo.cache";
@@ -21,9 +21,10 @@ type BootstrapState = "loading" | "ready" | "error";
 
 export function BootstrapProvider({ children }: BootstrapProviderProps) {
   const t = useTranslations("bootstrap");
-  const [state, setState] = useState<BootstrapState>("loading");
+  const hasCachedConfig = typeof window !== "undefined" && !!getCachedRuntimeConfig();
+  const [state, setState] = useState<BootstrapState>(hasCachedConfig ? "ready" : "loading");
   const [error, setError] = useState<string | null>(null);
-  const [isAppReady, setIsAppReady] = useState(false);
+  const [isAppReady, setIsAppReady] = useState(hasCachedConfig);
   const [isMounted, setIsMounted] = useState(false);
 
   // Prevent hydration mismatch - only show loading UI after mount

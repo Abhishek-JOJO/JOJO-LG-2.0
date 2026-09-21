@@ -280,18 +280,22 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     assetId,
     !!assetId && isAppReady && !!sessionId
   );
-  const queryNotStarted = status === 'pending' && fetchStatus === 'idle';
+  const queryNotStarted = (status as string) === 'pending' && fetchStatus === 'idle';
   // A 403 means the WebSocket socket handshake hasn't finished — treat as transient loading.
   const isTransient403 = isError && ((error as any)?.status === 403 || String(error).includes('socket'));
   
-  // Deliberately clientAsset only, NOT `|| initialAsset` — every piece of gating,
-  // button, and focus logic below reads `asset`/`currentAsset`, and initialAsset
-  // is only ever a partial content-rail item (no seasons/cast/pricing/entitlements),
-  // so treating it as a real asset here would let all that logic run against
-  // incomplete data. initialAsset is used ONLY inside the skeleton branch below,
-  // purely to paint the already-known poster/title instantly — real `asset` still
-  // waits for the actual fetch, exactly as before this prop existed.
-  const currentAsset = clientAsset;
+  // If initialAsset is a full asset (passed back from the player or restored from cache),
+  // use it immediately to render without delay or skeleton flashing.
+  const isFullAsset = initialAsset && (initialAsset.assetId || initialAsset.asset_id || (initialAsset.seasons && initialAsset.seasons.length > 0));
+  const currentAsset: NonNullable<typeof clientAsset> | null = clientAsset || (isFullAsset ? (initialAsset as NonNullable<typeof clientAsset>) : null);
+
+  useEffect(() => {
+    if (clientAsset && assetId) {
+      try {
+        sessionStorage.setItem(`asset_cache_${assetId}`, JSON.stringify(clientAsset));
+      } catch {}
+    }
+  }, [clientAsset, assetId]);
 
   // Auth is loading if bootstrap isn't done, session isn't loaded, or socket handshake is failing
   const isAuthLoading = !isAppReady || !sessionId || isTransient403;
@@ -903,9 +907,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // If found, that is our last watched episode, which we should resume.
   const lastWatchedEpisodeCwItem = useMemo(() => {
     if (!isShowAsset || !asset?.seasons) return null;
-    const allEpisodes = asset.seasons.flatMap((s) => s.episodes || []);
+    const allEpisodes = (asset.seasons as any[]).flatMap((s: any) => s.episodes || []);
     return cwItems.find((cw) =>
-      allEpisodes.some((ep) => String(ep.assetId) === String(cw.id))
+      allEpisodes.some((ep: any) => String(ep.assetId || ep.id) === String(cw.id))
     ) || null;
   }, [isShowAsset, asset, cwItems]);
 
@@ -1423,7 +1427,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const isComingSoon =
     asset.isUpcomingScheduled === true &&
     Array.isArray(asset.asset_tags) &&
-    asset.asset_tags.some((tag) => tag.toLowerCase().includes("coming soon"));
+    asset.asset_tags.some((tag: any) => typeof tag === "string" && tag.toLowerCase().includes("coming soon"));
 
   const bgPosterUrl = activePreview?.poster || asset.poster?.url || asset.landscape?.url || "";
 
@@ -1601,7 +1605,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
         {/* "More below" hint — only visible when the overlay sheet is CLOSED */}
         {isStandalone && hasAnyTab && (
-          <div className={`absolute left-4 sm:left-6 lg:left-14 bottom-5 sm:bottom-7 z-20 flex flex-col items-start gap-2 pointer-events-none transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+          <div className={`absolute left-4 sm:left-6 lg:left-14 bottom-5 sm:bottom-7 z-20 flex flex-row items-center gap-2.5 sm:gap-3 pointer-events-none transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
             <div className="flex items-center gap-2.5 sm:gap-3">
               {hasEpisodesTab && (
                 <span className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wide">
@@ -1624,7 +1628,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 </span>
               )}
             </div>
-            <ChevronDown size={20} className="text-white/70 animate-bounce ml-4" />
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-white/80 shrink-0">
+              <ChevronDown size={18} className="animate-bounce" />
+            </div>
           </div>
         )}
       </div>
@@ -1923,7 +1929,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                     {/* Left Column: Season List */}
                     {seasonsOption.length > 0 && (
                       <div className="flex flex-col gap-2.5 w-[220px] sm:w-[260px] shrink-0">
-                        {seasonsOption.map((s, idx) => (
+                        {seasonsOption.map((s: any, idx: number) => (
                           <FocusableSeasonListItem
                             key={s.assetId || idx}
                             idx={idx}

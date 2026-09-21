@@ -28,10 +28,21 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   // exactly the "did we just land here from that kind of navigation?" check
   // this needs — a no-op on every load that didn't schedule anything.
   useEffect(() => {
-    const pending = consumePendingAssetDetailOpen();
-    if (pending) {
-      useAssetDetailStore.getState().openAssetDetail(pending.id, pending.contentType, pending.title);
-    }
+    const handleReopen = () => {
+      const pending = consumePendingAssetDetailOpen();
+      if (pending) {
+        useAssetDetailStore.getState().openAssetDetail(
+          pending.id,
+          pending.contentType,
+          pending.title,
+          pending.cachedAsset
+        );
+      }
+    };
+
+    handleReopen();
+    window.addEventListener("pageshow", handleReopen);
+    return () => window.removeEventListener("pageshow", handleReopen);
   }, []);
   const { showNavbar, showFooter } = appConfig?.flags;
   const pathname = useActivePathname();

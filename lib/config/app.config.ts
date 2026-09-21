@@ -38,6 +38,23 @@ export interface RuntimeConfig {
 // In-memory config storage
 let runtimeConfig: RuntimeConfig | null = null;
 
+const RUNTIME_CONFIG_STORAGE_KEY = "jojo_runtime_config";
+
+export function getCachedRuntimeConfig(): RuntimeConfig | null {
+    if (runtimeConfig) return runtimeConfig;
+    if (typeof window === "undefined") return null;
+    try {
+        const raw = sessionStorage.getItem(RUNTIME_CONFIG_STORAGE_KEY);
+        if (raw) {
+            runtimeConfig = JSON.parse(raw);
+            return runtimeConfig;
+        }
+    } catch {
+        // ignore
+    }
+    return null;
+}
+
 // Fetch in progress flag to prevent duplicate requests
 let fetchInProgress: Promise<RuntimeConfig> | null = null;
 
@@ -47,13 +64,14 @@ let fetchInProgress: Promise<RuntimeConfig> | null = null;
  * Retries once on failure
  * Falls back to env variables if fetch fails
  * 
- * Uses in-memory cache to prevent duplicate fetches
+ * Uses in-memory cache and sessionStorage to prevent duplicate fetches
  */
 export async function fetchConfig(): Promise<RuntimeConfig> {
-    // Return cached config if already loaded
-    if (runtimeConfig) {
+    // Return cached config if already loaded (in-memory or sessionStorage)
+    const cached = getCachedRuntimeConfig();
+    if (cached) {
         logger.info("[Config] Using cached config");
-        return runtimeConfig;
+        return cached;
     }
 
     // Return in-progress fetch to prevent duplicate requests
@@ -67,6 +85,11 @@ export async function fetchConfig(): Promise<RuntimeConfig> {
         try {
             const config = await performFetch();
             runtimeConfig = config;
+            if (typeof window !== "undefined") {
+                try {
+                    sessionStorage.setItem(RUNTIME_CONFIG_STORAGE_KEY, JSON.stringify(config));
+                } catch {}
+            }
             return config;
         } finally {
             fetchInProgress = null;
@@ -246,6 +269,11 @@ async function decryptConfig(encrypted: string): Promise<RuntimeConfig> {
  */
 export function setAppConfig(config: RuntimeConfig): void {
     runtimeConfig = config;
+    if (typeof window !== "undefined") {
+        try {
+            sessionStorage.setItem(RUNTIME_CONFIG_STORAGE_KEY, JSON.stringify(config));
+        } catch {}
+    }
 }
 
 /**
