@@ -162,7 +162,7 @@ function AssetDetailModalBoundary({
         <div
           ref={scrollContainerRef}
           onClick={onBackdropClick}
-          className="absolute inset-0 overflow-y-auto flex items-start justify-center p-0 overscroll-contain"
+          className="absolute inset-0 overflow-y-auto flex items-start justify-start p-0 overscroll-contain"
         >
           <motion.div
             initial={{ opacity: 0 }}

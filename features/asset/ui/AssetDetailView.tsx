@@ -1601,7 +1601,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
         {/* "More below" hint — only visible when the overlay sheet is CLOSED */}
         {isStandalone && hasAnyTab && (
-          <div className={`absolute inset-x-0 bottom-5 sm:bottom-7 z-20 flex flex-col items-center gap-2 pointer-events-none transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+          <div className={`absolute left-4 sm:left-6 lg:left-14 bottom-5 sm:bottom-7 z-20 flex flex-col items-start gap-2 pointer-events-none transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
             <div className="flex items-center gap-2.5 sm:gap-3">
               {hasEpisodesTab && (
                 <span className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wide">
@@ -1624,7 +1624,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 </span>
               )}
             </div>
-            <ChevronDown size={20} className="text-white/70 animate-bounce" />
+            <ChevronDown size={20} className="text-white/70 animate-bounce ml-4" />
           </div>
         )}
       </div>
@@ -1801,17 +1801,17 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         id="asset-detail-content-sheet"
         ref={contentOverlayRef as any}
         data-overlay-open={contentOverlayOpen ? "true" : "false"}
-        className={`fixed inset-0 z-30 overflow-y-auto bg-neutral-950 transition-transform duration-500 ease-out ${contentOverlayOpen ? "translate-y-0" : "translate-y-full"}`}
+        className={`fixed inset-0 z-30 flex flex-col bg-neutral-950 transition-transform duration-500 ease-out overflow-hidden ${contentOverlayOpen ? "translate-y-0" : "translate-y-full"}`}
         style={{ willChange: "transform" }}
       >
       <FocusContext.Provider value={contentOverlayFocusKey}>
       {
         hasAnyTab && (
-          <div className={isStandalone ? "px-6 sm:px-10 lg:px-16 pt-20 sm:pt-24 pb-20 w-full" : "px-8 pt-20 pb-20 w-full"}>
-            <div className="flex flex-col gap-6">
-              {/* Tabs Selector Bar - Clean TV tabs with active orange underline and zero-clip focus state */}
-              <div className="flex items-center justify-between border-b border-white/10">
-                <div className="flex items-center gap-4 sm:gap-6 py-3 px-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div className="flex flex-col h-full w-full overflow-hidden">
+            {/* Fixed Tabs Header Bar — stays pinned at the top of the viewport during scrolling */}
+            <div className="w-full shrink-0 z-40 bg-neutral-950/95 backdrop-blur-md border-b border-white/10 px-6 sm:px-10 lg:px-16 pt-8 sm:pt-10 pb-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-6 sm:gap-8 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                   {hasEpisodesTab && (
                     <FocusableTabButton
                       label={t("episodes")}
@@ -1902,7 +1902,13 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   )}
                 </div>
               </div>
+            </div>
 
+            {/* Scrollable Content Body — scrolling episodes, cast, and related */}
+            <div
+              id="asset-detail-content-scroll"
+              className="flex-1 overflow-y-auto px-6 sm:px-10 lg:px-16 pt-6 pb-24 w-full scrollbar-none"
+            >
               {/* Episodes Tab Panel — only mounted while active. All 4 tab panels used to
                   be built into the DOM as soon as the asset loaded (just hidden via CSS),
                   which meant opening any asset paid the cost of rendering episodes AND
@@ -2052,7 +2058,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                       <div
                         ref={castListRef}
                         onScroll={checkCastScroll}
-                        className={`flex gap-6 sm:gap-8 overflow-x-auto pt-8 pb-12 px-8 scrollbar-none ${
+                        className={`flex gap-6 sm:gap-8 overflow-x-auto pt-4 pb-12 px-0 scrollbar-none ${
                           isCastDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"
                         }`}
                       >
@@ -2365,7 +2371,7 @@ function FocusableCastItem({
       return true;
     },
     onFocus: () => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
       onFocused?.(castFocusKey);
     }
   });
@@ -2599,6 +2605,10 @@ function FocusableTabButton({
     onFocus: () => {
       // Fluid Smart TV navigation: auto-activate tab when remote focuses it
       onActivate?.();
+      const scrollArea = typeof document !== 'undefined' ? document.getElementById("asset-detail-content-scroll") : null;
+      if (scrollArea && scrollArea.scrollTop > 5) {
+        scrollArea.scrollTop = 0;
+      }
       const sheet = ref.current?.closest("#asset-detail-content-sheet");
       if (sheet && sheet.scrollTop > 5) {
         sheet.scrollTop = 0;
@@ -2610,7 +2620,7 @@ function FocusableTabButton({
     <button
       ref={ref as any}
       onClick={handleActivate}
-      className={`relative pt-1 pb-3 text-base sm:text-lg lg:text-xl font-bold transition-all outline-none shrink-0 cursor-pointer ${
+      className={`relative pt-1 pb-3 text-base sm:text-lg lg:text-xl font-semibold transition-colors outline-none shrink-0 cursor-pointer ${
         isActive
           ? "text-theme_13_samecolour"
           : focused
@@ -2618,18 +2628,12 @@ function FocusableTabButton({
             : "text-neutral-400 hover:text-white"
       }`}
     >
-      <span
-        className={`relative inline-flex items-center justify-center px-4 py-1.5 rounded-xl border-2 transition-all ${
-          focused
-            ? "border-white bg-white/20 text-white shadow-lg"
-            : "border-transparent"
-        }`}
-      >
+      <span className="inline-block px-1 py-1">
         {label}
       </span>
       {isActive && (
         <span
-          className="absolute bottom-0 left-2 right-2 h-[3px] bg-theme_13_samecolour rounded-full shadow-[0_0_10px_rgba(255,102,0,0.6)]"
+          className="absolute bottom-0 left-0 right-0 h-[3px] bg-theme_13_samecolour rounded-full shadow-[0_0_10px_rgba(255,102,0,0.6)]"
         />
       )}
     </button>
