@@ -79,17 +79,32 @@ function sanitizeTildeFilenames(outDir: string) {
   if (tildeMap.size === 0) return;
   console.log(`[webOS Fix] Renamed ${tildeMap.size} files containing '~' to '_' for webOS file:// protocol compatibility.`);
 
-  // Step 2: Replace references to old tilde filenames across all HTML, JS, CSS, and JSON files
+  // Include Next.js static Flight payloads (.txt): client navigation reads
+  // their chunk references even though the initial HTML was already patched.
   const updatedFiles = getAllFiles(outDir);
   for (const filePath of updatedFiles) {
     if (
       filePath.endsWith('.html') ||
       filePath.endsWith('.js') ||
       filePath.endsWith('.css') ||
-      filePath.endsWith('.json')
+      filePath.endsWith('.json') ||
+      filePath.endsWith('.txt')
     ) {
       let content = fs.readFileSync(filePath, 'utf8');
       let modified = false;
+      if (filePath.endsWith('.html')) {
+        // Flight can split a filename between adjacent script payloads. Join
+        // those strings before rewriting names, otherwise a split '~' path
+        // survives even though the corresponding file has been renamed.
+        const flightScript = /<script>self\.__next_f\.push\((\[1,"(?:\\.|[^"\\])*"\])\)<\/script>/g;
+        const flightGroup = /(?:<script>self\.__next_f\.push\(\[1,"(?:\\.|[^"\\])*"\]\)<\/script>){2,}/g;
+        const joined = content.replace(flightGroup, (group) => {
+          const payload = Array.from(group.matchAll(flightScript), (match) => JSON.parse(match[1])[1]).join('');
+          return `<script>self.__next_f.push(${JSON.stringify([1, payload]).replaceAll('<', '\\u003c')})</script>`;
+        });
+        modified = joined !== content;
+        content = joined;
+      }
       for (const [oldName, newName] of tildeMap.entries()) {
         if (content.includes(oldName)) {
           content = content.replaceAll(oldName, newName);

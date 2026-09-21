@@ -14,6 +14,7 @@ import { logger } from '@lib/logger/logger';
 import { appConfig } from '@/lib/config/app.config';
 import { localStorageManager } from '@lib/localStorage/localStorage.manager';
 import { StorageKey } from '@enums/storage.enum';
+import { takePreparedPlayback } from '../utils/preparedPlayback';
 
 export function useVideoDetails(contentId: string, isAppReady: boolean = true, enabled: boolean = true) {
   const token = useAuthStore((state) => state.token);
@@ -32,6 +33,8 @@ export function useVideoDetails(contentId: string, isAppReady: boolean = true, e
   return useQuery({
     queryKey: ['video-details', contentId, effectiveSessionId],
     queryFn: async () => {
+      const prepared = takePreparedPlayback(contentId, effectiveSessionId, localStorage.getItem(StorageKey.SELECTED_PROFILE));
+      if (prepared) return prepared;
       logger.info('[useVideoDetails] Fetching', { contentId });
       const video = await fetchVideoDetails(contentId, effectiveSessionId ?? undefined);
       logger.info('[useVideoDetails] Fetched', { title: video.title });

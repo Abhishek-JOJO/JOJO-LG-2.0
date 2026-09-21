@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useCallback, useState } from "react";
 import { useVideoDetails } from "@features/player/hooks/useVideoDetails";
 import { OTTPlayer } from "@features/player/components/OTTPlayer";
+import { PlayerLoadingView } from "@features/player/components/PlayerLoadingView";
 import { Loader } from "@components/common/Loader";
 import { useToastStore } from "@store/useToastStore";
 import { ROUTES } from "@/lib/constants/routes";
@@ -40,7 +41,7 @@ function WatchContent() {
 
   // 2. Fetch video details for playback engine only when user is authorized
   const { isAppReady } = useBootstrap();
-  const { data: video, isLoading: isVideoLoading, isError, error } = useVideoDetails(
+  const { data: video, isError, error } = useVideoDetails(
     id,
     isAppReady,
     isPlaybackFetchEnabled
@@ -88,6 +89,18 @@ function WatchContent() {
       return;
     }
 
+    // Back also works before the playback response arrives. Reopen the
+    // selected title (or its series) using the metadata already available.
+    if (assetToCache) {
+      const parentId = currentAsset?.parent_id || currentAsset?.parentId || currentAsset?.seriesInfo?.seriesId;
+      const returnId = String(rawAsset?.asset_id ?? parentId ?? id);
+      const title = rawAsset?.asset_title ?? currentAsset?.seriesInfo?.seriesTitle ?? currentAsset?.asset_title ?? currentAsset?.title ?? "";
+      const type = rawAsset?.asset_type ?? (parentId ? "shows" : currentAsset?.asset_type ?? currentAsset?.assetTypeName ?? "movies");
+      schedulePendingAssetDetailOpen(returnId, type, title, rawAsset || (parentId ? undefined : currentAsset));
+      safeNavigate(router, ROUTES.HOME);
+      return;
+    }
+
     // video/rawAsset can transiently be unset here even after playback has
     // visibly started — confirmed live: `video.duration` on the actual
     // <video> element was already populated while this still fired, meaning
@@ -100,7 +113,7 @@ function WatchContent() {
     // reopen for without asset data, but landing cleanly on home beats
     // crashing to webOS's native error screen.
     safeNavigate(router, ROUTES.HOME);
-  }, [video, rawAsset, currentAsset, router]);
+  }, [video, rawAsset, currentAsset, id, router]);
 
   // Automatically reset asset detail modal state on mount
   useEffect(() => {
@@ -213,15 +226,6 @@ function WatchContent() {
     );
   }
 
-  // GATE: Still loading checks — show loader, NEVER the player
-  if (gateStatus === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <Loader />
-      </div>
-    );
-  }
-
   // GATE: Blocked — show loader while redirect fires
   if (gateStatus === "blocked") {
     return (
@@ -231,12 +235,14 @@ function WatchContent() {
     );
   }
 
-  // GATE: Still waiting for video data after passing the gate
-  if (isError || !video) {
+  // Show the player's loading presentation immediately. The playback engine
+  // still mounts only after authorization and a successful playback response.
+  if (gateStatus === "loading" || isError || !video) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <Loader />
-      </div>
+      <PlayerLoadingView
+        title={video?.title || currentAsset?.title || currentAsset?.asset_title}
+        onBack={handleBack}
+      />
     );
   }
 
@@ -330,11 +336,7 @@ function WatchContent() {
 export default function WatchPage() {
   return (
     <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-black">
-          <Loader />
-        </div>
-      }
+      fallback={<PlayerLoadingView />}
     >
       <WatchContent />
     </Suspense>

@@ -891,6 +891,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // ── Entitlement gating (mobile → auth → overseas → SVOD → TVOD) ──────────
   const {
     handleWatch,
+    isPreparingPlayback,
     gateResult,
     clearGate,
     isPricingLoading,
@@ -899,7 +900,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     isTvodPurchased,
     pricing,
     isVerifyLoading,
-  } = useWatchGating({ asset, enabled: isAppReady });
+  } = useWatchGating({ asset, enabled: isAppReady, prepareBeforeNavigation: true });
 
   const cwItems = useContinueWatchingStore((s) => s.items);
 
@@ -1680,13 +1681,13 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 state={JOJOButton.State.ACTIVE}
                 size={JOJOButton.Size.M}
                 appearance={buttonConfig.appearance}
-                disabled={buttonConfig.disabled}
-                leftIcon={buttonConfig.showIcon ? <Play className="w-4 h-4 sm:w-5" fill="currentColor" /> : undefined}
+                disabled={buttonConfig.disabled || isPreparingPlayback}
+                leftIcon={isPreparingPlayback ? <Loader size="sm" /> : buttonConfig.showIcon ? <Play className="w-4 h-4 sm:w-5" fill="currentColor" /> : undefined}
                 onClick={handleWatchNow}
                 className="text-theme_1 !text-sm sm:!text-base sm:body-sm-medium font-bold gap-1.5 sm:gap-2 h-9 sm:h-11 px-4 sm:px-8 transition-all !rounded-full shrink-0"
               >
                 {(() => {
-                  const text = buttonConfig.text;
+                  const text = isPreparingPlayback ? "Loading..." : buttonConfig.text;
                   // Map button text to translation keys
                   if (text === "Play") return tButton("play");
                   if (text === "Watch Now") return tButton("watch_now");

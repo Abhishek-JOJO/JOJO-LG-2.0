@@ -15,7 +15,7 @@
  * Returns a `checkGate` function and the current gate result state.
  */
 
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@store/useAuthStore";
 import { useGeoAvailability } from "@/features/geo/hooks/useGeoAvailability";
@@ -31,6 +31,10 @@ import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore"
 import { useGuestPopupStore } from "@/store/useGuestPopupStore";
 import { transformTVODToPaymentPlan } from "@/lib/utils/tvodPaymentTransformer";
 import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { fetchVideoDetails } from "@/features/player/services/player.service";
+import { savePreparedPlayback } from "@/features/player/utils/preparedPlayback";
+import { StorageKey } from "@/enums/storage.enum";
+import { useToastStore } from "@/store/useToastStore";
 
 // ── Gate result types ──────────────────────────────────────────────────────────
 
@@ -55,9 +59,11 @@ interface UseWatchGatingOptions {
   enabled?: boolean;
   batchPricing?: any;
   disableIndividualPricing?: boolean;
+  prepareBeforeNavigation?: boolean;
 }
 
 interface UseWatchGatingReturn {
+  isPreparingPlayback: boolean;
   /** Run the full gate check for the given assetId. Navigates to watch if all gates pass. */
   handleWatch: (targetAssetId: string, resumeTime?: number) => void;
   /** Current active gate result (null if no check has been performed) */
@@ -83,9 +89,19 @@ export function useWatchGating({
   enabled = true,
   batchPricing,
   disableIndividualPricing = false,
+  prepareBeforeNavigation = false,
 }: UseWatchGatingOptions): UseWatchGatingReturn {
   const router = useRouter();
   const [gateResult, setGateResult] = useState<WatchGateResult | null>(null);
+  const [isPreparingPlayback, setIsPreparingPlayback] = useState(false);
+  const preparingRef = useRef(false);
+  const preparationVersion = useRef(0);
+
+  useEffect(() => {
+    preparingRef.current = false;
+    setIsPreparingPlayback(false);
+    return () => { preparationVersion.current += 1; };
+  }, [asset?.assetId]);
 
   // ── Auth state ─────────────────────────────────────────────────────────────
   const { isAuthenticated, user, token } = useAuthStore();
@@ -130,7 +146,8 @@ export function useWatchGating({
 
   // ── Gate check chain ───────────────────────────────────────────────────────
   const handleWatch = useCallback(
-    (targetAssetId: string, resumeTime: number = 0) => {
+    async (targetAssetId: string, resumeTime: number = 0) => {
+      if (preparingRef.current) return;
       logger.info("[useWatchGating] Starting gate check", {
         targetAssetId,
         isMobile,
@@ -270,6 +287,39 @@ export function useWatchGating({
         logger.warn("[useWatchGating] Failed to store play metadata in sessionStorage", err);
       }
 
+      // Keep the detail page visible while preparing playback, instead of
+      // navigating into a second full-screen loader. The backend still makes
+      // the entitlement decision before it returns the signed stream URL.
+      if (prepareBeforeNavigation && token) {
+        preparingRef.current = true;
+        setIsPreparingPlayback(true);
+        const version = preparationVersion.current;
+        const profile = localStorage.getItem(StorageKey.SELECTED_PROFILE);
+        try {
+          const video = await fetchVideoDetails(targetAssetId, token);
+          video.thumbnailUrl ||= asset?.landscape?.url || asset?.poster?.url || "";
+          if (version !== preparationVersion.current) return;
+          if (useAuthStore.getState().token !== token || localStorage.getItem(StorageKey.SELECTED_PROFILE) !== profile) return;
+          // Storage can be unavailable; the watch page can still fetch normally.
+          try { savePreparedPlayback(video, token, profile); } catch { /* normal fetch fallback */ }
+        } catch (error) {
+          if (version !== preparationVersion.current) return;
+          const message = error instanceof Error ? error.message : "Failed to load playback details";
+          useToastStore.getState().show(message, "error");
+          const status = (error as { status?: number })?.status;
+          if (status === 403 || message.toLowerCase().includes("subscription")) {
+            useAssetDetailStore.getState().resetAssetDetailModal();
+            safeNavigate(router, ROUTES.SUBSCRIPTION);
+          }
+          return;
+        } finally {
+          if (version === preparationVersion.current) {
+            preparingRef.current = false;
+            setIsPreparingPlayback(false);
+          }
+        }
+      }
+
       // ── All gates passed — navigate to watch page ────────────────────────
       logger.info("[useWatchGating] All gates passed, navigating to watch", {
         targetAssetId,
@@ -292,6 +342,8 @@ export function useWatchGating({
       pricing,
       asset,
       router,
+      token,
+      prepareBeforeNavigation,
     ]
   );
 
@@ -300,6 +352,7 @@ export function useWatchGating({
   }, []);
 
   return {
+    isPreparingPlayback,
     handleWatch,
     gateResult,
     clearGate,
