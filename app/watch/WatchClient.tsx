@@ -108,7 +108,7 @@ function WatchContent() {
         if (rawMeta) meta = JSON.parse(rawMeta);
       } catch {}
 
-      const posterUrl = meta?.landscape || meta?.poster || video?.thumbnailUrl || "";
+      const posterUrl = meta?.assetDetailImage || meta?.poster || meta?.landscape || video?.assetDetailImage || video?.thumbnailUrl || "";
       assetToCache = {
         assetId: returnId,
         id: returnId,

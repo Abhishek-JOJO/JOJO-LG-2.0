@@ -84,6 +84,25 @@ interface UseWatchGatingReturn {
   isVerifyLoading: boolean;
 }
 
+function getAssetDetailHandoffImage(asset: ContentAsset | null | undefined): string {
+  if (!asset) return "";
+  const source = asset as any;
+  return (
+    asset.poster?.url ||
+    (typeof asset.poster === "string" ? asset.poster : "") ||
+    asset.landscape?.url ||
+    (typeof asset.landscape === "string" ? asset.landscape : "") ||
+    source.heroImage ||
+    source.landscapeImage ||
+    source.posterImage ||
+    source.image ||
+    source.thumbnailUrl ||
+    (asset.poster as any)?.path ||
+    (asset.landscape as any)?.path ||
+    ""
+  );
+}
+
 export function useWatchGating({
   asset,
   enabled = true,
@@ -240,6 +259,7 @@ export function useWatchGating({
           const newMeta = {
             title: playTitle,
             description: playDescription,
+            assetDetailImage: getAssetDetailHandoffImage(asset),
             seriesInfo,
             certification: asset.certification,
             classifications: asset.classifications,
@@ -297,7 +317,11 @@ export function useWatchGating({
         const profile = localStorage.getItem(StorageKey.SELECTED_PROFILE);
         try {
           const video = await fetchVideoDetails(targetAssetId, token);
-          video.thumbnailUrl ||= asset?.landscape?.url || asset?.poster?.url || "";
+          const assetDetailImage = getAssetDetailHandoffImage(asset);
+          if (assetDetailImage) {
+            video.assetDetailImage = assetDetailImage;
+            video.thumbnailUrl ||= assetDetailImage;
+          }
           if (version !== preparationVersion.current) return;
           if (useAuthStore.getState().token !== token || localStorage.getItem(StorageKey.SELECTED_PROFILE) !== profile) return;
           // Storage can be unavailable; the watch page can still fetch normally.

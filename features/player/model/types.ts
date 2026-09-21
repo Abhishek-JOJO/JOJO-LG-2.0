@@ -24,6 +24,8 @@ export interface VideoDetails {
   /** Duration in seconds */
   durationSeconds: number;
   thumbnailUrl: string;
+  /** Artwork captured from the asset detail page for page-to-player handoff. */
+  assetDetailImage?: string;
   /** VTT file describing thumbnail sprites for seek preview */
   thumbnailVttUrl: string | null;
   /** Sprite sheet image URL (alternative to VTT) */

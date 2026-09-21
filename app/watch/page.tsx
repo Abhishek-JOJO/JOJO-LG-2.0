@@ -20,8 +20,9 @@ export default async function WatchPage() {
             var prepared = JSON.parse(sessionStorage.getItem("jojo_prepared_playback") || "null");
             var contentId = new URLSearchParams(location.search).get("v");
             var age = prepared ? Date.now() - prepared.createdAt : -1;
-            if (prepared && prepared.video && prepared.video.contentId === contentId && age >= 0 && age <= 30000 && prepared.video.thumbnailUrl) {
-              document.documentElement.style.setProperty("--playback-startup-artwork", "url(" + JSON.stringify(prepared.video.thumbnailUrl) + ")");
+            var artwork = prepared && prepared.video ? (prepared.video.assetDetailImage || prepared.video.thumbnailUrl) : "";
+            if (prepared && prepared.video && prepared.video.contentId === contentId && age >= 0 && age <= 30000 && artwork) {
+              document.documentElement.style.setProperty("--playback-startup-artwork", "url(" + JSON.stringify(artwork) + ")");
             } else {
               document.documentElement.style.removeProperty("--playback-startup-artwork");
             }

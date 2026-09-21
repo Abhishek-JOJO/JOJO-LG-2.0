@@ -423,7 +423,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
           )}
         </div>
         {/* We keep a subtle left shadow just for text readability if needed, but Hotstar relies more on bottom shadow */}
-        <div className={`absolute inset-y-0 left-0 w-full sm:w-[50%] md:w-[45%] lg:w-[40%] xl:w-[35%] bg-gradient-to-r from-black/80 via-black/40 to-transparent z-10 pointer-events-none transition-opacity duration-700 ${isActive ? "opacity-100" : "opacity-0"}`} />
+        <div className={`absolute inset-y-0 left-0 w-full sm:w-[55%] md:w-[50%] lg:w-[46%] xl:w-[42%] bg-gradient-to-r from-black/80 via-black/40 to-transparent z-10 pointer-events-none transition-opacity duration-700 ${isActive ? "opacity-100" : "opacity-0"}`} />
       </div>
       
       {/* Hotstar Bottom Gradient */}
@@ -432,14 +432,14 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
 
 
       <div
-        className={`absolute bottom-12 sm:bottom-16 lg:bottom-20 left-6 sm:left-8 lg:left-12 right-[120px] max-w-4xl text-left z-20 transition-all duration-700 ease-out ${isActive ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        className={`absolute bottom-14 sm:bottom-[4.5rem] lg:bottom-[5.5rem] left-7 sm:left-10 lg:left-16 right-[120px] max-w-5xl text-left z-20 transition-all duration-700 ease-out ${isActive ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
       >
         {/* Title/Logo */}
         {config?.showTitle && (
           <div className={`mb-4 transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-100`}>
             {item?.title_image ? (
-              <div className="relative w-full max-w-[260px] sm:max-w-[340px] md:max-w-[400px] h-[55px] sm:h-[75px] md:h-[90px]">
+              <div className="relative w-full max-w-[320px] sm:max-w-[430px] md:max-w-[520px] lg:max-w-[600px] h-[72px] sm:h-[100px] md:h-[125px] lg:h-[145px]">
                 <JOJOCommonImage
                   src={item.title_image}
                   alt={item.title}
@@ -451,7 +451,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
                 />
               </div>
             ) : (
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white tracking-wide leading-tight drop-shadow-md">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-white tracking-wide leading-tight drop-shadow-md">
                 {item?.title}
               </h1>
             )}
@@ -461,31 +461,31 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
         {/* Top Left Badge moved below title */}
         {item?.asset_tags_badgeText && item.asset_tags_badgeText.toLowerCase().includes("new") && (
           <div className={`mb-3 inline-flex items-center bg-[#251307] px-3 py-1 rounded-full transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-150`}>
-            <span className="text-[#FF6A00] font-bold text-[10px] sm:text-[11px] tracking-wider uppercase">{item.asset_tags_badgeText}</span>
+            <span className="text-[#FF6A00] font-bold text-xs sm:text-sm tracking-wider uppercase">{item.asset_tags_badgeText}</span>
           </div>
         )}
 
         {/* Certificate, Year, Duration */}
         <div className={`mb-3 flex flex-wrap items-center gap-2 transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-200`}>
           {displayCertification && (
-            <span className="bg-white/20 text-neutral-300 font-semibold text-[11px] px-2.5 py-0.5 rounded-full drop-shadow-md backdrop-blur-sm">
+            <span className="bg-white/20 text-neutral-300 font-semibold text-xs sm:text-sm lg:text-base px-3 py-1 rounded-full drop-shadow-md backdrop-blur-sm">
               {displayCertification}
             </span>
           )}
           {item?.year && (
-            <span className="bg-white/20 text-neutral-300 font-semibold text-[11px] px-2.5 py-0.5 rounded-full drop-shadow-md backdrop-blur-sm">
+            <span className="bg-white/20 text-neutral-300 font-semibold text-xs sm:text-sm lg:text-base px-3 py-1 rounded-full drop-shadow-md backdrop-blur-sm">
               {item.year}
             </span>
           )}
           {displayDuration && (
-            <span className="bg-white/20 text-neutral-300 font-semibold text-[11px] px-2.5 py-0.5 rounded-full drop-shadow-md backdrop-blur-sm">
+            <span className="bg-white/20 text-neutral-300 font-semibold text-xs sm:text-sm lg:text-base px-3 py-1 rounded-full drop-shadow-md backdrop-blur-sm">
               {displayDuration}
             </span>
           )}
         </div>
 
         {/* Metadata String: Genre 1 • Genre 2 */}
-        <div className={`flex flex-wrap items-center font-bold text-white text-sm sm:text-base md:text-lg transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-300`}>
+        <div className={`flex flex-wrap items-center font-bold text-white text-base sm:text-lg md:text-xl lg:text-2xl transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-300`}>
           {item?.genres?.map((genre, i) => (
             <span key={i} className="flex items-center drop-shadow-md">
               {i > 0 && <span className="mx-2 text-white">•</span>}

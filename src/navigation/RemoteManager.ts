@@ -7,6 +7,7 @@ import { useAssetDetailStore } from '@/features/asset/store/useAssetDetailStore'
 import { useExitConfirmStore } from '@/store/useExitConfirmStore';
 import { useNavStore } from '@/store/useNavStore';
 import { tvSoundManager } from '@/lib/webos/tvSoundManager';
+import { doesFocusableExist, getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 // LG webOS Remote Key Codes
 export const WEBOS_KEYS = {
@@ -85,9 +86,21 @@ export const useRemoteManager = () => {
             } catch (err) {}
             return;
           }
-          // If we're on the root page, ask for confirmation before minimizing the
+          // On the home browse page, Back first returns focus to the Home nav
+          // item. A second Back from that Home item opens the exit confirmation.
+          if (currentPathForBack === '/') {
+            const currentFocusKey = getCurrentFocusKey();
+            if (currentFocusKey !== 'nav-link-0' && doesFocusableExist('nav-link-0')) {
+              setFocus('nav-link-0');
+              return;
+            }
+            useExitConfirmStore.getState().open();
+            return;
+          }
+
+          // On non-browse roots, ask for confirmation before minimizing the
           // app (platform convention) — otherwise go back in history.
-          if (currentPathForBack === '/' || currentPathForBack === '/landing' || currentPathForBack === '/login') {
+          if (currentPathForBack === '/landing' || currentPathForBack === '/login') {
             useExitConfirmStore.getState().open();
           } else {
             window.history.back();
