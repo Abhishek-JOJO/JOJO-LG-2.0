@@ -74,9 +74,12 @@ export async function verifyQrCode(code: string, sessionId?: string, signal?: Ab
     const payload = (response?.data as any)?.data ?? response?.data ?? {};
     const resultSessionId = payload?.session_id ?? payload?.sessionId;
     const userId = payload?.user_id ?? payload?.userId;
+    const metaStatus = Number(response?.metaData?.status ?? 200);
+    const tvHasLoginPayload = Boolean(resultSessionId && userId);
+    const phoneClaimSucceeded = Boolean(sessionId && metaStatus >= 200 && metaStatus < 300);
 
     return {
-      verified: Boolean(resultSessionId && userId),
+      verified: tvHasLoginPayload || phoneClaimSucceeded,
       sessionId: resultSessionId,
       userId,
       token: payload?.token,

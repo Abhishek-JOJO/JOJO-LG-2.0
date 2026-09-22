@@ -203,6 +203,9 @@ export function Navbar() {
     guestLoginPending
   } = useNavbar();
 
+  const shouldDelayLogoUntilGoldStatus = isWatching && isGoldStatusPending;
+  const useGoldLogoSlot = isGold || shouldDelayLogoUntilGoldStatus;
+
   return (
     <header
       className={`z-[999] overflow-visible transition-colors duration-300 sticky top-0 left-0 right-0 w-full ${
@@ -292,14 +295,16 @@ export function Navbar() {
               aria-label="JOJO Home"
               className="flex items-center shrink-0"
             >
-              <div className={isGold ? "w-[120px] h-[48px] sm:w-[180px] sm:h-[76px]" : "w-[80px] h-[38px] sm:w-[120px] sm:h-[65px]"}>
-                <JOJOCommonImage
-                  src={isGold ? LOGOS.JOJO_GOLD : LOGOS.JOJO_LOGO}
-                  alt="JOJO"
-                  fill
-                  preset={JOJOImagePreset.Logo}
-                  wrapperClassName={`w-full h-full cursor-pointer ${isGoldStatusPending ? "opacity-0" : ""}`}
-                />
+              <div className={useGoldLogoSlot ? "w-[120px] h-[48px] sm:w-[180px] sm:h-[76px]" : "w-[80px] h-[38px] sm:w-[120px] sm:h-[65px]"}>
+                {!shouldDelayLogoUntilGoldStatus && (
+                  <JOJOCommonImage
+                    src={isGold ? LOGOS.JOJO_GOLD : LOGOS.JOJO_LOGO}
+                    alt="JOJO"
+                    fill
+                    preset={JOJOImagePreset.Logo}
+                    wrapperClassName="w-full h-full cursor-pointer animate-fade-in"
+                  />
+                )}
               </div>
             </Link>
           </div>

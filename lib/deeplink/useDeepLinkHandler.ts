@@ -196,31 +196,21 @@ export function useDeepLinkHandler(isAppReady: boolean) {
       const alreadyProcessed = sessionStorage.getItem("qr_code_processed") === "1";
       if (!qrCode || alreadyProcessed) return;
 
+      if (!sessionId) {
+        logger.info("[DeepLink] QR pairing code is pending, waiting for user login before claiming it");
+        return;
+      }
+
       try {
         logger.info("[DeepLink] Process pending QR Code pairing", { qrCode });
         // verifyQrCode, not pairDevice — this "claim" call and the TV's own
         // poll (QrPairingPanel.tsx) must hit the same endpoint with the same
-        // code for them to ever actually meet. pairDevice() posts to a
-        // different endpoint (/pair) used by the unrelated "link a device to
-        // an already-signed-in account" flow on /account-settings — calling
-        // it here meant the phone claimed the code on one endpoint while the
-        // TV polled a different one, so pairing could never complete even
-        // once the TV's polling endpoint itself was fixed.
-        const result = await verifyQrCode(qrCode, sessionId ?? undefined);
-        if (result.verified && result.sessionId && result.userId) {
-          setAuth(
-            {
-              id: result.userId,
-              phone: result.phone || "",
-              isGuest: false,
-              createdAt: new Date().toISOString(),
-            },
-            result.sessionId,
-            result.token || ""
-          );
+        // code for them to ever actually meet.
+        const result = await verifyQrCode(qrCode, sessionId);
+        if (result.verified) {
+          localStorage.removeItem("qr_code_pending");
           sessionStorage.setItem("qr_code_processed", "1");
-          logger.info("[DeepLink] TV Pairing successful. Redirecting to profile selection.");
-          router.replace(ROUTES.WATCHING);
+          logger.info("[DeepLink] TV pairing code claimed successfully");
         }
       } catch (err) {
         logger.error("[DeepLink] TV pairing failed", err);
@@ -228,7 +218,7 @@ export function useDeepLinkHandler(isAppReady: boolean) {
     };
 
     processQrCode();
-  }, [sessionId, isAppReady]);
+  }, [sessionId, isAppReady, router]);
 
   const confirmMismatch = () => {
     if (!pendingAsset) return;

@@ -36,10 +36,11 @@ export function useNavbar() {
     }
   }, []);
 
-  const { data: subData, isLoading: isSubscriptionLoading, isFetching: isSubscriptionFetching } = useVerifySubscription(countryCode, sessionId, isAppReady);
+  const { data: subData } = useVerifySubscription(countryCode, sessionId, isAppReady);
+  const isSubscriptionCheckEnabled = !!sessionId && !!user && !isGuest && !!countryCode && !!isAppReady;
   const isExpired = subData?.data?.subscription?.dEndDate ? new Date(subData.data.subscription.dEndDate).getTime() < Date.now() : false;
   const isGold = !!(subData?.data?.subscription && !isExpired);
-  const isGoldStatusPending = isAuthenticated && !isGuest && !subData && (isSubscriptionLoading || isSubscriptionFetching);
+  const isGoldStatusPending = isAuthenticated && !isGuest && isSubscriptionCheckEnabled && !subData;
 
   const { data: apiNavItems, isLoading: isNavLoading } = useAppNavigation(isAppReady);
   const persistedNavItems = useNavStore((s) => s.persistedNavItems);
