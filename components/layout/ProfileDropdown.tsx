@@ -139,11 +139,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     onArrowPress: (direction) => {
       if (direction === 'up') return false;
       if (direction === 'left') {
-        if (!isGold) {
-          setFocus('navbar-get-gold');
-        } else if (totalNavItems > 0) {
-          setFocus(`nav-link-${totalNavItems - 1}`);
-        }
+        setFocus('navbar-search');
         return false;
       }
       if (direction === 'down') {

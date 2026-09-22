@@ -53,21 +53,20 @@ export const FocusableNavLink = React.memo(({
     }
 
     if (direction === 'left' && index === 0) {
-      setFocus('navbar-search');
-      return false;
+      return false; // Search icon is now at the end of the nav bar; stop at first item
     }
 
     if (direction === 'right' && index === totalNavItems - 1) {
       if (!isGold) {
         setFocus('navbar-get-gold');
       } else {
-        setFocus(isAuthenticated ? 'navbar-profile-trigger' : 'navbar-login');
+        setFocus('navbar-search');
       }
       return false;
     }
     
     return true;
-  }, [index, totalNavItems, isGold, isAuthenticated]);
+  }, [index, totalNavItems, isGold]);
 
   const navigateTab = useCallback(() => {
     const normTarget = normalizePathname(targetUrl);

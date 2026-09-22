@@ -192,16 +192,16 @@ export function ContentRailSection({
   );
   const railCardDesktopHeight = isStandardTvRail ? "490px" : `${config.height}px`;
 
+  const isSectionDimmed = !isHero && !isFirstContentRail && hasAnyRailActive && !isSectionActive;
+  const isTitleDimmed = !isHero && !isFirstContentRail && hasAnyRailActive && !isSectionActive;
+
   return (
     <section
       ref={sectionRef}
       data-section-index={index}
-      className={`${isHero ? "mb-10 w-full" : "mb-10 w-full"} relative ${!isHero && hasAnyRailActive
-        ? isSectionActive
-          ? "opacity-100 z-20"
-          : "opacity-35 z-10"
-        : "opacity-100"
-        }`}
+      className={`${isHero ? "mb-10 w-full" : "mb-10 w-full"} relative ${
+        isSectionDimmed ? "opacity-35 z-10" : "opacity-100 z-20"
+      }`}
       style={{
         scrollMarginTop: "105px",
       }}
@@ -209,8 +209,9 @@ export function ContentRailSection({
       {!isHero && (
         <div className="relative z-50 flex items-center justify-between w-full px-6 sm:px-12 lg:px-16 mb-4 min-h-[42px] overflow-visible">
           <h2
-            className={`max-w-[calc(100vw-8rem)] whitespace-normal break-words text-xl sm:text-[28px] font-bold leading-[1.35] py-1 overflow-visible ${hasAnyRailActive && !isSectionActive ? "text-white/40" : "text-white"
-              }`}
+            className={`max-w-[calc(100vw-8rem)] whitespace-normal break-words text-xl sm:text-[28px] font-bold leading-[1.35] py-1 overflow-visible ${
+              isTitleDimmed ? "text-white/40" : "text-white"
+            }`}
           >
             {cr_title}
           </h2>

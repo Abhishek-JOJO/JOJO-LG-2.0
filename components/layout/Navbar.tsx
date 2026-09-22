@@ -34,7 +34,7 @@ function LogoSkeleton({ isGoldSlot = false }: { isGoldSlot?: boolean }) {
   );
 }
 
-function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: number; isAuthenticated: boolean }) {
+function FocusableGetGold({ totalNavItems }: { totalNavItems: number }) {
   const router = useRouter();
 
   const handleArrowPress = (direction: string) => {
@@ -42,13 +42,11 @@ function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: n
     if (direction === 'left') {
       if (totalNavItems > 0) {
         setFocus(`nav-link-${totalNavItems - 1}`);
-      } else {
-        setFocus('navbar-search');
       }
       return false;
     }
     if (direction === 'right') {
-      setFocus(isAuthenticated ? 'navbar-profile-trigger' : 'navbar-login');
+      setFocus('navbar-search');
       return false;
     }
     if (direction === 'down') {
@@ -86,18 +84,29 @@ function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: n
   );
 }
 
-function FocusableSearch({ totalNavItems }: { totalNavItems: number }) {
+function FocusableSearch({
+  totalNavItems,
+  isGold,
+  isAuthenticated,
+}: {
+  totalNavItems: number;
+  isGold: boolean;
+  isAuthenticated: boolean;
+}) {
   const setSearchOpen = usePlayerStore((s) => s.setSearchOpen);
 
   const handleArrowPress = (direction: string) => {
     if (direction === 'up') return false;
-    if (direction === 'left') return false;
-    if (direction === 'right') {
-      if (totalNavItems > 0) {
-        setFocus('nav-link-0');
-      } else {
+    if (direction === 'left') {
+      if (!isGold) {
         setFocus('navbar-get-gold');
+      } else if (totalNavItems > 0) {
+        setFocus(`nav-link-${totalNavItems - 1}`);
       }
+      return false;
+    }
+    if (direction === 'right') {
+      setFocus(isAuthenticated ? 'navbar-profile-trigger' : 'navbar-login');
       return false;
     }
     if (direction === 'down') {
@@ -136,17 +145,11 @@ function FocusableSearch({ totalNavItems }: { totalNavItems: number }) {
   );
 }
 
-function FocusableLoginButton({ t, router, totalNavItems, isGold }: { t: any; router: any; totalNavItems: number; isGold: boolean }) {
+function FocusableLoginButton({ t, router }: { t: any; router: any }) {
   const handleArrowPress = (direction: string) => {
     if (direction === 'up') return false;
     if (direction === 'left') {
-      if (!isGold) {
-        setFocus('navbar-get-gold');
-      } else if (totalNavItems > 0) {
-        setFocus(`nav-link-${totalNavItems - 1}`);
-      } else {
-        setFocus('navbar-search');
-      }
+      setFocus('navbar-search');
       return false;
     }
     if (direction === 'down') {
@@ -221,12 +224,12 @@ export function Navbar() {
     <header
       className={`z-[999] overflow-visible transition-colors duration-300 sticky top-0 left-0 right-0 w-full ${
         isScrolled
-          ? "bg-[#050505]/95 shadow-2xl"
+          ? "bg-[#050505]/95"
           : "bg-transparent shadow-none"
       }`}
       style={{
         background: isScrolled ? "rgba(5, 5, 5, 0.95)" : "transparent",
-        boxShadow: isScrolled ? "0 10px 30px rgba(0, 0, 0, 0.9)" : "none",
+        boxShadow: "none",
         borderBottom: "none",
       }}
     >
@@ -262,7 +265,6 @@ export function Navbar() {
               <NavMenuListSkeleton />
             ) : (
               <div className="flex items-center gap-2 sm:gap-3 lg:gap-5">
-                <FocusableSearch totalNavItems={visibleNavItems.length} />
                 {visibleNavItems.map((item, index) => {
                   const targetUrl = item?.url === ROUTES.HOMEPAGE ? ROUTES.HOME : item?.url;
                   const isItemActive = pathname === targetUrl;
@@ -283,9 +285,13 @@ export function Navbar() {
                 {!isGold && !shouldDelayLogoUntilGoldStatus && (
                   <FocusableGetGold
                     totalNavItems={visibleNavItems.length}
-                    isAuthenticated={isAuthenticated}
                   />
                 )}
+                <FocusableSearch
+                  totalNavItems={visibleNavItems.length}
+                  isGold={isGold}
+                  isAuthenticated={isAuthenticated}
+                />
               </div>
             )}
           </div>
@@ -298,7 +304,7 @@ export function Navbar() {
             {!isGuest ? (
               <ProfileDropdown totalNavItems={visibleNavItems.length} isGold={isGold} />
             ) : (
-              <FocusableLoginButton t={t} router={router} totalNavItems={visibleNavItems.length} isGold={isGold} />
+              <FocusableLoginButton t={t} router={router} />
             )}
           </div>
         </div>
