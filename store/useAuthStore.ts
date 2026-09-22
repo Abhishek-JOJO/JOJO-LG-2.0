@@ -4,6 +4,7 @@ import { localStorageManager } from "@lib/localStorage/localStorage.manager";
 import type { User, AuthState } from "@features/auth/model/types";
 import { analyticsService } from "@/shared/analytics";
 import { AttributionManager } from "@/lib/deeplink/attributionManager";
+import { useSubscriptionStore } from "./useSubscriptionStore";
 
 interface AuthStore extends AuthState {
   setAuth: (user: User, token: string, refreshToken: string) => void;
@@ -118,6 +119,9 @@ export const useAuthStore = create<AuthStore>((set, get) => {
       document.cookie = `jojo_is_guest=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
       document.cookie = `jojo_has_profile=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
     }
+
+    // Clear subscription state
+    useSubscriptionStore.getState().clearSubscription();
 
     // Reset state
     set({

@@ -27,7 +27,13 @@ export function useSelectProfile() {
       logger.info('[Select Profile Hook] Profile selection complete', {
         profile_id: profile.profile_id
       });
-      queryClient.invalidateQueries();
+      // Invalidate profile-dependent queries, while preserving user session queries (verify-subscription & appNavigation)
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return key !== "verify-subscription" && key !== "appNavigation";
+        },
+      });
       router.refresh();
     },
     onError: (error, profile) => {

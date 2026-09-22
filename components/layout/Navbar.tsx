@@ -23,6 +23,17 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { usePlayerStore } from "@/store/usePlayerStore";
 
+function LogoSkeleton({ isGoldSlot = false }: { isGoldSlot?: boolean }) {
+  return (
+    <div
+      className={`w-full h-full rounded-xl bg-white/8 overflow-hidden relative ${isGoldSlot ? "min-w-[120px]" : "min-w-[80px]"}`}
+      aria-hidden="true"
+    >
+      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.25s_infinite] bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+    </div>
+  );
+}
+
 function FocusableGetGold({ totalNavItems, isAuthenticated }: { totalNavItems: number; isAuthenticated: boolean }) {
   const router = useRouter();
 
@@ -203,7 +214,7 @@ export function Navbar() {
     guestLoginPending
   } = useNavbar();
 
-  const shouldDelayLogoUntilGoldStatus = isWatching && isGoldStatusPending;
+  const shouldDelayLogoUntilGoldStatus = isGoldStatusPending;
   const useGoldLogoSlot = isGold || shouldDelayLogoUntilGoldStatus;
 
   return (
@@ -229,14 +240,18 @@ export function Navbar() {
               aria-label="JOJO Home"
               className="flex items-center shrink-0"
             >
-              <div className={isGold ? "w-[125px] h-[48px] sm:w-[175px] sm:h-[68px] relative flex items-center" : "w-[95px] h-[42px] sm:w-[135px] sm:h-[54px] relative flex items-center"}>
-                <JOJOCommonImage
-                  src={isGold ? LOGOS.JOJO_GOLD : LOGOS.JOJO_LOGO}
-                  alt="JOJO"
-                  fill
-                  preset={JOJOImagePreset.Logo}
-                  wrapperClassName="w-full h-full cursor-pointer animate-fade-in"
-                />
+              <div className={useGoldLogoSlot ? "w-[125px] h-[48px] sm:w-[175px] sm:h-[68px] relative flex items-center" : "w-[95px] h-[42px] sm:w-[135px] sm:h-[54px] relative flex items-center"}>
+                {shouldDelayLogoUntilGoldStatus ? (
+                  <LogoSkeleton isGoldSlot />
+                ) : (
+                  <JOJOCommonImage
+                    src={isGold ? LOGOS.JOJO_GOLD : LOGOS.JOJO_LOGO}
+                    alt="JOJO"
+                    fill
+                    preset={JOJOImagePreset.Logo}
+                    wrapperClassName="w-full h-full cursor-pointer animate-fade-in"
+                  />
+                )}
               </div>
             </Link>
           </div>
@@ -265,7 +280,7 @@ export function Navbar() {
                     />
                   );
                 })}
-                {!isGold && (
+                {!isGold && !shouldDelayLogoUntilGoldStatus && (
                   <FocusableGetGold
                     totalNavItems={visibleNavItems.length}
                     isAuthenticated={isAuthenticated}
@@ -296,7 +311,9 @@ export function Navbar() {
               className="flex items-center shrink-0"
             >
               <div className={useGoldLogoSlot ? "w-[120px] h-[48px] sm:w-[180px] sm:h-[76px]" : "w-[80px] h-[38px] sm:w-[120px] sm:h-[65px]"}>
-                {!shouldDelayLogoUntilGoldStatus && (
+                {shouldDelayLogoUntilGoldStatus ? (
+                  <LogoSkeleton isGoldSlot />
+                ) : (
                   <JOJOCommonImage
                     src={isGold ? LOGOS.JOJO_GOLD : LOGOS.JOJO_LOGO}
                     alt="JOJO"

@@ -20,6 +20,8 @@ export enum StorageKey {
   USER = 'user',
   COUNTRY_LIST_DATA = "ott_country_list_data",
   COUNTRY_LIST_TIMESTAMP = "ott_country_list_timestamp",
+  IS_GOLD = "ott_is_gold",
+  SUBSCRIPTION_DATA = "ott_subscription_data",
 
   // Player
   PLAYER_VOLUME = "ott_player_volume",

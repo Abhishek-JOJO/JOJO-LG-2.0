@@ -12,6 +12,7 @@ import { appConfig } from "@/lib/config/app.config";
 import { ROUTES } from "@/lib/constants/routes";
 import { localStorageManager } from "@/lib/localStorage/localStorage.manager";
 import { StorageKey } from "@/enums/storage.enum";
+import { useSubscriptionStore } from "@/store/useSubscriptionStore";
 
 export function useNavbar() {
   const pathname = useActivePathname();
@@ -20,7 +21,17 @@ export function useNavbar() {
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [countryCode, setCountryCode] = useState(appConfig.GEO_DEFAULT_COUNTRY_CODE);
+  const [countryCode, setCountryCode] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const geoCache = localStorageManager.get<any>(StorageKey.GEO_CACHE);
+        if (geoCache?.geoData?.country_code) {
+          return geoCache.geoData.country_code;
+        }
+      } catch {}
+    }
+    return appConfig.GEO_DEFAULT_COUNTRY_CODE;
+  });
 
   const { isAppReady } = useBootstrap();
   const sessionId = useAuthStore(state => state.token);
@@ -28,6 +39,7 @@ export function useNavbar() {
   const user = useAuthStore(state => state.user);
   const isGuest = user?.isGuest ?? false;
   const selectedProfile = useProfileStore(state => state.selectedProfile);
+  const storeIsGold = useSubscriptionStore(state => state.isGold);
 
   useEffect(() => {
     const geoCache = localStorageManager.get<any>(StorageKey.GEO_CACHE);
@@ -39,8 +51,8 @@ export function useNavbar() {
   const { data: subData } = useVerifySubscription(countryCode, sessionId, isAppReady);
   const isSubscriptionCheckEnabled = !!sessionId && !!user && !isGuest && !!countryCode && !!isAppReady;
   const isExpired = subData?.data?.subscription?.dEndDate ? new Date(subData.data.subscription.dEndDate).getTime() < Date.now() : false;
-  const isGold = !!(subData?.data?.subscription && !isExpired);
-  const isGoldStatusPending = isAuthenticated && !isGuest && isSubscriptionCheckEnabled && !subData;
+  const isGold = (storeIsGold === true) || !!(subData?.data?.subscription && !isExpired);
+  const isGoldStatusPending = isAuthenticated && !isGuest && isSubscriptionCheckEnabled && storeIsGold === null && !subData;
 
   const { data: apiNavItems, isLoading: isNavLoading } = useAppNavigation(isAppReady);
   const persistedNavItems = useNavStore((s) => s.persistedNavItems);
