@@ -12,7 +12,7 @@ import { useBootstrap } from "@lib/bootstrap/BootstrapContext";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useActivePathname } from "@/hooks/useActivePathname";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { setFocus, getCurrentFocusKey } from "@noriginmedia/norigin-spatial-navigation";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { useContentRails } from "../hooks/useContentRails";
@@ -51,6 +51,39 @@ function cacheRouteSubnavs(items: NavigationItem[] | undefined) {
 
 interface ContentRailsViewProps {
   subnavId?: number;
+}
+
+// Preview rows are below the hero and spotlight on TV. Mounting their cards
+// immediately also registers/measures every card with spatial navigation,
+// even though these rows are not D-pad focusable. Keep their scroll space and
+// mount shortly before they become visible; the spotlight itself stays eager.
+function PreviewRail(props: ComponentProps<typeof ContentRailSection>) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(() =>
+    typeof window === "undefined" || window.location.protocol !== "file:"
+  );
+
+  useEffect(() => {
+    if (visible) return;
+    if (!("IntersectionObserver" in window)) {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: "200px 0px" });
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [visible]);
+
+  return (
+    <div ref={containerRef} style={visible ? undefined : { minHeight: 580 }}>
+      {visible && <ContentRailSection {...props} />}
+    </div>
+  );
 }
 
 export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewProps) {
@@ -517,7 +550,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
 
       {/* Upcoming Preview Rails (Section index 2+) - 100% standard portrait cards only */}
       {showPreviewRails && upcomingRails.map((rail, idx) => (
-        <ContentRailSection
+        <PreviewRail
           key={rail.id}
           index={2 + idx}
           isFirstContentRail={false}

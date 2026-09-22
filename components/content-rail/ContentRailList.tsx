@@ -275,6 +275,13 @@ export function ContentRailList({
   // ONLY enabled for the single active spotlight rail (isFirstContentRail, never for Genre)
   const isSpotlightRail = !isHeroVariant && !isExpanded && Boolean(isFirstContentRail) && config?.variant !== RailCardVariant.GENRE && type !== ContentRailType.GENRE;
   const leadFocusKey = "spotlight-lead-fixed";
+  const isTvFileRuntime = typeof window !== "undefined" && window.location.protocol === "file:";
+  const { ref: railBoundaryRef, focusKey: railBoundaryFocusKey, hasFocusedChild: railActive } = useFocusable({
+    focusable: false,
+    trackChildren: true,
+    saveLastFocusedChild: false,
+    preferredChildFocusKey: leadFocusKey,
+  });
   const [spotlightIndex, setSpotlightIndex] = useState(0);
 
   const handleCycle = useCallback((direction: "left" | "right") => {
@@ -315,15 +322,17 @@ export function ContentRailList({
     }
   }, [isSpotlightRail, spotlightIndex, listRef]);
 
-  // Eagerly preload all rail items on mount so navigating left/right is instant (0ms delay)
+  // On TV the visible cards load their own images. Do not compete with a new
+  // tab's hero/API by decoding 12 cards' three image variants on every mount.
   useEffect(() => {
-    if (!isSpotlightRail || !items?.length) return;
+    if (isTvFileRuntime || !isSpotlightRail || !items?.length) return;
     preloadRailItems(items, 12);
-  }, [isSpotlightRail, items]);
+  }, [isSpotlightRail, items, isTvFileRuntime]);
 
   // When cycling cards in spotlight rail, ensure adjacent items are preloaded immediately
   useEffect(() => {
     if (!isSpotlightRail || !items?.length) return;
+    if (isTvFileRuntime && !railActive) return;
     const si = spotlightIndex;
     const nextIdx = (si + 1) % items.length;
     const nextIdx2 = (si + 2) % items.length;
@@ -336,7 +345,7 @@ export function ContentRailList({
         preloadImageUrl(it.portraitImage || it.image, { width: 326, height: 490 });
       }
     });
-  }, [isSpotlightRail, items, spotlightIndex]);
+  }, [isSpotlightRail, items, spotlightIndex, isTvFileRuntime, railActive]);
 
   // Fetch the next page of this rail's items well before the user reaches the end of what's
   // already loaded, so cycling Right (even held down, repeat-firing every ~100-150ms on a TV
@@ -348,13 +357,6 @@ export function ContentRailList({
     }
   }, [isSpotlightRail, hasMore, loadNextPage, items?.length, spotlightIndex]);
 
-
-  const { ref: railBoundaryRef, focusKey: railBoundaryFocusKey, hasFocusedChild: railActive } = useFocusable({
-    focusable: false,
-    trackChildren: true,
-    saveLastFocusedChild: false,
-    preferredChildFocusKey: leadFocusKey,
-  });
 
   const [isAutoplayPaused, setIsAutoplayPaused] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);

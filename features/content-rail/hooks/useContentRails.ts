@@ -1,4 +1,4 @@
-import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { getContentRails } from "../api/getContentRails";
 import { useAuthStore } from "@store/useAuthStore";
 import { useLocaleStore } from "@store/useLocaleStore";
@@ -41,7 +41,8 @@ export function useContentRails(subnavId: number, isAppReady: boolean, limit: nu
       return currentPage < totalPages ? currentPage + 1 : undefined;
     },
     enabled: !!sessionId && isAppReady && !!subnavId,
-    placeholderData: keepPreviousData,
+    // A new tab must not display the previous tab's assets while it loads.
+    // Pagination still keeps the existing pages in this query's own cache.
     staleTime: appConfig.STALE_TIME, // 5 minutes cache
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),

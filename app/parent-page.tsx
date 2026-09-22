@@ -58,6 +58,7 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
     const { isAppReady } = useBootstrap();
     const sessionId = useAuthStore(state => state.token);
     const persistedNavItems = useNavStore((state) => state.persistedNavItems);
+    const locale = useLocaleStore((state) => state.locale) || "en";
     const [countryCode, setCountryCode] = useState(appConfig.GEO_DEFAULT_COUNTRY_CODE);
 
     useEffect(() => {
@@ -118,7 +119,6 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         if (!isAppReady || !sessionId) return;
 
         const queryClient = getQueryClient();
-        const locale = useLocaleStore.getState().locale || "en";
         const subnavIds = (persistedNavItems && persistedNavItems.length > 0)
             ? persistedNavItems.map((n: any) => n.subnav_id).filter(Boolean)
             : [1, 3, 9, 5];
@@ -126,28 +126,30 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         const isTvFileRuntime = typeof window !== "undefined" && window.location.protocol === "file:";
 
         let cancelled = false;
-        const timers: ReturnType<typeof setTimeout>[] = [];
-        const startDelay = isTvFileRuntime ? 100 : 1200;
+        let timer: ReturnType<typeof setTimeout>;
+        const startDelay = 1200;
         const gap = isTvFileRuntime ? 350 : 600;
 
-        uniqueSubnavIds.forEach((subnavId: number, index: number) => {
-            const timer = setTimeout(() => {
-                if (cancelled) return;
-                queryClient.prefetchInfiniteQuery({
-                    queryKey: ["contentRails", subnavId, sessionId, locale, 20],
-                    queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
-                    initialPageParam: 1,
-                    staleTime: appConfig.STALE_TIME,
-                }).catch(() => {});
-            }, startDelay + index * gap);
-            timers.push(timer);
-        });
+        // Fixed staggered timers can still overlap on a slow TV connection.
+        // Wait for each request to finish before scheduling the next tab.
+        const prefetchNext = async (index: number) => {
+            if (cancelled || index >= uniqueSubnavIds.length) return;
+            const subnavId = uniqueSubnavIds[index];
+            await queryClient.prefetchInfiniteQuery({
+                queryKey: ["contentRails", subnavId, sessionId, locale, 20],
+                queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
+                initialPageParam: 1,
+                staleTime: appConfig.STALE_TIME,
+            }).catch(() => {});
+            if (!cancelled) timer = setTimeout(() => void prefetchNext(index + 1), gap);
+        };
+        timer = setTimeout(() => void prefetchNext(0), startDelay);
 
         return () => {
             cancelled = true;
-            timers.forEach(clearTimeout);
+            clearTimeout(timer);
         };
-    }, [isAppReady, sessionId, persistedNavItems]);
+    }, [isAppReady, sessionId, persistedNavItems, locale]);
 
     // Completely suppress render when on a non-home route
     if (isSuppressed) {

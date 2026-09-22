@@ -2,7 +2,7 @@
 
 import React, { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { useFocusable, setFocus, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
 import { safeNavigate } from "@/lib/webos/safeNavigate";
 import { useNavStore } from "@/store/useNavStore";
 import { normalizePathname } from "@/lib/utils/pathname";
@@ -112,29 +112,35 @@ export const FocusableNavLink = React.memo(({
   }, [index, totalNavItems, isGold, isItemActive, navigateTab]);
 
   const handleFocus = useCallback(() => {
-    // 1. Immediately prefetch this tab's rails if not yet in cache
-    const subnavId = item?.subnav_id;
-    if (subnavId) {
-      const sessionId = useAuthStore.getState().token;
-      const locale = useLocaleStore.getState().locale || "en";
-      if (sessionId) {
-        getQueryClient().prefetchInfiniteQuery({
-          queryKey: ["contentRails", subnavId, sessionId, locale, 20],
-          queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
-          initialPageParam: 1,
-          staleTime: appConfig.STALE_TIME,
-        }).catch(() => {});
-      }
-    }
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    // Give the focus highlight a paint before changing the content tree. A
+    // single rAF still runs before paint; the second frame separates the work.
+    // Blur cancels tabs that the user only passes through on the way elsewhere.
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        if (getCurrentFocusKey() !== `nav-link-${index}`) return;
 
-    // 2. Activate tab synchronously — setActiveBrowseTab is now a direct zustand
-    // update (no startTransition), so the re-render happens in the same React
-    // batch as the focus event. No artificial delay needed.
-    if (!isItemActive) {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      navigateTab();
-    }
-  }, [item?.subnav_id, isItemActive, navigateTab]);
+        const subnavId = item?.subnav_id;
+        if (subnavId) {
+          const sessionId = useAuthStore.getState().token;
+          const locale = useLocaleStore.getState().locale || "en";
+          if (sessionId) {
+            getQueryClient().prefetchInfiniteQuery({
+              queryKey: ["contentRails", subnavId, sessionId, locale, 20],
+              queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
+              initialPageParam: 1,
+              staleTime: appConfig.STALE_TIME,
+            }).catch(() => {});
+          }
+        }
+
+        if (!isItemActive) {
+          navigateTab();
+        }
+      });
+    });
+  }, [index, item?.subnav_id, isItemActive, navigateTab]);
 
   const handleBlur = useCallback(() => {
     if (rafRef.current) {
@@ -187,8 +193,7 @@ export const FocusableNavLink = React.memo(({
       data-focuskey={`nav-link-${index}`}
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}
-      style={{ willChange: "transform, background-color" }}
-      className={`relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none border transition-[transform,background-color,color,box-shadow] duration-75 ease-out ${
+      className={`relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none border ${
         focused
           ? "bg-white text-black scale-105 shadow-md border-transparent"
           : isItemActive
@@ -208,4 +213,3 @@ export const FocusableNavLink = React.memo(({
 });
 
 FocusableNavLink.displayName = "FocusableNavLink";
-
