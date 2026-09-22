@@ -207,9 +207,9 @@ export function ContentRailSection({
       }}
     >
       {!isHero && (
-        <div className="relative z-50 flex items-center justify-between w-full px-6 sm:px-12 lg:px-16 mb-3">
+        <div className="relative z-50 flex items-center justify-between w-full px-6 sm:px-12 lg:px-16 mb-4 min-h-[42px] overflow-visible">
           <h2
-            className={`text-xl sm:text-2xl font-bold ${hasAnyRailActive && !isSectionActive ? "text-white/40" : "text-white"
+            className={`max-w-[calc(100vw-8rem)] whitespace-normal break-words text-xl sm:text-[28px] font-bold leading-[1.35] py-1 overflow-visible ${hasAnyRailActive && !isSectionActive ? "text-white/40" : "text-white"
               }`}
           >
             {cr_title}

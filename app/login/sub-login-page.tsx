@@ -130,7 +130,7 @@ function LoginPageContent() {
   });
 
   useEffect(() => {
-    // Focus login input field by default when entering 'remote' mode
+    // Set initial focus on mount
     const timer = setTimeout(() => {
       if (mode === "remote") {
         setFocus('login-input');
@@ -141,7 +141,7 @@ function LoginPageContent() {
       }
     }, 100);
     return () => clearTimeout(timer);
-  }, [mode]);
+  }, []);
 
   const lastTrackedErrorRef = useRef<ErrorKey | null>(null);
 
@@ -608,7 +608,16 @@ function LoginPageContent() {
           ) : (
             <form id="login-form" onSubmit={handleSubmit} noValidate className="w-full max-w-[480px] mx-auto flex flex-col items-center gap-6">
               <div className="w-full flex flex-col items-center">
-                <div ref={inputRef as any} className={`w-full rounded-full transition-all duration-200 ${inputFocused ? "ring-4 ring-white shadow-2xl scale-[1.02] z-10" : ""}`}>
+                <div
+                  ref={inputRef as any}
+                  className={cn(
+                    "relative w-full rounded-full transition-all duration-200",
+                    inputFocused ? "scale-[1.02] z-10" : ""
+                  )}
+                  style={inputFocused ? {
+                    boxShadow: "0 0 0 3px #ffffff, 0 0 16px rgba(255, 255, 255, 0.5)",
+                  } : undefined}
+                >
                   <CountryWithEMailInput
                     id="login-input-field"
                     type="text"
@@ -657,7 +666,16 @@ function LoginPageContent() {
                 </p>
               </div>
 
-              <div ref={submitRef as any} className={`w-full rounded-full transition-all duration-200 ${submitFocused ? "ring-4 ring-white shadow-2xl scale-[1.02] z-10" : ""}`}>
+              <div
+                ref={submitRef as any}
+                className={cn(
+                  "relative w-full rounded-full transition-all duration-200",
+                  submitFocused ? "scale-[1.02] z-10" : ""
+                )}
+                style={submitFocused ? {
+                  boxShadow: "0 0 0 3px #ffffff, 0 0 16px rgba(255, 255, 255, 0.5)",
+                } : undefined}
+              >
                 <button
                   type="submit"
                   disabled={!canSubmit || initiateOtp.isPending || checkUserExists.isPending}
