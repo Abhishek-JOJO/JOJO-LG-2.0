@@ -3,7 +3,6 @@
 import { PageBackground } from "@/components/common/PageBackground";
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
 import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
-import { LoginModeToggle, LoginMode } from "../components/LoginModeToggle";
 import { JOJOCustomInput } from "@/components/ui/JOJOInput";
 import { ErrorKey, LoginIdentifierType, OtpDeliveryMethod } from "@/enums/ui.enum";
 import { appConfig } from "@/lib/config/app.config";
@@ -25,6 +24,11 @@ import { ChangeEvent, CSSProperties, KeyboardEvent, Suspense, useCallback, useEf
 import { useOtpStore } from "./store";
 import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useVerifySubscription } from "@/hooks/useVerifySubscription";
+import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
+import { doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+import { useProfileStore } from "@/store/useProfileStore";
 
 export default function OtpPage() {
   return (
@@ -48,6 +52,11 @@ function OtpPageContent() {
   const resendOtp = useResendOtp();
   const authContext = useOtpStore(state => state.authContext);
   const resetOtpStore = useOtpStore(state => state.reset);
+  const { isAppReady } = useBootstrap();
+  const sessionId = useAuthStore(state => state.token);
+  const clearSelectedProfile = useProfileStore(state => state.clearSelectedProfile);
+  const { data: subData } = useVerifySubscription(appConfig.GEO_DEFAULT_COUNTRY_CODE, sessionId, isAppReady);
+  const isGoldLogo = !!(subData?.data?.subscription?.dEndDate && new Date(subData.data.subscription.dEndDate).getTime() >= Date.now());
 
   // Security & expiration hooks
   const otpExpiration = useOtpExpiration({ expirationMinutes: 5, warningThresholdSeconds: 60 });
@@ -219,22 +228,22 @@ function OtpPageContent() {
       const otp = digits.join("");
 
       if (otp.length < appConfig.OTP_LENGTH) {
-        setError(ErrorKey.REQUIRED);
-        setTouched(true);
+        setError(null);
+        setTouched(false);
+        const firstEmptyIndex = digits.findIndex((digit) => !digit);
+        if (firstEmptyIndex >= 0) {
+          setActiveIndex(firstEmptyIndex);
+        }
         return;
       }
 
       if (!identifier) {
-        setError(ErrorKey.ERR_INVALID);
-        setTouched(true);
         return;
       }
 
       // Security check: Rate limiting
       if (!otpSecurity.canAttempt()) {
         const remainingTime = otpSecurity.getRemainingLockTime();
-        setError(ErrorKey.ERR_INVALID);
-        setTouched(true);
         secureLogger.logSecurityEvent("OTP submission blocked - rate limit", {
           attemptsRemaining: otpSecurity.attemptsRemaining,
           lockedFor: remainingTime,
@@ -272,6 +281,7 @@ function OtpPageContent() {
 
         // Success - reset security state
         otpSecurity.recordSuccessfulAttempt();
+        clearSelectedProfile();
         secureLogger.logOtpAttempt(true, {
           identifier: isEmail ? email : phone,
           isRegister,
@@ -287,7 +297,7 @@ function OtpPageContent() {
             : `${LoginIdentifierType.EMAIL}=${encodeURIComponent(email)}`;
           tvNavigate(`${ROUTES.REGISTER_CREATE_ACCOUNT}?${param}`, router);
         } else {
-          tvNavigate(ROUTES.HOME, router);
+          tvNavigate(ROUTES.WATCHING, router);
         }
 
         // Clear sessionStorage and reset store AFTER navigation is initiated
@@ -317,7 +327,7 @@ function OtpPageContent() {
         });
       }
     },
-    [digits, identifier, isEmail, phoneCode, isRegister, verifyOtp, router, otpSecurity, otpExpiration, phone, email, resetOtpStore]
+    [clearSelectedProfile, digits, identifier, isEmail, phoneCode, isRegister, verifyOtp, router, otpSecurity, otpExpiration, phone, email, resetOtpStore]
   );
 
   // Auto-submit OTP when all digits are entered (with race condition guard)
@@ -335,10 +345,10 @@ function OtpPageContent() {
       isSubmittingRef.current = true;
       lastAttemptedOtpRef.current = otp;
 
-      // Small delay to allow user to see complete OTP before submitting
+      // Small delay to allow the last entered digit to paint before verifying.
       const timer = setTimeout(() => {
         if (!verifyOtp.isPending && !isVerifiedRef.current) {
-          submitButtonRef.current?.click();
+          handleOtpSubmit();
         }
         isSubmittingRef.current = false;
       }, 150);
@@ -348,7 +358,7 @@ function OtpPageContent() {
         isSubmittingRef.current = false;
       };
     }
-  }, [digits, verifyOtp.isPending, verifyOtp.isSuccess]);
+  }, [digits, handleOtpSubmit, verifyOtp.isPending, verifyOtp.isSuccess]);
 
   const handleResend = async (method: OtpDeliveryMethod.SMS | OtpDeliveryMethod.CALL) => {
     if (countdown > 0) return;
@@ -410,12 +420,7 @@ function OtpPageContent() {
   });
 
   const isDisabled = countdown > 0 || resendOtp.isPending || otpSecurity.isLocked;
-
-  const handleModeChange = (nextMode: LoginMode) => {
-    if (nextMode === "phone") {
-      tvNavigate(`${ROUTES.LOGIN}?mode=phone`, router);
-    }
-  };
+  const canFocusResend = !isDisabled && countdown <= 0;
 
   // Display value for UI
   const displayIdentifier = isEmail
@@ -432,8 +437,12 @@ function OtpPageContent() {
     },
     onArrowPress: (direction) => {
       if (direction === 'up') {
-        setFocus('otp-input-0');
-        inputRefs.current[0]?.focus();
+        if (canFocusResend && doesFocusableExist('otp-resend')) {
+          setFocus('otp-resend');
+        } else {
+          setFocus('otp-input-0');
+          inputRefs.current[0]?.focus();
+        }
         return false;
       }
       return true;
@@ -444,6 +453,18 @@ function OtpPageContent() {
     focusKey: 'otp-resend',
     onEnterPress: () => {
       if (!isDisabled) handleResend(OtpDeliveryMethod.SMS);
+    },
+    onArrowPress: (direction) => {
+      if (direction === 'up') {
+        setFocus('otp-input-0');
+        inputRefs.current[0]?.focus();
+        return false;
+      }
+      if (direction === 'down') {
+        setFocus('otp-submit');
+        return false;
+      }
+      return true;
     }
   });
 
@@ -451,23 +472,19 @@ function OtpPageContent() {
     <div className="relative min-h-screen overflow-hidden">
       <PageBackground />
       <div className="relative z-10 flex min-h-screen flex-col px-6 py-8 sm:px-10">
-        {/* Top bar: logo (left) + mode toggle (centered) */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+        {/* Top bar: logo */}
+        <div className="flex items-center">
           <JOJOCommonImage
-            src={LOGOS.JOJO_LOGO}
+            src={isGoldLogo ? LOGOS.JOJO_GOLD : LOGOS.JOJO_LOGO}
             altKey="img_jojo_logo"
-            width={110}
-            height={40}
+            width={isGoldLogo ? 180 : 110}
+            height={isGoldLogo ? 70 : 40}
             preset={JOJOImagePreset.Logo}
-            wrapperClassName="h-9 w-[110px] justify-self-start"
+            wrapperClassName={isGoldLogo ? "h-[70px] w-[180px] justify-self-start" : "h-9 w-[110px] justify-self-start"}
           />
-          <div className="justify-self-center">
-            <LoginModeToggle mode="remote" onChange={handleModeChange} />
-          </div>
-          <div />
         </div>
 
-        <div className="flex flex-1 items-center justify-center px-4">
+        <div className="flex flex-1 items-start justify-center px-4 pt-14 sm:pt-16">
         <form onSubmit={handleOtpSubmit as any} noValidate className="w-full max-w-sm sm:max-w-md">
             <div className="flex flex-col items-center text-center gap-2">
               <h1 className="text-xl sm:text-2xl font-semibold text-theme_1">
@@ -479,7 +496,7 @@ function OtpPageContent() {
               </p>
             </div>
 
-            <div className="flex flex-col gap-0 pt-8" style={{ gap: "10px" }}>
+            <div className="flex flex-col gap-0 pt-5" style={{ gap: "10px" }}>
               {/* OTP boxes */}
               <div className="grid gap-3 w-full pt-3" style={{ gridTemplateColumns: `repeat(${appConfig.OTP_LENGTH}, 1fr)` }}>
                 {Array.from({ length: appConfig.OTP_LENGTH }).map((_, i) => (
@@ -497,6 +514,7 @@ function OtpPageContent() {
                     inputRefs={inputRefs}
                     boxClass={boxClass}
                     boxStyle={boxStyle}
+                    canFocusResend={canFocusResend}
                   />
                 ))}
               </div>
@@ -561,24 +579,30 @@ function OtpPageContent() {
               )}
 
               {/* Resend */}
-              <div className="flex flex-col items-center w-full text-center py-8">
-                <p className="m-0 text-sm text-theme_5">
+              <div className="flex flex-col items-center w-full text-center py-5">
+                <div className="m-0 flex min-h-[48px] items-center justify-center text-sm text-theme_5">
                   {countdown > 0 && !otpSecurity.isLocked ? (
                     <>{t("resend_in")} <span className="text-theme_13_samecolour font-semibold tabular-nums">{formatTime(countdown)}</span></>
                   ) : (
-                    <span
+                    <button
                       ref={resendRef as any}
-                      role="button"
+                      type="button"
                       tabIndex={isDisabled ? -1 : 0}
                       aria-disabled={isDisabled}
                       onClick={() => { if (!isDisabled) handleResend(OtpDeliveryMethod.SMS); }}
                       onKeyDown={(e) => { if (!isDisabled && (e.key === "Enter" || e.key === " ")) handleResend(OtpDeliveryMethod.SMS); }}
-                      className={cn("cursor-pointer body-xs-medium transition-all duration-150 inline-block px-3 py-1 rounded-full", isDisabled ? "opacity-40 cursor-not-allowed text-theme_13_samecolour" : "cursor-pointer hover:underline text-theme_13_samecolour", resendFocused ? "ring-2 ring-white scale-105" : "")}
+                      className={cn(
+                        "body-sm-medium min-w-[220px] rounded-full border px-8 py-3 transition-all duration-150 outline-none",
+                        isDisabled
+                          ? "cursor-not-allowed border-white/10 bg-white/5 text-white/35"
+                          : "cursor-pointer border-theme_13_samecolour bg-black/40 text-white shadow-lg shadow-black/20",
+                        resendFocused ? "scale-110 bg-theme_13_samecolour text-black ring-4 ring-white shadow-2xl ring-offset-2 ring-offset-black" : ""
+                      )}
                     >
                       {!isEmail ? t("resend_now_on") : t("resend_now")}
-                    </span>
+                    </button>
                   )}
-                </p>
+                </div>
                 {/* {
                   !isEmail && <div className="flex items-center gap-4 pt-2">
                     <div
@@ -614,7 +638,7 @@ function OtpPageContent() {
               </div>
             </div>
 
-            <div ref={submitRef as any} className={`w-[80%] mx-auto mt-10 rounded-[100px] transition-all ${submitFocused ? "ring-4 ring-white shadow-xl scale-105" : ""}`}>
+            <div ref={submitRef as any} className={`w-[80%] mx-auto mt-6 rounded-[100px] transition-all ${submitFocused ? "ring-4 ring-white shadow-xl scale-105" : ""}`}>
               <JOJOCustomButton
                 ref={submitButtonRef}
                 size={JOJOButton.Size.L}
@@ -635,9 +659,23 @@ function OtpPageContent() {
   );
 }
 
-function FocusableOtpInput({ index, digit, activeIndex, hasError, handleChange, handleKeyDown, handlePaste, setActiveIndex, t, inputRefs, boxClass, boxStyle }: any) {
+function FocusableOtpInput({ index, digit, activeIndex, hasError, handleChange, handleKeyDown, handlePaste, setActiveIndex, t, inputRefs, boxClass, boxStyle, canFocusResend }: any) {
+  const moveDownFromOtp = useCallback(() => {
+    inputRefs.current[index]?.blur();
+    if (canFocusResend) {
+      setFocus('otp-resend');
+    } else {
+      setFocus('otp-submit');
+    }
+  }, [canFocusResend, index, inputRefs]);
+
   const { ref, focused } = useFocusable({
     focusKey: `otp-input-${index}`,
+    onFocus: () => {
+      setActiveIndex(index);
+      inputRefs.current[index]?.focus();
+      inputRefs.current[index]?.setSelectionRange(0, inputRefs.current[index]?.value.length ?? 0);
+    },
     onEnterPress: () => {
       inputRefs.current[index]?.focus();
     },
@@ -653,11 +691,12 @@ function FocusableOtpInput({ index, digit, activeIndex, hasError, handleChange, 
         return false;
       }
       if (direction === 'down') {
-        setFocus('otp-submit');
+        moveDownFromOtp();
         return false;
       }
       if (direction === 'up') {
-        setFocus('login-mode-remote');
+        setFocus(`otp-input-${index}`);
+        inputRefs.current[index]?.focus();
         return false;
       }
       return true;
@@ -665,13 +704,31 @@ function FocusableOtpInput({ index, digit, activeIndex, hasError, handleChange, 
   });
 
   return (
-    <div ref={ref as any} className={`rounded-full transition-all ${focused ? "ring-4 ring-white shadow-xl scale-[1.05]" : ""}`}>
+    <div
+      ref={ref as any}
+      className={`rounded-full transition-all ${focused ? "ring-4 ring-white shadow-xl scale-[1.05]" : ""}`}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          e.stopPropagation();
+          moveDownFromOtp();
+        }
+      }}
+      onKeyUp={(e) => {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          e.stopPropagation();
+          moveDownFromOtp();
+        }
+      }}
+    >
       <JOJOCustomInput
         ref={(el) => { inputRefs.current[index] = el; }}
-        type="text"
+        type="tel"
         inputMode="numeric"
+        pattern="[0-9]*"
         autoComplete={index === 0 ? "one-time-code" : "off"}
-        maxLength={appConfig.OTP_LENGTH}
+        maxLength={1}
         value={digit}
         onChange={(e) => {
           handleChange(e, index);
@@ -682,16 +739,33 @@ function FocusableOtpInput({ index, digit, activeIndex, hasError, handleChange, 
           }
         }}
         onKeyDown={(e) => {
+          const isDigitKey = /^[0-9]$/.test(e.key);
+          const allowedControlKeys = [
+            "Backspace",
+            "Delete",
+            "Tab",
+            "Enter",
+            "ArrowLeft",
+            "ArrowRight",
+            "ArrowUp",
+            "ArrowDown",
+            "Home",
+            "End",
+          ];
+          if (!isDigitKey && !allowedControlKeys.includes(e.key) && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            return;
+          }
           if (e.key === "ArrowDown") {
             e.preventDefault();
-            (e.target as HTMLElement)?.blur();
-            setFocus('otp-submit');
+            e.stopPropagation();
+            moveDownFromOtp();
             return;
           }
           if (e.key === "ArrowUp") {
             e.preventDefault();
-            (e.target as HTMLElement)?.blur();
-            setFocus('login-mode-remote');
+            setFocus(`otp-input-${index}`);
+            inputRefs.current[index]?.focus();
             return;
           }
           if (e.key === "ArrowLeft" && index > 0) {
@@ -719,8 +793,18 @@ function FocusableOtpInput({ index, digit, activeIndex, hasError, handleChange, 
             inputRefs.current[index - 1]?.focus();
           }
         }}
+        onKeyUp={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            e.stopPropagation();
+            moveDownFromOtp();
+          }
+        }}
         onPaste={handlePaste}
-        onFocus={() => setActiveIndex(index)}
+        onFocus={() => {
+          setActiveIndex(index);
+          setFocus(`otp-input-${index}`);
+        }}
         aria-label={t("otp_digit", { number: index + 1 })}
         tabIndex={0}
         name={index === 0 ? "one-time-code" : undefined}

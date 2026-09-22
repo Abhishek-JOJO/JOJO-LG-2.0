@@ -33,6 +33,10 @@ import { LoginModeToggle, LoginMode } from "./components/LoginModeToggle";
 import { QrPairingPanel } from "./components/QrPairingPanel";
 
 import { tvNavigate } from "@/src/navigation/tvNavigate";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useProfileStore } from "@/store/useProfileStore";
+import { useVerifySubscription } from "@/hooks/useVerifySubscription";
+import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
 
 export default function LoginPage() {
   return (
@@ -53,6 +57,11 @@ function LoginPageContent() {
   const { data: countries, isLoading: countriesLoading, error: countriesError } = useCountries();
   const { isAvailable, countryCode: geoCountryCode } = useGeoAvailability();
   const setAuthContext = useOtpStore(state => state.setAuthContext);
+  const clearSelectedProfile = useProfileStore(state => state.clearSelectedProfile);
+  const { isAppReady } = useBootstrap();
+  const sessionId = useAuthStore(state => state.token);
+  const { data: subData } = useVerifySubscription(appConfig.GEO_DEFAULT_COUNTRY_CODE, sessionId, isAppReady);
+  const isGoldLogo = !!(subData?.data?.subscription?.dEndDate && new Date(subData.data.subscription.dEndDate).getTime() >= Date.now());
 
   const [mode, setMode] = useState<LoginMode>(() => {
     const m = searchParams?.get("mode");
@@ -68,6 +77,7 @@ function LoginPageContent() {
   );
   const [error, setError] = useState<ErrorKey | null>(null);
   const [touched, setTouched] = useState(false);
+  const autoSubmittedPhoneRef = useRef<string | null>(null);
 
   // ── Focus setup ──────────────────────────────────────────────────────────
   const { ref: pageRef, focusKey: pageFocusKey } = useFocusable({
@@ -294,6 +304,30 @@ function LoginPageContent() {
     if (touched) {
       setError(validate(nextValue?.trim()));
     }
+
+    const nextDigits = nextValue.replace(REGEX?.NON_DIGIT, "");
+    const shouldAutoSubmitPhone =
+      mode === "remote" &&
+      nextDigits.length === 10 &&
+      isPossiblePhoneInput(nextValue.trim()) &&
+      !validate(nextValue.trim()) &&
+      !initiateOtp.isPending &&
+      !checkUserExists.isPending;
+
+    if (shouldAutoSubmitPhone && autoSubmittedPhoneRef.current !== nextDigits) {
+      autoSubmittedPhoneRef.current = nextDigits;
+      setTimeout(() => {
+        const form = document.getElementById("login-form") as HTMLFormElement | null;
+        if (!form) return;
+        if (typeof form.requestSubmit === "function") {
+          form.requestSubmit();
+        } else {
+          form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+        }
+      }, 100);
+    } else if (nextDigits.length < 10) {
+      autoSubmittedPhoneRef.current = null;
+    }
   };
 
   const handleBlur = () => {
@@ -402,6 +436,7 @@ function LoginPageContent() {
               phoneCode: phonePayload.phoneCode,
               isRegister: false,
             });
+            clearSelectedProfile();
             showToast(t("login_success") || "Special User Login Successful!", "success");
             tvNavigate(ROUTES.WATCHING || "/watching", router);
             return;
@@ -448,6 +483,7 @@ function LoginPageContent() {
             phoneCode: "",
             isRegister: false,
           });
+          clearSelectedProfile();
           showToast(t("login_success") || "Special User Login Successful!", "success");
           tvNavigate(ROUTES.WATCHING || "/watching", router);
           return;
@@ -491,6 +527,7 @@ function LoginPageContent() {
             phoneCode: phonePayload.phoneCode,
             isRegister: !result.isExists,
           });
+          clearSelectedProfile();
           showToast(t("login_success") || "Special User Login Successful!", "success");
           tvNavigate(ROUTES.WATCHING || "/watching", router);
           return;
@@ -517,6 +554,12 @@ function LoginPageContent() {
       const result = await checkUserExists.mutateAsync({ phone: trimmed, phoneCode: "" });
       if (result?.isSpecialUser) {
         logger.info("[Login] Special user (email) detected, initiating direct passwordless login");
+        await verifySpecialUser.mutateAsync({
+          phone: trimmed,
+          phoneCode: "",
+          isRegister: false,
+        });
+        clearSelectedProfile();
         showToast(t("login_success") || "Special User Login Successful!", "success");
         tvNavigate(ROUTES.WATCHING || "/watching", router);
         return;
@@ -541,22 +584,25 @@ function LoginPageContent() {
         {/* Absolute Top-Left Logo */}
         <div className="absolute top-10 left-12 z-30">
           <JOJOCommonImage
-            src={LOGOS.JOJO_LOGO}
+            src={isGoldLogo ? LOGOS.JOJO_GOLD : LOGOS.JOJO_LOGO}
             altKey="img_jojo_logo"
-            width={140}
-            height={50}
+            width={isGoldLogo ? 190 : 140}
+            height={isGoldLogo ? 74 : 50}
             preset={JOJOImagePreset.Logo}
-            wrapperClassName="h-11 w-[140px]"
+            wrapperClassName={isGoldLogo ? "h-[74px] w-[190px]" : "h-11 w-[140px]"}
           />
         </div>
 
         {/* Centered Top Mode Switcher */}
-        <div className="w-full flex justify-center pt-8 pb-2 z-30">
+        <div className="w-full flex justify-center pt-6 pb-0 z-30">
           <LoginModeToggle mode={mode} onChange={setMode} />
         </div>
 
         {/* Main Centered Content */}
-        <div className="flex-1 flex items-center justify-center py-4 z-20 w-full">
+        <div className={cn(
+          "flex-1 flex justify-center pb-4 z-20 w-full",
+          mode === "phone" ? "items-center pt-0" : "items-start pt-10"
+        )}>
           {mode === "phone" ? (
             <QrPairingPanel />
           ) : (
@@ -606,7 +652,7 @@ function LoginPageContent() {
                   </div>
                 )}
 
-                <p className="text-sm font-normal text-white/40 text-center leading-relaxed max-w-[440px] mt-4 mb-2">
+                <p className="text-sm font-normal text-white/40 text-left leading-relaxed max-w-[440px] mt-4 mb-2 self-start">
                   {t("disclaimer") || "By proceeding with the login process, we might send a one-time verification code to the phone number linked to your account."}
                 </p>
               </div>
@@ -624,7 +670,7 @@ function LoginPageContent() {
                 >
                   {initiateOtp.isPending || checkUserExists.isPending
                     ? t("loading") || "Loading..."
-                    : t("get_otp") || "Get OTP"}
+                    : "Next"}
                 </button>
               </div>
             </form>

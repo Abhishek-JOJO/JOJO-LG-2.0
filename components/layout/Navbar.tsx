@@ -186,6 +186,7 @@ export function Navbar() {
     isMobileMenuOpen,
     setIsMobileMenuOpen,
     isGold,
+    isGoldStatusPending,
     navItems,
     visibleNavItems,
     isLanding,
@@ -225,7 +226,7 @@ export function Navbar() {
               aria-label="JOJO Home"
               className="flex items-center shrink-0"
             >
-              <div className="w-[95px] h-[42px] sm:w-[135px] sm:h-[54px] relative flex items-center">
+              <div className={isGold ? "w-[125px] h-[48px] sm:w-[175px] sm:h-[68px] relative flex items-center" : "w-[95px] h-[42px] sm:w-[135px] sm:h-[54px] relative flex items-center"}>
                 <JOJOCommonImage
                   src={isGold ? LOGOS.JOJO_GOLD : LOGOS.JOJO_LOGO}
                   alt="JOJO"
@@ -291,13 +292,13 @@ export function Navbar() {
               aria-label="JOJO Home"
               className="flex items-center shrink-0"
             >
-              <div className="w-[80px] h-[38px] sm:w-[120px] sm:h-[65px]">
+              <div className={isGold ? "w-[120px] h-[48px] sm:w-[180px] sm:h-[76px]" : "w-[80px] h-[38px] sm:w-[120px] sm:h-[65px]"}>
                 <JOJOCommonImage
-                  src={LOGOS.JOJO_LOGO}
+                  src={isGold ? LOGOS.JOJO_GOLD : LOGOS.JOJO_LOGO}
                   alt="JOJO"
                   fill
                   preset={JOJOImagePreset.Logo}
-                  wrapperClassName="w-full h-full cursor-pointer"
+                  wrapperClassName={`w-full h-full cursor-pointer ${isGoldStatusPending ? "opacity-0" : ""}`}
                 />
               </div>
             </Link>

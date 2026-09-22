@@ -293,6 +293,8 @@ export function AppProvider({ children }: AppProviderProps) {
   // AUTO-SELECT PROFILE from API
   useEffect(() => {
     if (!profilesQuery.data) return;
+    const normalizedPath = pathname ? (pathname.replace(/\/$/, "") || "/") : "/";
+    if (normalizedPath === ROUTES.WATCHING) return;
 
     const { selected_profile } = profilesQuery.data;
 
@@ -308,7 +310,7 @@ export function AppProvider({ children }: AppProviderProps) {
 
       setSelectedProfile(selected_profile, false); // false = not user selection
     }
-  }, [profilesQuery.data, hasUserSelectedProfile, selectedProfile, setSelectedProfile]);
+  }, [pathname, profilesQuery.data, hasUserSelectedProfile, selectedProfile, setSelectedProfile]);
 
   // SYNC SELECTED PROFILE with latest API data (handles edits/updates)
   useEffect(() => {
@@ -403,9 +405,11 @@ export function AppProvider({ children }: AppProviderProps) {
         }
       }
 
-      const destination = shouldRedirectAuthenticatedUsersToHome(isMobile)
-        ? ROUTES.HOME
-        : getProfileSelectionRoute(isMobile);
+      const destination = !selectedProfile
+        ? getProfileSelectionRoute(isMobile)
+        : shouldRedirectAuthenticatedUsersToHome(isMobile)
+          ? ROUTES.HOME
+          : getProfileSelectionRoute(isMobile);
       logger.info('[AppProvider] ➡️  Authenticated user on auth-only route, redirecting', { normalizedPath, destination });
       tvNavigate(destination, router, { replace: true });
       return;

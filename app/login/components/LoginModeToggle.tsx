@@ -56,7 +56,6 @@ function ToggleOption({
   const { ref, focused } = useFocusable({
     focusKey,
     onEnterPress: onSelect,
-    onFocus: onSelect,
     onArrowPress: (direction) => {
       if (direction === "down") {
         setFocus("login-input");

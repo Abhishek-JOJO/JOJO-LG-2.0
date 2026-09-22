@@ -9,6 +9,7 @@ import { generateQrCode, verifyQrCode } from "@/lib/api/pair";
 import { deepLinkManager } from "@/lib/deeplink/deepLinkManager";
 import { ROUTES } from "@/lib/constants/routes";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useProfileStore } from "@/store/useProfileStore";
 import { logger } from "@/lib/logger/logger";
 import { cn } from "@/lib/utils";
 import { CircleUser, Tv } from "lucide-react";
@@ -20,12 +21,14 @@ export function QrPairingPanel() {
   const t = useTranslations("loginPage");
   const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
+  const clearSelectedProfile = useProfileStore((state) => state.clearSelectedProfile);
 
   const [code, setCode] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
   const [genError, setGenError] = useState(false);
   const generationRef = useRef(0);
+  const retryCountRef = useRef(0);
 
   const generateCode = async () => {
     const myGeneration = ++generationRef.current;
@@ -42,22 +45,35 @@ export function QrPairingPanel() {
     if (generationRef.current !== myGeneration) return;
     if (!result?.code) {
       logger.error("[QrPairingPanel] Failed to get a pairing code from the backend");
+      if (retryCountRef.current < 1) {
+        retryCountRef.current += 1;
+        setTimeout(generateCode, 600);
+        return;
+      }
       setGenError(true);
       return;
     }
+    retryCountRef.current = 0;
     setCode(result.code);
 
     // Always the real public domain (https://jojoapp.in), never the TV's own
     // current origin — see generatePairingQrUrl's own comment.
     const qrUrl = await deepLinkManager.generatePairingQrUrl(result.code);
-    if (!qrUrl) return;
+    if (!qrUrl) {
+      logger.error("[QrPairingPanel] Failed to generate pairing deep link URL");
+      setGenError(true);
+      return;
+    }
     if (generationRef.current !== myGeneration) return;
 
-    QRCode.toDataURL(qrUrl, { width: 380, margin: 1, color: { dark: "#f97316", light: "#ffffff" } })
+    QRCode.toDataURL(qrUrl, { width: 380, margin: 1, color: { dark: "#000000", light: "#ffffff" } })
       .then((dataUrl) => {
         if (generationRef.current === myGeneration) setQrDataUrl(dataUrl);
       })
-      .catch((err) => logger.error("[QrPairingPanel] Failed to render QR code", err));
+      .catch((err) => {
+        logger.error("[QrPairingPanel] Failed to render QR code", err);
+        if (generationRef.current === myGeneration) setGenError(true);
+      });
   };
 
   useEffect(() => {
@@ -84,6 +100,7 @@ export function QrPairingPanel() {
       if (cancelled) return;
 
       if (result.verified && result.sessionId && result.userId) {
+        clearSelectedProfile();
         setAuth(
           {
             id: result.userId,
@@ -109,7 +126,7 @@ export function QrPairingPanel() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [code, expired, router, setAuth]);
+  }, [clearSelectedProfile, code, expired, router, setAuth]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center w-full max-w-7xl mx-auto px-4 py-2">
