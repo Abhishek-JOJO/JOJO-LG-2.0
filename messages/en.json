@@ -329,7 +329,8 @@
     "logout": "Logout",
     "logout_confirm": "Are you sure you want to log out?",
     "logout_desc": "You will be asked to log in again to watch your favorites.",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "exit": "Exit"
   },
   "contentRails": {
     "error_load": "Failed to load content. Please try again later.",

@@ -82,12 +82,31 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
   const [appreciationState, setAppreciationState] = useState<"none" | LikeLovePartHerocarousel.LIKE | LikeLovePartHerocarousel.LOVE | LikeLovePartHerocarousel.DISLIKE>("none");
   const leaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const user = useAuthStore((s) => s.user);
+  const isTvFileRuntime = typeof window !== "undefined" && window.location.protocol === "file:";
+  const [heavyReady, setHeavyReady] = useState(() => !isTvFileRuntime && isActive);
+
+  useEffect(() => {
+    if (!isActive) {
+      setHeavyReady(false);
+      return;
+    }
+    if (!isTvFileRuntime) {
+      setHeavyReady(true);
+      return;
+    }
+
+    setHeavyReady(false);
+    const timer = setTimeout(() => setHeavyReady(true), 700);
+    return () => clearTimeout(timer);
+  }, [isActive, isTvFileRuntime, item?.id]);
+
+  const heavyActive = isActive && heavyReady;
 
   // ── Share state ───────────────────────────────────────────────────────────
   const [copied, setCopied] = useState(false);
 
   // ── Asset details (for accurate certification & duration) ─────────────────
-  const { data: assetDetails } = useAsset(item.id, isActive);
+  const { data: assetDetails } = useAsset(item.id, heavyActive);
 
   const isShow = item.assetType === "SHOW" || assetDetails?.assetType === "SHOW";
   const heroPreviewUrl = item?.previewUrl || (item as any)?.preview_url || assetDetails?.previewUrl || null;
@@ -161,7 +180,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
 
   const { handleWatch, isSubscribed, isOverseas, isTvodPurchased, pricing, isPricingLoading, isVerifyLoading } = useWatchGating({
     asset: gatingAsset as unknown as ContentAsset,
-    enabled: isActive,
+    enabled: heavyActive,
     batchPricing,
     disableIndividualPricing: true,
   });
@@ -242,12 +261,12 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
     };
   }, []);
 
-  const shouldPlay = ENABLE_HERO_BACKGROUND_VIDEO && isActive && isSlideSettled && isIntersecting && !isAnyCardHovered && !isSearchOpen && !isAssetDetailOpen && !isSessionExpiredVisible;
+  const shouldPlay = ENABLE_HERO_BACKGROUND_VIDEO && heavyActive && isSlideSettled && isIntersecting && !isAnyCardHovered && !isSearchOpen && !isAssetDetailOpen && !isSessionExpiredVisible;
 
   // Unmute hero carousel by default when mounting
   useEffect(() => {
-    setMuted(false);
-  }, [setMuted]);
+    if (heavyActive) setMuted(false);
+  }, [heavyActive, setMuted]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -354,7 +373,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
           >
             <JOJOCommonVideo
               ref={videoRef}
-              src={isActive && isSlideSettled ? heroPreviewUrl : undefined}
+              src={heavyActive && isSlideSettled ? heroPreviewUrl : undefined}
               // `poster` is the video element's own content before playback
               // begins — standard image rendering, not decoder output — so it's
               // always correct even during the window the wrapper above has it
@@ -371,8 +390,8 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
               // while MediaSource is available, which it always is here.
               preferNativeHls
               preferConservativeQuality
-              autoPlay={isActive && isIntersecting && !isAnyCardHovered && !isAssetDetailOpen && !isSessionExpiredVisible}
-              muted={!(isActive && isIntersecting && !isAnyCardHovered && !isAssetDetailOpen && !isSessionExpiredVisible) || isMuted}
+              autoPlay={heavyActive && isIntersecting && !isAnyCardHovered && !isAssetDetailOpen && !isSessionExpiredVisible}
+              muted={!(heavyActive && isIntersecting && !isAnyCardHovered && !isAssetDetailOpen && !isSessionExpiredVisible) || isMuted}
               loop
               playsInline
               // onPlaying only means "not paused" — it fires whether or not any

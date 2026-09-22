@@ -12,7 +12,7 @@ import { useBootstrap } from "@lib/bootstrap/BootstrapContext";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useActivePathname } from "@/hooks/useActivePathname";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { setFocus, getCurrentFocusKey } from "@noriginmedia/norigin-spatial-navigation";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { useContentRails } from "../hooks/useContentRails";
@@ -57,6 +57,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   const locale = useLocaleStore((s) => s.locale);
   const user = useAuthStore((s) => s.user);
   const isGuest = user?.isGuest ?? false;
+  const isTvFileRuntime = typeof window !== "undefined" && window.location.protocol === "file:";
 
   // Synchronously check if navigation items are already in the TanStack cache
   // We can do this safely on both Client and Server because getQueryClient gives us the correct instance.
@@ -148,13 +149,18 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     return () => window.removeEventListener("scroll", handleScroll);
   }, [hasNextPage]); // re-evaluates when hasNextPage flips to false → cleans up listener
 
-  // Trigger continue-watching fetch when the view loads or when subnav changes
+  // Trigger continue-watching fetch when the view loads. On packaged webOS, do
+  // not refetch it for every navbar tab switch; that competes with rail rendering
+  // and makes Home → Movies feel delayed. Socket updates still keep it fresh.
+  const didFetchContinueWatchingRef = useRef(false);
   useEffect(() => {
-    if (socketClient.isConnected && !isGuest) {
-      logger.info("[ContentRailsView] Fetching continue watching list");
-      useContinueWatchingStore.getState().fetchItems();
-    }
-  }, [subnavId, isGuest]);
+    if (isGuest || !socketClient.isConnected) return;
+    if (isTvFileRuntime && didFetchContinueWatchingRef.current) return;
+
+    didFetchContinueWatchingRef.current = true;
+    logger.info("[ContentRailsView] Fetching continue watching list");
+    useContinueWatchingStore.getState().fetchItems();
+  }, [subnavId, isGuest, isTvFileRuntime]);
 
   const openAssetDetail = useAssetDetailStore((s) => s.openAssetDetail);
 
@@ -262,46 +268,40 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
 
   const responsePages = data?.pages || [];
 
-  const rawRails = responsePages.flatMap((page) => {
-    const responseData = (page as { data?: { content_rail_items?: unknown[] } })?.data;
-    return responseData?.content_rail_items || [];
-  });
-
   const isHomePage = pathname === ROUTES.HOME || pathname === ROUTES.HOMEPAGE || pathname === "/" || subnavId === 1;
 
-  // Map API rails and filter out empty ones, but keep CONTINUE_WATCHING rail even if its items are empty
-  let mappedRails = rawRails
-    .map((rawRail, idx) => mapApiRail(rawRail as Record<string, unknown>, idx))
-    .filter((rail) => (rail?.items && rail?.items?.length > 0) || rail.type === ContentRailType.CONTINUE_WATCHING)
-    .filter((rail) => {
-      // Remove Genre section from Home page per user requirement
-      const isGenreRail =
-        rail.type === ContentRailType.GENRE ||
-        rail.title?.toLowerCase()?.trim() === "genre";
-      if (isGenreRail && isHomePage) {
-        return false;
-      }
-      return true;
+  const mappedRails = useMemo(() => {
+    const rawRails = responsePages.flatMap((page) => {
+      const responseData = (page as { data?: { content_rail_items?: unknown[] } })?.data;
+      return responseData?.content_rail_items || [];
     });
 
-  // Check if backend returned a CONTINUE_WATCHING rail position
-  const cwRailIndex = mappedRails.findIndex((rail) => rail.type === ContentRailType.CONTINUE_WATCHING);
+    const rails = rawRails
+      .map((rawRail, idx) => mapApiRail(rawRail as Record<string, unknown>, idx))
+      .filter((rail) => (rail?.items && rail?.items?.length > 0) || rail.type === ContentRailType.CONTINUE_WATCHING)
+      .filter((rail) => {
+        const isGenreRail =
+          rail.type === ContentRailType.GENRE ||
+          rail.title?.toLowerCase()?.trim() === "genre";
+        return !(isGenreRail && isHomePage);
+      });
 
-  if (cwRailIndex !== -1) {
-    // Backend returned a position for continue watching
-    if (cwItems && cwItems.length > 0 && !isGuest) {
-      // Replace with our dynamic items, keeping the position and other fields if available
-      mappedRails[cwRailIndex] = {
-        ...mappedRails[cwRailIndex],
-        id: mappedRails[cwRailIndex].id || "continue-watching-rail",
-        title: mappedRails[cwRailIndex].title || "Continue Watching",
-        items: cwItems,
-      };
-    } else {
-      // No continue watching items, or user is a guest, so remove the rail
-      mappedRails.splice(cwRailIndex, 1);
+    const cwRailIndex = rails.findIndex((rail) => rail.type === ContentRailType.CONTINUE_WATCHING);
+    if (cwRailIndex !== -1) {
+      if (cwItems && cwItems.length > 0 && !isGuest) {
+        rails[cwRailIndex] = {
+          ...rails[cwRailIndex],
+          id: rails[cwRailIndex].id || "continue-watching-rail",
+          title: rails[cwRailIndex].title || "Continue Watching",
+          items: cwItems,
+        };
+      } else {
+        rails.splice(cwRailIndex, 1);
+      }
     }
-  }
+
+    return rails;
+  }, [responsePages, isHomePage, cwItems, isGuest]);
 
   const [activeRailIndex, setActiveRailIndex] = useState(0);
   const activeRailIndexRef = useRef(0);
@@ -313,7 +313,10 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
 
   const isFirstHero = mappedRails.length > 0 ? mappedRails[0].type === ContentRailType.HERO_CAROUSEL : false;
   const heroRail = isFirstHero ? mappedRails[0] : null;
-  const contentRails = isFirstHero ? mappedRails.slice(1) : mappedRails;
+  const contentRails = useMemo(
+    () => (isFirstHero ? mappedRails.slice(1) : mappedRails),
+    [isFirstHero, mappedRails]
+  );
 
   const returnAssetId = useAssetDetailStore((s) => s.returnAssetId);
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
@@ -334,7 +337,11 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     Math.max(0, contentRails.length - 1)
   );
   const activeRail = contentRails[safeActiveRailIndex];
-  const upcomingRails = contentRails.slice(safeActiveRailIndex + 1, safeActiveRailIndex + 5);
+  const upcomingRails = useMemo(
+    () => contentRails.slice(safeActiveRailIndex + 1, safeActiveRailIndex + 5),
+    [contentRails, safeActiveRailIndex]
+  );
+  const showPreviewRails = true;
 
   // TV remote vertical navigation: ArrowDown / ArrowUp updates the active rail in place instantly
   const handleArrowUpDown = useCallback((direction: "up" | "down") => {
@@ -385,32 +392,39 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   // repeat-fire every ~100-150ms, but a rails page fetch (20 rails' worth of items) can easily take
   // 1-2s+ on TV hardware/network — a 3-rail buffer gives far less lead time than that requires, so
   // trigger with a much larger margin (half a page) instead of waiting until the user is nearly there.
-  const RAIL_PAGINATION_LOOKAHEAD = 10;
+  const RAIL_PAGINATION_LOOKAHEAD = isTvFileRuntime ? 4 : 10;
   useEffect(() => {
     if (hasNextPage && !isFetchingNextPage && safeActiveRailIndex >= contentRails.length - RAIL_PAGINATION_LOOKAHEAD) {
       fetchNextPage();
     }
-  }, [hasNextPage, isFetchingNextPage, safeActiveRailIndex, contentRails.length, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, safeActiveRailIndex, contentRails.length, fetchNextPage, RAIL_PAGINATION_LOOKAHEAD]);
 
   // Covers the fastest-possible case (rapid ArrowDown from the very start of a small rail set):
   // kick off page 2 the moment page 1 finishes loading, without waiting on scroll position at all.
   // Only fires once — subsequent pages are handled by the lookahead effect above.
   useEffect(() => {
+    if (isTvFileRuntime) return;
     if (hasNextPage && !isFetchingNextPage && !isFetching && responsePages.length === 1) {
       fetchNextPage();
     }
-  }, [responsePages.length, hasNextPage, isFetchingNextPage, isFetching, fetchNextPage]);
+  }, [responsePages.length, hasNextPage, isFetchingNextPage, isFetching, fetchNextPage, isTvFileRuntime]);
 
   // Ahead-of-time preloading of upcoming rails' lead card images, logos, and side portrait cards
   // Ensures 0ms latency and instant data filling with zero delay on ArrowDown
   // Dep: safeActiveRailIndex (not upcomingRails which is a new .slice() every render)
   useEffect(() => {
+    if (isTvFileRuntime) return;
+
     const upcoming = contentRails.slice(safeActiveRailIndex + 1, safeActiveRailIndex + 4);
     if (!upcoming.length) return;
-    upcoming.forEach((rail) => {
-      preloadRailItems(rail?.items, 6);
-    });
-  }, [safeActiveRailIndex, contentRails]);
+    const timer = setTimeout(() => {
+      upcoming.forEach((rail) => {
+        preloadRailItems(rail?.items, 6);
+      });
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [safeActiveRailIndex, contentRails, isTvFileRuntime]);
 
   // ── Initial load: TV Hero Slider skeleton matching 75vh layout ──
   const showSkeleton = isLoading || (isFetching && !data);
@@ -490,7 +504,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
       )}
 
       {/* Upcoming Preview Rails (Section index 2+) - 100% standard portrait cards only */}
-      {upcomingRails.map((rail, idx) => (
+      {showPreviewRails && upcomingRails.map((rail, idx) => (
         <ContentRailSection
           key={rail.id}
           index={2 + idx}

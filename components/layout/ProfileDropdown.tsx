@@ -14,6 +14,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ProfileMenuLink } from "../ui/ProfileDropdownList";
+import { useExitConfirmStore } from "@/store/useExitConfirmStore";
 import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 
 // The dropdown mounts several focusables at once (menu links) the
@@ -125,12 +126,19 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDropdownOpen]);
 
+  const openExit = useExitConfirmStore((state) => state.open);
+  const handleExit = () => {
+    closeDropdown();
+    openExit();
+  };
+
   const dropdownContent = isMounted ? (
     <ProfileDropdownMenu
       dropdownRef={dropdownRef}
       dropdownPos={dropdownPos}
       isVisible={isVisible}
       t={t}
+      onExit={handleExit}
     />
   ) : null;
 
@@ -142,6 +150,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
         setFocus('navbar-search');
         return false;
       }
+      if (direction === 'right') return false;
       if (direction === 'down') {
         if (document.getElementById('hero-carousel-container')) {
           setFocus('hero-carousel');
@@ -158,6 +167,13 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     },
     onEnterPress: toggleDropdown,
   });
+
+  useEffect(() => {
+    if (!focused || isDropdownOpen) return;
+    const timer = setTimeout(openDropdown, 120);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focused, isDropdownOpen]);
 
   return (
     <>
@@ -201,6 +217,7 @@ function ProfileDropdownMenu({
   dropdownPos,
   isVisible,
   t,
+  onExit,
 }: any) {
   const { ref: dropdownBoundaryRef, focusKey: dropdownBoundaryKey } = useFocusable({
     focusKey: 'profile-dropdown-boundary',
@@ -242,8 +259,34 @@ function ProfileDropdownMenu({
         <ProfileMenuLink href={ROUTES.ACCOUNT_SETTINGS}>
           {t("account_settings")}
         </ProfileMenuLink>
+
+        <ProfileMenuAction onEnter={onExit}>
+          {t("exit") || "Exit"}
+        </ProfileMenuAction>
       </div>
     </FocusContext.Provider>
   );
 }
 
+
+function ProfileMenuAction({ onEnter, children }: { onEnter: () => void; children: React.ReactNode }) {
+  const { ref, focused } = useFocusable({
+    onEnterPress: onEnter,
+  });
+
+  return (
+    <div
+      ref={ref as any}
+      onClick={onEnter}
+      className={cn(
+        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular border-2 border-transparent",
+        "text-theme_5",
+        "hover:bg-theme_11_samecolour hover:text-theme_13_samecolour",
+        "transition-all duration-200 cursor-pointer",
+        focused ? "bg-theme_11_samecolour border-white text-theme_13_samecolour" : ""
+      )}
+    >
+      {children}
+    </div>
+  );
+}

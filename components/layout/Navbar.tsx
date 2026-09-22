@@ -29,7 +29,7 @@ function LogoSkeleton({ isGoldSlot = false }: { isGoldSlot?: boolean }) {
       className={`w-full h-full rounded-xl bg-white/8 overflow-hidden relative ${isGoldSlot ? "min-w-[120px]" : "min-w-[80px]"}`}
       aria-hidden="true"
     >
-      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.25s_infinite] bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+      <div className="absolute inset-0 -translate-x-full animate-pulse bg-gradient-to-r from-white/5 via-white/15 to-white/5" />
     </div>
   );
 }
@@ -302,9 +302,13 @@ export function Navbar() {
               <LanguageSwitcher className="h-9! bg-theme_9!" />
             )}
             {!isGuest ? (
-              <ProfileDropdown totalNavItems={visibleNavItems.length} isGold={isGold} />
+              <>
+                <ProfileDropdown totalNavItems={visibleNavItems.length} isGold={isGold} />
+              </>
             ) : (
-              <FocusableLoginButton t={t} router={router} />
+              <>
+                <FocusableLoginButton t={t} router={router} />
+              </>
             )}
           </div>
         </div>

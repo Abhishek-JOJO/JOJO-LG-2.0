@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { getContentRails } from "../api/getContentRails";
 import { useAuthStore } from "@store/useAuthStore";
 import { useLocaleStore } from "@store/useLocaleStore";
@@ -41,6 +41,7 @@ export function useContentRails(subnavId: number, isAppReady: boolean, limit: nu
       return currentPage < totalPages ? currentPage + 1 : undefined;
     },
     enabled: !!sessionId && isAppReady && !!subnavId,
+    placeholderData: keepPreviousData,
     staleTime: appConfig.STALE_TIME, // 5 minutes cache
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),

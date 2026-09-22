@@ -57,6 +57,7 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
 
     const { isAppReady } = useBootstrap();
     const sessionId = useAuthStore(state => state.token);
+    const persistedNavItems = useNavStore((state) => state.persistedNavItems);
     const [countryCode, setCountryCode] = useState(appConfig.GEO_DEFAULT_COUNTRY_CODE);
 
     useEffect(() => {
@@ -110,28 +111,43 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         return () => window.removeEventListener("scroll", onScroll);
     }, [hasScrolled]);
 
-    // Background pre-warm for remaining tabs (Movies, Shows, Natak) after initial load
+    // Controlled tab pre-warm. On webOS, do NOT fetch every tab together; that
+    // competes with rendering. Instead, wait for Home to settle, then fetch the
+    // next tab pages one by one so Home → Movies is usually already cached.
     useEffect(() => {
         if (!isAppReady || !sessionId) return;
+
         const queryClient = getQueryClient();
         const locale = useLocaleStore.getState().locale || "en";
-        const navItems = useNavStore.getState().persistedNavItems;
-        const subnavIds = (navItems && navItems.length > 0)
-            ? navItems.map((n: any) => n.subnav_id).filter(Boolean)
+        const subnavIds = (persistedNavItems && persistedNavItems.length > 0)
+            ? persistedNavItems.map((n: any) => n.subnav_id).filter(Boolean)
             : [1, 2, 3, 4];
+        const uniqueSubnavIds = Array.from(new Set(subnavIds)).filter((id) => Number(id) !== 1);
+        const isTvFileRuntime = typeof window !== "undefined" && window.location.protocol === "file:";
 
-        const timer = setTimeout(() => {
-            subnavIds.forEach((subnavId: number) => {
+        let cancelled = false;
+        const timers: ReturnType<typeof setTimeout>[] = [];
+        const startDelay = isTvFileRuntime ? 100 : 1200;
+        const gap = isTvFileRuntime ? 350 : 600;
+
+        uniqueSubnavIds.forEach((subnavId: number, index: number) => {
+            const timer = setTimeout(() => {
+                if (cancelled) return;
                 queryClient.prefetchInfiniteQuery({
                     queryKey: ["contentRails", subnavId, sessionId, locale, 20],
                     queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
                     initialPageParam: 1,
                     staleTime: appConfig.STALE_TIME,
                 }).catch(() => {});
-            });
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [isAppReady, sessionId]);
+            }, startDelay + index * gap);
+            timers.push(timer);
+        });
+
+        return () => {
+            cancelled = true;
+            timers.forEach(clearTimeout);
+        };
+    }, [isAppReady, sessionId, persistedNavItems]);
 
     // Completely suppress render when on a non-home route
     if (isSuppressed) {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { safeNavigate } from "@/lib/webos/safeNavigate";
@@ -33,6 +33,7 @@ export const FocusableNavLink = React.memo(({
   isAuthenticated = false
 }: FocusableNavLinkProps) => {
   const router = useRouter();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const navigateTab = useCallback(() => {
     const normTarget = normalizePathname(targetUrl);
@@ -41,11 +42,18 @@ export const FocusableNavLink = React.memo(({
     const isCurrentBrowse = BROWSE_ROUTES.includes(normCurrent);
 
     if (isTargetBrowse && isCurrentBrowse) {
-      useNavStore.getState().setActiveBrowseTab(normTarget);
-      window.scrollTo({ top: 0, behavior: "auto" });
+      const navStore = useNavStore.getState();
+      if (navStore.activeBrowseTab !== normTarget) {
+        navStore.setActiveBrowseTab(normTarget);
+      }
+      if (window.scrollY > 0) {
+        window.scrollTo({ top: 0, behavior: "auto" });
+      }
       try {
-        const hashTarget = normTarget === "/" ? "#/" : `#${normTarget}`;
-        window.history.replaceState({ browseTab: normTarget }, "", hashTarget);
+        if (window.location.protocol !== "file:") {
+          const hashTarget = normTarget === "/" ? "#/" : `#${normTarget}`;
+          window.history.replaceState({ browseTab: normTarget }, "", hashTarget);
+        }
       } catch (e) {}
       return;
     }
@@ -55,10 +63,11 @@ export const FocusableNavLink = React.memo(({
 
   const handleArrowPress = useCallback((direction: string) => {
     if (direction === 'up') {
-      return false; // Prevent focus escaping off top
+      return false;
     }
 
     if (direction === 'down') {
+      if (timerRef.current) clearTimeout(timerRef.current);
       if (!isItemActive) {
         navigateTab();
       }
@@ -74,11 +83,20 @@ export const FocusableNavLink = React.memo(({
       }
     }
 
-    if (direction === 'left' && index === 0) {
-      return false; // Search icon is now at the end of the nav bar; stop at first item
+    // Direct O(1) neighbor focus to bypass Norigin full-DOM spatial geometry calculations
+    if (direction === 'left') {
+      if (index > 0) {
+        setFocus(`nav-link-${index - 1}`);
+        return false;
+      }
+      return false; // Stop at first tab
     }
 
-    if (direction === 'right' && index === totalNavItems - 1) {
+    if (direction === 'right') {
+      if (index < totalNavItems - 1) {
+        setFocus(`nav-link-${index + 1}`);
+        return false;
+      }
       if (!isGold) {
         setFocus('navbar-get-gold');
       } else {
@@ -90,51 +108,68 @@ export const FocusableNavLink = React.memo(({
     return true;
   }, [index, totalNavItems, isGold, isItemActive, navigateTab]);
 
+  const handleFocus = useCallback(() => {
+    // 1. Immediately prefetch this tab's rails if not yet in cache
+    const subnavId = item?.subnav_id;
+    if (subnavId) {
+      const sessionId = useAuthStore.getState().token;
+      const locale = useLocaleStore.getState().locale || "en";
+      if (sessionId) {
+        getQueryClient().prefetchInfiniteQuery({
+          queryKey: ["contentRails", subnavId, sessionId, locale, 20],
+          queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
+          initialPageParam: 1,
+          staleTime: appConfig.STALE_TIME,
+        }).catch(() => {});
+      }
+    }
+
+    // 2. Debounce tab activation so rapid scrolling past tabs skips heavy rendering
+    if (!isItemActive) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        navigateTab();
+      }, 110);
+    }
+  }, [item?.subnav_id, isItemActive, navigateTab]);
+
+  const handleBlur = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const handleEnterPress = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    navigateTab();
+  }, [navigateTab]);
+
   const { ref, focused } = useFocusable({
     focusKey: `nav-link-${index}`,
     onArrowPress: handleArrowPress,
-    onEnterPress: navigateTab
+    onEnterPress: handleEnterPress,
+    onFocus: handleFocus,
+    onBlur: handleBlur,
   });
 
-  // Instant prefetch + snappy 90ms debounce:
-  // Instantly kicks off background prefetching so data is loaded and ready before or upon tab switch
   useEffect(() => {
-    if (focused && !isItemActive) {
-      const subnavId = item?.subnav_id;
-      if (subnavId) {
-        const sessionId = useAuthStore.getState().token;
-        const locale = useLocaleStore.getState().locale || "en";
-        if (sessionId) {
-          getQueryClient().prefetchInfiniteQuery({
-            queryKey: ["contentRails", subnavId, sessionId, locale, 20],
-            queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
-            initialPageParam: 1,
-            staleTime: appConfig.STALE_TIME,
-          }).catch(() => {});
-        }
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
       }
+    };
+  }, []);
 
-      const timer = setTimeout(() => {
-        navigateTab();
-      }, 90);
-      return () => clearTimeout(timer);
-    }
-  }, [focused, isItemActive, navigateTab, item]);
-
-  useEffect(() => {
-    if (isItemActive) {
-      const timer = setTimeout(() => {
-        const active = typeof document !== "undefined" ? document.activeElement : null;
-        const isBodyOrNull = !active || active === document.body || active.id === "root";
-        if (isBodyOrNull) {
-          setFocus(`nav-link-${index}`);
-        }
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isItemActive, index]);
 
   const handleClick = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     navigateTab();
   }, [navigateTab]);
 
@@ -145,16 +180,18 @@ export const FocusableNavLink = React.memo(({
   return (
     <div
       ref={ref as any}
+      tabIndex={0}
       data-active={isItemActive ? "true" : "false"}
       data-focuskey={`nav-link-${index}`}
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}
-      className={`relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none transition-all duration-150 ease-out ${
+      style={{ willChange: "transform, background-color" }}
+      className={`relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none border transition-[transform,background-color,color,box-shadow] duration-75 ease-out ${
         focused
-          ? "bg-white text-black scale-105 shadow-md"
+          ? "bg-white text-black scale-105 shadow-md border-transparent"
           : isItemActive
-          ? "bg-white/15 border border-white/25 text-white scale-100"
-          : "text-white/75 hover:text-white scale-100"
+          ? "bg-white/15 border-white/25 text-white scale-100"
+          : "text-white/75 hover:text-white scale-100 border-transparent"
       }`}
     >
       <span
