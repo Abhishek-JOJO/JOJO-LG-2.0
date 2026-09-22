@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useActivePathname } from "@/hooks/useActivePathname";
 import { useGuestLogin } from "@/features/auth/hooks/useGuestLogin";
@@ -67,10 +67,12 @@ export function useNavbar() {
 
   const navItems = apiNavItems && apiNavItems.length > 0 ? apiNavItems : persistedNavItems;
 
-  const visibleNavItems = navItems.filter((item) => {
-    const url = item?.url?.toLowerCase();
-    return url !== ROUTES.SEARCH && url !== ROUTES.PROFILE;
-  });
+  const visibleNavItems = useMemo(() => {
+    return (navItems || []).filter((item) => {
+      const url = item?.url?.toLowerCase();
+      return url !== ROUTES.SEARCH && url !== ROUTES.PROFILE;
+    });
+  }, [navItems]);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 30);

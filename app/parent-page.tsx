@@ -121,7 +121,7 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         const locale = useLocaleStore.getState().locale || "en";
         const subnavIds = (persistedNavItems && persistedNavItems.length > 0)
             ? persistedNavItems.map((n: any) => n.subnav_id).filter(Boolean)
-            : [1, 2, 3, 4];
+            : [1, 3, 9, 5];
         const uniqueSubnavIds = Array.from(new Set(subnavIds)).filter((id) => Number(id) !== 1);
         const isTvFileRuntime = typeof window !== "undefined" && window.location.protocol === "file:";
 

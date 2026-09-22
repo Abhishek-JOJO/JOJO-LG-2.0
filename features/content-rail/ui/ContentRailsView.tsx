@@ -30,7 +30,14 @@ import { restorePageFocus } from "@/src/navigation/focusUtils";
 import { preloadRailItems } from "@/components/content-rail/utils/imagePreloader";
 
 // Global module-level cache to track route-to-subnav_id mapping for instant frame 1 loads on popstate / routing
-const routeSubnavMap: Record<string, number> = {};
+const routeSubnavMap: Record<string, number> = {
+  [ROUTES.HOME]: 1,
+  [ROUTES.HOMEPAGE]: 1,
+  "/movies": 3,
+  "/shows": 9,
+  "/nataks": 5,
+  "/natak": 5,
+};
 
 function cacheRouteSubnavs(items: NavigationItem[] | undefined) {
   if (!items) return;
@@ -307,9 +314,14 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   const activeRailIndexRef = useRef(0);
   activeRailIndexRef.current = activeRailIndex;
 
-  useEffect(() => {
-    setActiveRailIndex(0);
-  }, [subnavId]);
+  // Track subnavId to reset activeRailIndex synchronously during render (no extra effect round-trip)
+  const prevSubnavIdRef = useRef(subnavId);
+  if (prevSubnavIdRef.current !== subnavId) {
+    prevSubnavIdRef.current = subnavId;
+    if (activeRailIndex !== 0) {
+      setActiveRailIndex(0);
+    }
+  }
 
   const isFirstHero = mappedRails.length > 0 ? mappedRails[0].type === ContentRailType.HERO_CAROUSEL : false;
   const heroRail = isFirstHero ? mappedRails[0] : null;
@@ -338,8 +350,8 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   );
   const activeRail = contentRails[safeActiveRailIndex];
   const upcomingRails = useMemo(
-    () => contentRails.slice(safeActiveRailIndex + 1, safeActiveRailIndex + 5),
-    [contentRails, safeActiveRailIndex]
+    () => contentRails.slice(safeActiveRailIndex + 1, safeActiveRailIndex + (isTvFileRuntime ? 2 : 4)),
+    [contentRails, safeActiveRailIndex, isTvFileRuntime]
   );
   const showPreviewRails = true;
 

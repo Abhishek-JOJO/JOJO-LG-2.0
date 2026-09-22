@@ -33,7 +33,7 @@ export const FocusableNavLink = React.memo(({
   isAuthenticated = false
 }: FocusableNavLinkProps) => {
   const router = useRouter();
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   const navigateTab = useCallback(() => {
     const normTarget = normalizePathname(targetUrl);
@@ -67,7 +67,10 @@ export const FocusableNavLink = React.memo(({
     }
 
     if (direction === 'down') {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       if (!isItemActive) {
         navigateTab();
       }
@@ -124,26 +127,26 @@ export const FocusableNavLink = React.memo(({
       }
     }
 
-    // 2. Debounce tab activation so rapid scrolling past tabs skips heavy rendering
+    // 2. Activate tab synchronously — setActiveBrowseTab is now a direct zustand
+    // update (no startTransition), so the re-render happens in the same React
+    // batch as the focus event. No artificial delay needed.
     if (!isItemActive) {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        navigateTab();
-      }, 110);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      navigateTab();
     }
   }, [item?.subnav_id, isItemActive, navigateTab]);
 
   const handleBlur = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
   }, []);
 
   const handleEnterPress = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
     navigateTab();
   }, [navigateTab]);
@@ -158,17 +161,16 @@ export const FocusableNavLink = React.memo(({
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
       }
     };
   }, []);
 
-
   const handleClick = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
     navigateTab();
   }, [navigateTab]);

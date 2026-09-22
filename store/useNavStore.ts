@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { startTransition } from "react";
 
 interface NavState {
   heroLoginVisible: boolean;
@@ -16,10 +15,9 @@ export const useNavStore = create<NavState>((set) => ({
   persistedNavItems: [],
   setPersistedNavItems: (items) => set({ persistedNavItems: items }),
   activeBrowseTab: null,
-  // Wrap in startTransition so React treats downstream re-renders (ContentRailsView,
-  // hero carousel, etc.) as low-priority concurrent work. The navbar focus highlight
-  // updates instantly while the heavy content swap renders in the background.
-  setActiveBrowseTab: (tab) => startTransition(() => {
-    set((state) => state.activeBrowseTab === tab ? state : { activeBrowseTab: tab });
-  }),
+  // Synchronous update — on webOS ARM the React concurrent scheduler (startTransition)
+  // adds 700-1000ms overhead before processing the update. Switching tabs must feel
+  // instant, not low-priority.
+  setActiveBrowseTab: (tab) =>
+    set((state) => state.activeBrowseTab === tab ? state : { activeBrowseTab: tab }),
 }));

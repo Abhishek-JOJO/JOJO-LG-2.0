@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useActivePathname } from "@/hooks/useActivePathname";
+import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ROUTES } from "@/lib/constants/routes";
@@ -45,7 +45,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
     return () => window.removeEventListener("pageshow", handleReopen);
   }, []);
   const { showNavbar, showFooter } = appConfig?.flags;
-  const pathname = useActivePathname();
+  const pathname = usePathname();
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
 
   const isLegalPage = pathname === ROUTES.TERMS || pathname === ROUTES.PRIVACY;
