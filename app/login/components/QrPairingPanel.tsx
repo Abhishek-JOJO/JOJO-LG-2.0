@@ -13,7 +13,6 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useProfileStore } from "@/store/useProfileStore";
 import { logger } from "@/lib/logger/logger";
 import { cn } from "@/lib/utils";
-import { CircleUser, Tv } from "lucide-react";
 import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
 
 const POLL_INTERVAL_MS = 3000;
@@ -69,7 +68,7 @@ export function QrPairingPanel() {
     }
     if (generationRef.current !== myGeneration) return;
 
-    QRCode.toDataURL(qrUrl, { width: 380, margin: 1, color: { dark: "#000000", light: "#ffffff" } })
+    QRCode.toDataURL(qrUrl, { width: 420, margin: 0, color: { dark: "#000000", light: "#ffffff" } })
       .then((dataUrl) => {
         if (generationRef.current === myGeneration) setQrDataUrl(dataUrl);
       })
@@ -139,10 +138,10 @@ export function QrPairingPanel() {
         <h2 className="max-w-[400px] text-left text-3xl sm:text-[34px] font-bold text-white leading-[1.25] tracking-tight">
           {t("scan_qr_instruction") || "Scan the QR Code using your phone or tablet's camera"}
         </h2>
-        <div className="relative flex h-[280px] w-[280px] sm:h-[300px] sm:w-[300px] items-center justify-center rounded-[32px] bg-white p-5 shadow-2xl border border-white/20">
+        <div className="relative flex h-[280px] w-[280px] sm:h-[310px] sm:w-[310px] items-center justify-center rounded-2xl bg-white p-3 shadow-2xl border border-white/20">
           {qrDataUrl && !expired && !genError ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={qrDataUrl} alt="Pairing QR Code" className="h-full w-full object-contain rounded-2xl" />
+            <img src={qrDataUrl} alt="Pairing QR Code" className="h-full w-full object-contain" />
           ) : expired ? (
             <FocusableRefreshButton onClick={generateCode} label={t("qr_get_new_code") || "Get New Code"} />
           ) : genError ? (
@@ -178,16 +177,22 @@ export function QrPairingPanel() {
           <li className="flex flex-wrap items-center gap-x-2">
             <span>1. {t("qr_step_open_app") || "Open the JOJO app on your mobile phone"}</span>
           </li>
-          <li className="flex items-center gap-2 flex-wrap">
+          <li className="flex items-center gap-3 flex-wrap">
             <span>2. {t("qr_step_go_to") || "Go to Profile"}</span>
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f97316]/20 text-[#f97316] font-bold text-2xl">
-              <CircleUser className="h-6 w-6 fill-current" />
+            <span
+              className="text-2xl leading-none select-none inline-flex items-center"
+              style={{ fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif' }}
+            >
+              👤
             </span>
           </li>
-          <li className="flex items-center gap-2 flex-wrap">
+          <li className="flex items-center gap-3 flex-wrap">
             <span>3. {t("qr_step_click_on") || "Click on TV Login"}</span>
-            <span className="inline-flex items-center gap-2 font-bold text-white text-2xl">
-              <Tv className="h-6 w-6 text-white" />
+            <span
+              className="text-2xl leading-none select-none inline-flex items-center"
+              style={{ fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif' }}
+            >
+              📺
             </span>
           </li>
           <li className="flex flex-wrap items-center gap-x-2">

@@ -63,15 +63,19 @@ function LoginPageContent() {
   const { data: subData } = useVerifySubscription(appConfig.GEO_DEFAULT_COUNTRY_CODE, sessionId, isAppReady);
   const isGoldLogo = !!(subData?.data?.subscription?.dEndDate && new Date(subData.data.subscription.dEndDate).getTime() >= Date.now());
 
+  const authContext = useOtpStore(state => state.authContext);
   const [mode, setMode] = useState<LoginMode>(() => {
+    if (authContext?.phone || authContext?.email) return "remote";
     const m = searchParams?.get("mode");
     return m === "remote" ? "remote" : "phone";
   });
 
-  const [value, setValue] = useState("");
-  const [phoneCode, setPhoneCode] = useState<string>(
-    LoginIdentifierType.PHONE_CODE_NUMBER_DEFAULT
-  );
+  const [value, setValue] = useState(() => {
+    return authContext?.phone || authContext?.email || "";
+  });
+  const [phoneCode, setPhoneCode] = useState<string>(() => {
+    return authContext?.phoneCode || LoginIdentifierType.PHONE_CODE_NUMBER_DEFAULT;
+  });
   const [selectedCountryCode, setSelectedCountryCode] = useState(
     appConfig.DEFAULT_COUNTRY_NAME
   );

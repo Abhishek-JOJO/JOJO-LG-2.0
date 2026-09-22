@@ -86,6 +86,23 @@ function OtpPageContent() {
   const isVerifiedRef = useRef(false);
   const lastAttemptedOtpRef = useRef<string | null>(null);
 
+  // Intercept LG remote Back key (keyCode 461 / "GoBack" / "Escape") and navigate back to login
+  useEffect(() => {
+    const handleBackKey = (e: globalThis.KeyboardEvent) => {
+      const isBack = (e as any).keyCode === 461 || e.key === "GoBack" || e.key === "Escape";
+      if (isBack) {
+        e.preventDefault();
+        e.stopPropagation();
+        tvNavigate(ROUTES.LOGIN, router);
+      }
+    };
+
+    window.addEventListener("keydown", handleBackKey, true);
+    return () => {
+      window.removeEventListener("keydown", handleBackKey, true);
+    };
+  }, [router]);
+
   // Initialize on mount
   useEffect(() => {
     setDigits(Array(appConfig.OTP_LENGTH).fill(""));
@@ -739,6 +756,14 @@ function FocusableOtpInput({ index, digit, activeIndex, hasError, handleChange, 
           }
         }}
         onKeyDown={(e) => {
+          const isBack = (e as any).keyCode === 461 || e.key === "GoBack" || e.key === "Escape";
+          if (isBack) {
+            e.preventDefault();
+            e.stopPropagation();
+            tvNavigate(ROUTES.LOGIN, null);
+            return;
+          }
+
           const isDigitKey = /^[0-9]$/.test(e.key);
           const allowedControlKeys = [
             "Backspace",

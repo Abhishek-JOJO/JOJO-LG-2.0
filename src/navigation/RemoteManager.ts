@@ -8,6 +8,8 @@ import { useExitConfirmStore } from '@/store/useExitConfirmStore';
 import { useNavStore } from '@/store/useNavStore';
 import { tvSoundManager } from '@/lib/webos/tvSoundManager';
 import { doesFocusableExist, getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { tvNavigate } from './tvNavigate';
+import { ROUTES } from '@/lib/constants/routes';
 
 // LG webOS Remote Key Codes
 export const WEBOS_KEYS = {
@@ -102,6 +104,8 @@ export const useRemoteManager = () => {
           // app (platform convention) — otherwise go back in history.
           if (currentPathForBack === '/landing' || currentPathForBack === '/login') {
             useExitConfirmStore.getState().open();
+          } else if (currentPathForBack.includes('/login/otp') || currentPathForBack.endsWith('/otp')) {
+            tvNavigate(ROUTES.LOGIN, null);
           } else {
             window.history.back();
           }
