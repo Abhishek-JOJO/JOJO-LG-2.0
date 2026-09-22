@@ -16,6 +16,8 @@ import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.con
 const LEAD_IMAGE_SIZE = { width: 871, height: 490 };
 // Matches the standard portrait card's rendered size (portraitConfig / standardCardConfig).
 const PORTRAIT_IMAGE_SIZE = { width: 326, height: 490 };
+// Matches the spotlight title logo's rendered size (InlineHoverTrailer).
+const TITLE_IMAGE_SIZE = { width: 560, height: 160 };
 
 const preloadedUrls = new Set<string>();
 const activePreloadMap = new Map<string, HTMLImageElement>();
@@ -78,7 +80,7 @@ export function preloadRailItems(items?: ContentRailItem[] | null, maxItems = 10
     if (!item) continue;
     const landscapeUrl = item.posterImage || item.heroImage || item.landscapeImage || item.image || item.portraitImage;
     preloadImageUrl(landscapeUrl, LEAD_IMAGE_SIZE);
-    preloadImageUrl(item.title_image);
+    preloadImageUrl(item.title_image, TITLE_IMAGE_SIZE);
     preloadImageUrl(item.portraitImage || item.image, PORTRAIT_IMAGE_SIZE);
   }
 }

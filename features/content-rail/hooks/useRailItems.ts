@@ -68,6 +68,8 @@ export function useRailItems(
 
   const initialState = getInitialState();
 
+  const railKey = `${railId}-${initialItems?.[0]?.id}`;
+  const [currentRailKey, setCurrentRailKey] = useState(railKey);
   const [items, setItems] = useState<ContentRailItem[]>(initialState.items);
   const [loadedPages, setLoadedPages] = useState<Set<number>>(initialState.loadedPages);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -76,29 +78,30 @@ export function useRailItems(
   // Track the pages currently in transit to prevent duplicate requests
   const fetchingPagesRef = useRef<Set<number>>(new Set());
 
-  // Ref-based rail change detection: returns correct items on the FIRST render
-  // after a rail change WITHOUT calling setState during render (which forces
-  // React to bail out and re-render, adding ~16ms per up/down keypress on TV).
-  const prevRailKeyRef = useRef(`${railId}-${initialItems?.[0]?.id}`);
-  const currentRailKey = `${railId}-${initialItems?.[0]?.id}`;
-  const railJustChanged = currentRailKey !== prevRailKeyRef.current;
-  if (railJustChanged) {
-    prevRailKeyRef.current = currentRailKey;
+  // React-supported synchronous state adjustment during render:
+  // When railId or initialItems change (e.g. during fast ArrowUp/Down scrolling),
+  // immediately update items so every render gets fresh data from frame 1 with zero lag.
+  if (railKey !== currentRailKey) {
+    setCurrentRailKey(railKey);
+    const freshState = (railId && railCache[railId] && !bypassCache)
+      ? {
+          items: railCache[railId].items,
+          loadedPages: new Set(railCache[railId].loadedPages),
+          maxPages: railCache[railId].maxPages,
+        }
+      : {
+          items: initialItems,
+          loadedPages: new Set([1]),
+          maxPages: totalPages,
+        };
+
+    setItems(freshState.items);
+    setLoadedPages(freshState.loadedPages);
+    setMaxPages(freshState.maxPages);
     fetchingPagesRef.current.clear();
   }
 
-  // Compute effective items: on the frame the rail changes, use fresh data
-  // directly (cache or props) instead of stale state — zero flicker, zero extra render.
-  let effectiveItems = items;
-  if (railJustChanged) {
-    if (railId && railCache[railId] && !bypassCache) {
-      effectiveItems = railCache[railId].items;
-    } else {
-      effectiveItems = initialItems;
-    }
-  }
-
-  // Update maxPages if the prop changes
+  // Update maxPages if totalPages changes
   useEffect(() => {
     if (railId && railCache[railId] && !bypassCache) {
       if (totalPages > railCache[railId].maxPages) {
@@ -109,21 +112,6 @@ export function useRailItems(
       setMaxPages(totalPages);
     }
   }, [totalPages, railId, bypassCache]);
-
-  // Sync state after paint when rail changes (for pagination to work correctly).
-  // The UI already shows correct data via effectiveItems above.
-  useEffect(() => {
-    if (railId && railCache[railId] && !bypassCache) {
-      setItems(railCache[railId].items);
-      setLoadedPages(new Set(railCache[railId].loadedPages));
-      setMaxPages(railCache[railId].maxPages);
-    } else {
-      setItems(initialItems);
-      setLoadedPages(new Set([1]));
-      setMaxPages(totalPages);
-    }
-    fetchingPagesRef.current.clear();
-  }, [initialItems, railId, totalPages, bypassCache]);
 
   // Keep railCache in sync with state changes
   useEffect(() => {
@@ -259,7 +247,7 @@ export function useRailItems(
   }, [loadedPages, maxPages, fetchPage]);
 
   return {
-    items: effectiveItems,
+    items,
     isLoadingMore,
     loadNextPage,
     hasMore: Math.max(...Array.from(loadedPages)) < maxPages,

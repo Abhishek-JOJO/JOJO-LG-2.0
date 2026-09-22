@@ -318,7 +318,7 @@ export function ContentRailList({
       const it = items[idx];
       if (it) {
         preloadImageUrl(it.posterImage || it.heroImage || it.landscapeImage || it.image || it.portraitImage, { width: 871, height: 490 });
-        preloadImageUrl(it.title_image);
+        preloadImageUrl(it.title_image, { width: 560, height: 160 });
         preloadImageUrl(it.portraitImage || it.image, { width: 326, height: 490 });
       }
     });
