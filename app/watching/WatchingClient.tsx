@@ -1,6 +1,5 @@
 "use client";
 
-import { PageBackground } from "@/components/common/PageBackground";
 import { ProfilesErrorFallback } from "@/components/common/ProfilesErrorFallback";
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
 import JOJOCommonImage, { JOJOImageContentMode, JOJOImagePreset, JOJOImageRadius } from "@/components/ui/JOJOCommonImage";
@@ -108,8 +107,11 @@ export default function WatchingPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden -mt-15 lg:-mt-25">
-      <PageBackground />
+    <div className="relative min-h-screen overflow-hidden -mt-15 lg:-mt-25 bg-[radial-gradient(circle_at_25%_25%,_#3d1a08_0%,_#140a04_50%,_#050201_100%)]">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 z-0 pointer-events-none bg-black/35"
+      />
 
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 sm:px-6 md:px-8 py-8 sm:py-12">
         <div className="w-full max-w-4xl">

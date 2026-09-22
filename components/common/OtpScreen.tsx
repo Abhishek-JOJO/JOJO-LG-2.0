@@ -397,14 +397,14 @@ export function OtpScreen({ mode }: OtpScreenProps) {
 
               {/* Error */}
               {!otpSecurity.isLocked && error && touched && !verifyOtp.isPending && (
-                <div role="alert" className="text-xs text-theme_14_samecolour flex items-center gap-1.5">
+                <div role="alert" className="text-sm leading-snug text-theme_14_samecolour flex items-center gap-2">
                   <JOJOCommonImage
                     src={LOGOS.ERROR_ICON}
                     altKey="img_jojo_logo"
-                    width={12}
-                    height={12}
+                    width={14}
+                    height={14}
                     preset={JOJOImagePreset.Logo}
-                    wrapperClassName="size-3 flex-shrink-0"
+                    wrapperClassName="size-3.5 flex-shrink-0"
                   />
                   {t(error as any)}
                 </div>
@@ -412,14 +412,14 @@ export function OtpScreen({ mode }: OtpScreenProps) {
 
               {/* Rate Limit Warning */}
               {otpSecurity.isLocked && (
-                <div role="alert" className="text-xs text-theme_14_samecolour flex items-center gap-1.5 mt-2">
+                <div role="alert" className="text-sm leading-snug text-theme_14_samecolour flex items-center gap-2 mt-2">
                   <JOJOCommonImage
                     src={LOGOS.ERROR_ICON}
                     altKey="img_jojo_logo"
-                    width={12}
-                    height={12}
+                    width={14}
+                    height={14}
                     preset={JOJOImagePreset.Logo}
-                    wrapperClassName="size-3 flex-shrink-0"
+                    wrapperClassName="size-3.5 flex-shrink-0"
                   />
                   Too many attempts. Try again in {formatTime(otpSecurity.getRemainingLockTime())}
                 </div>
@@ -427,28 +427,28 @@ export function OtpScreen({ mode }: OtpScreenProps) {
 
               {/* Attempts Remaining */}
               {!otpSecurity.isLocked && otpSecurity.attempts > 0 && (
-                <div className="text-xs text-orange-500 flex items-center gap-1.5 mt-2">
+                <div className="text-sm leading-snug text-orange-500 flex items-center gap-2 mt-2">
                   ⚠️ {otpSecurity.attemptsRemaining} {otpSecurity.attemptsRemaining === 1 ? 'attempt' : 'attempts'} remaining
                 </div>
               )}
 
               {/* Expiration Warning */}
               {!otpSecurity.isLocked && otpExpiration.showWarning && !otpExpiration.isExpired && (
-                <div className="text-xs text-orange-500 flex items-center gap-1.5 mt-2">
+                <div className="text-sm leading-snug text-orange-500 flex items-center gap-2 mt-2">
                   ⏱️ OTP expires in {otpExpiration.formattedTime}
                 </div>
               )}
 
               {/* Expiration Error */}
               {!otpSecurity.isLocked && otpExpiration.isExpired && (
-                <div role="alert" className="text-xs text-theme_14_samecolour flex items-center gap-1.5 mt-2">
+                <div role="alert" className="text-sm leading-snug text-theme_14_samecolour flex items-center gap-2 mt-2">
                   <JOJOCommonImage
                     src={LOGOS.ERROR_ICON}
                     altKey="img_jojo_logo"
-                    width={12}
-                    height={12}
+                    width={14}
+                    height={14}
                     preset={JOJOImagePreset.Logo}
-                    wrapperClassName="size-3 flex-shrink-0"
+                    wrapperClassName="size-3.5 flex-shrink-0"
                   />
                   OTP has expired. Please request a new one.
                 </div>

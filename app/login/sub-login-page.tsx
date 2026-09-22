@@ -670,7 +670,7 @@ function LoginPageContent() {
                 >
                   {initiateOtp.isPending || checkUserExists.isPending
                     ? t("loading") || "Loading..."
-                    : "Next"}
+                    : t("next") || "Next"}
                 </button>
               </div>
             </form>

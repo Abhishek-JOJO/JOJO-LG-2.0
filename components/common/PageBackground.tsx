@@ -10,9 +10,10 @@ const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 interface PageBackgroundProps {
   staticOnly?: boolean;
   bgImage?: string;
+  showFadeGradient?: boolean;
 }
 
-export function PageBackground({ staticOnly = false, bgImage }: PageBackgroundProps) {
+export function PageBackground({ staticOnly = false, bgImage, showFadeGradient = true }: PageBackgroundProps) {
   const [animationData, setAnimationData] = useState<object | null>(null);
   const [isLottieLoaded, setIsLottieLoaded] = useState(false);
   const [isLottieReady, setIsLottieReady] = useState(false);
@@ -100,10 +101,12 @@ export function PageBackground({ staticOnly = false, bgImage }: PageBackgroundPr
         className="absolute inset-0 bg-theme_12/75 z-1"
       />
 
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 page-bg-fade-gradient z-1"
-      />
+      {showFadeGradient && (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 page-bg-fade-gradient z-1"
+        />
+      )}
     </>
   );
 }

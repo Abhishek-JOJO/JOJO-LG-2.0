@@ -133,7 +133,7 @@ export function QrPairingPanel() {
       {/* Left Column: Instructions + QR Code (Right-aligned to OR line) */}
       <div className="flex flex-col items-start gap-6 shrink-0 justify-self-end sm:pr-8 md:pr-14 lg:pr-20">
         <h2 className="max-w-[400px] text-left text-3xl sm:text-[34px] font-bold text-white leading-[1.25] tracking-tight">
-          Scan the QR Code using your phone or tablet’s camera
+          {t("scan_qr_instruction") || "Scan the QR Code using your phone or tablet's camera"}
         </h2>
         <div className="relative flex h-[280px] w-[280px] sm:h-[300px] sm:w-[300px] items-center justify-center rounded-[32px] bg-white p-5 shadow-2xl border border-white/20">
           {qrDataUrl && !expired && !genError ? (
@@ -158,13 +158,13 @@ export function QrPairingPanel() {
       <div className="relative hidden self-stretch sm:flex sm:items-center sm:justify-center px-4 justify-self-center">
         <div className="h-[380px] w-px bg-white/20" />
         <span className="absolute text-[#aaaaaa] font-medium text-2xl tracking-widest uppercase bg-[#140a04] px-4">
-          OR
+          {t("qr_or") || "OR"}
         </span>
       </div>
 
       <div className="flex items-center gap-4 sm:hidden my-4 justify-self-center">
         <div className="h-px w-24 bg-white/20" />
-        <span className="text-base font-medium text-[#aaaaaa] tracking-widest uppercase">OR</span>
+        <span className="text-base font-medium text-[#aaaaaa] tracking-widest uppercase">{t("qr_or") || "OR"}</span>
         <div className="h-px w-24 bg-white/20" />
       </div>
 
@@ -172,24 +172,22 @@ export function QrPairingPanel() {
       <div className="flex flex-col gap-8 shrink-0 items-start justify-self-start sm:pl-8 md:pl-14 lg:pl-20">
         <ol className="flex flex-col gap-6 text-2xl sm:text-[28px] font-bold text-white leading-snug max-w-[460px]">
           <li className="flex flex-wrap items-center gap-x-2">
-            <span>1. Open the JOJO app on your mobile phone</span>
+            <span>1. {t("qr_step_open_app") || "Open the JOJO app on your mobile phone"}</span>
           </li>
           <li className="flex items-center gap-2 flex-wrap">
-            <span>2. Go to</span>
+            <span>2. {t("qr_step_go_to") || "Go to Profile"}</span>
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f97316]/20 text-[#f97316] font-bold text-2xl">
               <CircleUser className="h-6 w-6 fill-current" />
-              <span>Profile</span>
             </span>
           </li>
           <li className="flex items-center gap-2 flex-wrap">
-            <span>3. Click on</span>
+            <span>3. {t("qr_step_click_on") || "Click on TV Login"}</span>
             <span className="inline-flex items-center gap-2 font-bold text-white text-2xl">
               <Tv className="h-6 w-6 text-white" />
-              <span>TV Login</span>
             </span>
           </li>
           <li className="flex flex-wrap items-center gap-x-2">
-            <span>4. Enter this unique code to continue</span>
+            <span>4. {t("qr_step_enter_code") || "Enter this unique code to continue"}</span>
           </li>
         </ol>
 
