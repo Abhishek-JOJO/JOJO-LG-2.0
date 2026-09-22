@@ -10,32 +10,31 @@ import { cn } from "@/lib/utils";
 import { useProfileStore } from "@/store/useProfileStore";
 import { UserCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ProfileMenuLink } from "../ui/ProfileDropdownList";
 import { useExitConfirmStore } from "@/store/useExitConfirmStore";
 import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+import { tvNavigate } from "@/src/navigation/tvNavigate";
 
 // The dropdown mounts several focusables at once (menu links) the
 // moment it opens, via a React portal. norigin's setFocus/addFocusable share a
 // single-slot scheduler ("a new task replaces the pending next task"), so a
 // single setFocus call racing that mount storm can get clobbered and silently
 // do nothing — leaving the dropdown open with nothing focused. Retry a few
-// times instead of hoping one attempt lands (same fix used elsewhere in this
-// app for the identical race, e.g. AssetDetailView.tsx).
-function retrySetFocus(focusKey: string, attempts = 6, intervalMs = 90) {
+// times instead of hoping one attempt lands.
+function retrySetFocus(focusKey: string, attempts = 6, intervalMs = 60) {
   let tries = 0;
   const attempt = () => {
     tries += 1;
     if (doesFocusableExist(focusKey)) {
       setFocus(focusKey);
-    }
-    if (tries < attempts) {
+    } else if (tries < attempts) {
       setTimeout(attempt, intervalMs);
     }
   };
-  setTimeout(attempt, intervalMs);
+  setTimeout(attempt, 30);
 }
 
 interface ProfileDropdownProps {
@@ -45,45 +44,52 @@ interface ProfileDropdownProps {
 
 export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDropdownProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const selectedProfile = useProfileStore((state) => state.selectedProfile);
   const triggerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const unmountTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isNavigatingUpFromMenuRef = useRef(false);
 
   // isDropdownOpen = should be open, isVisible = controls CSS animation
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
+  const [dropdownPos, setDropdownPos] = useState({ top: 80, right: 40 });
   const t = useTranslations("profile-dropdown");
 
-  // Open: mount first, then trigger CSS transition on next tick
+  // Open: cancel any pending unmount, measure trigger, mount immediately
   const openDropdown = () => {
+    if (unmountTimerRef.current) {
+      clearTimeout(unmountTimerRef.current);
+      unmountTimerRef.current = null;
+    }
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       setDropdownPos({
         top: rect.bottom + 12,
-        right: window.innerWidth - rect.right - 14,
+        right: Math.max(10, window.innerWidth - rect.right - 14),
       });
     }
     setIsMounted(true);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setIsVisible(true);
-        retrySetFocus('profile-dropdown-boundary');
-      });
-    });
     setIsDropdownOpen(true);
+    requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
   };
 
   // Close: remove visible class first, unmount after transition ends
   const closeDropdown = () => {
-    if (isDropdownOpen) {
-      setFocus('navbar-profile-trigger');
-    }
     setIsVisible(false);
     setIsDropdownOpen(false);
-    setTimeout(() => setIsMounted(false), 200);
+    if (unmountTimerRef.current) {
+      clearTimeout(unmountTimerRef.current);
+    }
+    unmountTimerRef.current = setTimeout(() => {
+      setIsMounted(false);
+      unmountTimerRef.current = null;
+    }, 200);
   };
 
   const toggleDropdown = () => {
@@ -112,7 +118,9 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       if (e.keyCode === 461 || e.key === "Back" || e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
+        isNavigatingUpFromMenuRef.current = true;
         closeDropdown();
+        setFocus('navbar-profile-trigger');
       }
     };
     if (isDropdownOpen) {
@@ -132,6 +140,18 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     openExit();
   };
 
+  const handleSwitchProfile = () => {
+    closeDropdown();
+    useProfileStore.getState().clearSelectedProfile();
+    tvNavigate(ROUTES.WATCHING, router);
+  };
+
+  const handleArrowUpFromMenu = () => {
+    isNavigatingUpFromMenuRef.current = true;
+    closeDropdown();
+    setFocus('navbar-profile-trigger');
+  };
+
   const dropdownContent = isMounted ? (
     <ProfileDropdownMenu
       dropdownRef={dropdownRef}
@@ -139,19 +159,36 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       isVisible={isVisible}
       t={t}
       onExit={handleExit}
+      onSwitchProfile={handleSwitchProfile}
+      onArrowUp={handleArrowUpFromMenu}
     />
   ) : null;
 
   const { ref: focusableRef, focused } = useFocusable({
     focusKey: 'navbar-profile-trigger',
+    onFocus: () => {
+      if (isNavigatingUpFromMenuRef.current) {
+        return;
+      }
+      openDropdown();
+    },
+    onBlur: () => {
+      isNavigatingUpFromMenuRef.current = false;
+    },
     onArrowPress: (direction) => {
       if (direction === 'up') return false;
       if (direction === 'left') {
+        isNavigatingUpFromMenuRef.current = false;
+        closeDropdown();
         setFocus('navbar-search');
         return false;
       }
       if (direction === 'right') return false;
       if (direction === 'down') {
+        if (isDropdownOpen) {
+          setFocus('profile-menu-switch');
+          return false;
+        }
         if (document.getElementById('hero-carousel-container')) {
           setFocus('hero-carousel');
           return false;
@@ -165,13 +202,21 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       }
       return true;
     },
-    onEnterPress: toggleDropdown,
+    onEnterPress: () => {
+      isNavigatingUpFromMenuRef.current = false;
+      if (!isDropdownOpen) {
+        openDropdown();
+      }
+      retrySetFocus('profile-menu-switch');
+    },
   });
 
   useEffect(() => {
-    if (!focused || isDropdownOpen) return;
-    const timer = setTimeout(openDropdown, 120);
-    return () => clearTimeout(timer);
+    if (focused && !isDropdownOpen) {
+      if (!isNavigatingUpFromMenuRef.current) {
+        openDropdown();
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focused, isDropdownOpen]);
 
@@ -179,6 +224,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     <>
       <div className="relative shrink-0 flex items-center" ref={triggerRef}>
         <div
+          id="navbar-profile-trigger"
           ref={focusableRef as any}
           onClick={toggleDropdown}
           className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full border-2 ${
@@ -218,6 +264,8 @@ function ProfileDropdownMenu({
   isVisible,
   t,
   onExit,
+  onSwitchProfile,
+  onArrowUp,
 }: any) {
   const { ref: dropdownBoundaryRef, focusKey: dropdownBoundaryKey } = useFocusable({
     focusKey: 'profile-dropdown-boundary',
@@ -252,9 +300,7 @@ function ProfileDropdownMenu({
       >
         <div className="absolute right-[18px] -top-1.5 w-3 h-3 rotate-45 z-[1]" />
 
-        <ProfileMenuLink href={ROUTES.MANAGE_PROFILE}>
-          {t("manage_profiles")}
-        </ProfileMenuLink>
+        <ProfileMenuSwitchItem onSwitch={onSwitchProfile} onArrowUp={onArrowUp} t={t} />
 
         <ProfileMenuLink href={ROUTES.ACCOUNT_SETTINGS}>
           {t("account_settings")}
@@ -268,6 +314,44 @@ function ProfileDropdownMenu({
   );
 }
 
+function ProfileMenuSwitchItem({
+  onSwitch,
+  onArrowUp,
+  t,
+}: {
+  onSwitch: () => void;
+  onArrowUp?: () => void;
+  t: any;
+}) {
+  const { ref, focused } = useFocusable({
+    focusKey: 'profile-menu-switch',
+    onArrowPress: (direction) => {
+      if (direction === 'up') {
+        onArrowUp?.();
+        return false;
+      }
+      return true;
+    },
+    onEnterPress: onSwitch,
+  });
+
+  return (
+    <div
+      id="profile-menu-switch"
+      ref={ref as any}
+      onClick={onSwitch}
+      className={cn(
+        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular border-2 border-transparent",
+        "text-theme_5",
+        "hover:bg-theme_11_samecolour hover:text-theme_13_samecolour",
+        "transition-all duration-200 cursor-pointer",
+        focused ? "bg-theme_11_samecolour border-white text-theme_13_samecolour" : ""
+      )}
+    >
+      {t("switch_profile") || "Switch Profile"}
+    </div>
+  );
+}
 
 function ProfileMenuAction({ onEnter, children }: { onEnter: () => void; children: React.ReactNode }) {
   const { ref, focused } = useFocusable({

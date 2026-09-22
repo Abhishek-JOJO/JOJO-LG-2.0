@@ -320,6 +320,7 @@
     "failed_fetch": "શોધ પરિણામો લાવવામાં નિષ્ફળ. કૃપા કરીને ફરી પ્રયાસ કરો."
   },
   "profile-dropdown": {
+    "switch_profile": "પ્રોફાઇલ સ્વિચ કરો",
     "manage_profiles": "પ્રોફાઇલ મેનેજ કરો",
     "account_settings": "એકાઉન્ટ સેટિંગ્સ",
     "watch_list": "વોચલિસ્ટ",

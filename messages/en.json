@@ -320,6 +320,7 @@
     "failed_fetch": "Failed to fetch search results. Please try again."
   },
   "profile-dropdown": {
+    "switch_profile": "Switch Profile",
     "manage_profiles": "Manage Profiles",
     "account_settings": "Account Settings",
     "watch_list": "Watchlist",
