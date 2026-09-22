@@ -441,10 +441,17 @@ export function ContentRailList({
         return false;
       }
       if (direction === 'up') {
-        const navLink = document.querySelector('header nav a[data-focuskey], header [data-focuskey]') as HTMLElement | null;
-        if (navLink) {
-          navLink.focus();
-          const targetKey = navLink.getAttribute('data-focuskey');
+        // Return focus to the currently active nav tab (e.g. Movies, Shows, Nataks) rather than hardcoding Home
+        const activeNavLink = (
+          document.querySelector('header [data-active="true"][data-focuskey]') ||
+          document.querySelector('header [data-focuskey].active')
+        ) as HTMLElement | null;
+
+        const targetEl = activeNavLink || (document.querySelector('header [data-focuskey^="nav-link-"]') as HTMLElement | null);
+
+        if (targetEl) {
+          targetEl.focus();
+          const targetKey = targetEl.getAttribute('data-focuskey');
           if (targetKey) {
             try { setFocus(targetKey); } catch { }
           }

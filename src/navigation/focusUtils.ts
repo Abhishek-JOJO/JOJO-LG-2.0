@@ -41,6 +41,32 @@ export function restorePageFocus(preferredKey?: string | null) {
       return;
     }
 
+    // Do NOT steal focus if the user currently has focus on the top navbar / header
+    const currentFocusKey = getCurrentFocusKey();
+    if (
+      currentFocusKey &&
+      (currentFocusKey.startsWith("nav-link") ||
+       currentFocusKey.startsWith("navbar-") ||
+       currentFocusKey.startsWith("nav-"))
+    ) {
+      clearInterval(interval);
+      return;
+    }
+
+    if (typeof document !== "undefined") {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.closest("header") ||
+         activeEl.closest("nav") ||
+         activeEl.getAttribute("data-focuskey")?.startsWith("nav-link") ||
+         activeEl.getAttribute("data-focuskey")?.startsWith("navbar-"))
+      ) {
+        clearInterval(interval);
+        return;
+      }
+    }
+
     // A full-screen modal (search, asset detail) owns its own focus while it's open.
     // However, if SearchModal IS open and AssetDetailModal just closed:
     // Focus should be restored INSIDE SearchModal!
@@ -171,8 +197,11 @@ export function restorePageFocus(preferredKey?: string | null) {
       }
     }
 
-    // 6. Fallback: first navbar link if the page has no cards yet
-    const navLink = document.querySelector('[data-focuskey^="nav-link"]');
+    // 6. Fallback: active navbar link (or first navbar link) if the page has no cards yet
+    const navLink = (
+      document.querySelector('header [data-active="true"][data-focuskey]') ||
+      document.querySelector('[data-focuskey^="nav-link"]')
+    ) as HTMLElement | null;
     if (navLink) {
       const key = navLink.getAttribute("data-focuskey");
       if (key && doesFocusableExist(key)) {

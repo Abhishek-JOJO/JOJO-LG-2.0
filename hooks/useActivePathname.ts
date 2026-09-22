@@ -3,7 +3,7 @@ import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore"
 import { useNavStore } from "@/store/useNavStore";
 import { normalizePathname } from "@/lib/utils/pathname";
 
-export const BROWSE_ROUTES = ["/", "/home", "/movies", "/shows", "/nataks"];
+export const BROWSE_ROUTES = ["/", "/home", "/movies", "/shows", "/nataks", "/kids", "/hot-and-new"];
 
 /**
  * Custom hook to get the active pathname of the page.

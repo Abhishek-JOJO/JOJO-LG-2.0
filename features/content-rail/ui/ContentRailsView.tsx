@@ -13,7 +13,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useActivePathname } from "@/hooks/useActivePathname";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { setFocus, getCurrentFocusKey } from "@noriginmedia/norigin-spatial-navigation";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { useContentRails } from "../hooks/useContentRails";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
@@ -113,6 +113,15 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     if (isLoading) return;
     const isModalOpen = useAssetDetailStore.getState().isOpen;
     if (isModalOpen) return;
+    const currentKey = getCurrentFocusKey();
+    if (
+      currentKey &&
+      (currentKey.startsWith("nav-link") ||
+       currentKey.startsWith("navbar-") ||
+       currentKey.startsWith("nav-"))
+    ) {
+      return;
+    }
     restorePageFocus();
   }, [pathname, subnavId, isLoading, data]);
 
@@ -353,6 +362,20 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
         useActiveRailStore.getState().setActiveSectionIndex(0);
         return true;
       }
+      // If there is no hero carousel on this tab, UP from the top rail returns to active nav tab
+      const activeNavLink = (
+        document.querySelector('header [data-active="true"][data-focuskey]') ||
+        document.querySelector('header [data-focuskey].active')
+      ) as HTMLElement | null;
+      const targetEl = activeNavLink || (document.querySelector('header [data-focuskey^="nav-link-"]') as HTMLElement | null);
+      if (targetEl) {
+        targetEl.focus();
+        const key = targetEl.getAttribute('data-focuskey');
+        if (key) {
+          try { setFocus(key); } catch {}
+        }
+      }
+      return true;
     }
     return true;
   }, [contentRails.length, isFirstHero]);

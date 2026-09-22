@@ -115,8 +115,13 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         if (!isAppReady || !sessionId) return;
         const queryClient = getQueryClient();
         const locale = useLocaleStore.getState().locale || "en";
+        const navItems = useNavStore.getState().persistedNavItems;
+        const subnavIds = (navItems && navItems.length > 0)
+            ? navItems.map((n: any) => n.subnav_id).filter(Boolean)
+            : [1, 2, 3, 4];
+
         const timer = setTimeout(() => {
-            [2, 3, 4].forEach((subnavId) => {
+            subnavIds.forEach((subnavId: number) => {
                 queryClient.prefetchInfiniteQuery({
                     queryKey: ["contentRails", subnavId, sessionId, locale, 20],
                     queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
@@ -124,7 +129,7 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
                     staleTime: appConfig.STALE_TIME,
                 }).catch(() => {});
             });
-        }, 1500);
+        }, 300);
         return () => clearTimeout(timer);
     }, [isAppReady, sessionId]);
 
