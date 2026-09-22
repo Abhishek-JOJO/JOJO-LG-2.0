@@ -88,12 +88,15 @@ function LoginPageContent() {
 
   const handleCloseNotFoundModal = useCallback(() => {
     setIsNotFoundModalOpen(false);
-    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
     setTimeout(() => {
       setFocus('login-input');
-    }, 60);
+      const el = document.getElementById("login-input-field") as HTMLInputElement | null;
+      if (el) {
+        el.focus();
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
+      }
+    }, 150);
   }, []);
 
   // ── Focus setup ──────────────────────────────────────────────────────────
@@ -106,9 +109,13 @@ function LoginPageContent() {
     focusKey: 'login-input',
     focusable: !isNotFoundModalOpen,
     onEnterPress: () => {
-      // Trigger native keyboard or handle submit if valid
-      const el = document.getElementById("login-input-field");
-      if (el) el.focus();
+      // Trigger native keyboard
+      const el = document.getElementById("login-input-field") as HTMLInputElement | null;
+      if (el) {
+        el.focus();
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
+      }
     },
     onArrowPress: (direction) => {
       if (direction === 'down') {
@@ -350,19 +357,14 @@ function LoginPageContent() {
       return;
     }
     if (e.key === "Enter") {
+      // Prevent Enter key from triggering form submit so user can type on virtual keyboard
       e.preventDefault();
-      (e.target as HTMLElement)?.blur();
-      if (canSubmit && !initiateOtp.isPending && !checkUserExists.isPending) {
-        const form = document.getElementById("login-form") as HTMLFormElement;
-        if (form) {
-          if (typeof form.requestSubmit === "function") {
-            form.requestSubmit();
-          } else {
-            form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-          }
-        }
-      } else {
-        setFocus("login-submit");
+      e.stopPropagation();
+      const el = document.getElementById("login-input-field") as HTMLInputElement | null;
+      if (el && document.activeElement !== el) {
+        el.focus();
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
       }
       return;
     }
@@ -541,8 +543,16 @@ function LoginPageContent() {
               <div className="w-full flex flex-col items-center">
                 <div
                   ref={inputRef as any}
+                  onClick={() => {
+                    const el = document.getElementById("login-input-field") as HTMLInputElement | null;
+                    if (el) {
+                      el.focus();
+                      const len = el.value.length;
+                      el.setSelectionRange(len, len);
+                    }
+                  }}
                   className={cn(
-                    "relative w-full rounded-full transition-all duration-200",
+                    "relative w-full rounded-full transition-all duration-200 cursor-text",
                     inputFocused && !isNotFoundModalOpen ? "scale-[1.02] z-10" : ""
                   )}
                   style={inputFocused && !isNotFoundModalOpen ? {
