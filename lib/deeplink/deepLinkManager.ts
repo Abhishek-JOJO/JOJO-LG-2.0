@@ -34,7 +34,8 @@ export const deepLinkManager = {
   async parseDeeplink(encryptedHex: string): Promise<DeepLinkPayload | null> {
     if (!encryptedHex) return null;
     try {
-      const decrypted = await decrypt(encryptedHex, true);
+      const normalizedPayload = decodeURIComponent(encryptedHex.trim());
+      const decrypted = await decrypt(normalizedPayload, true);
       if (!decrypted || (typeof decrypted === "string" && !decrypted.trim())) {
         return null;
       }
@@ -77,16 +78,15 @@ export const deepLinkManager = {
    *
    * Always points at the real public domain, NOT the TV's own current
    * origin (unlike generateEncryptedShareUrl above, which intentionally
-   * preserves origin for its own UTM tracking). This QR is scanned by an
-   * external phone camera — on a dev machine `window.location.origin` is
-   * `localhost`, which no phone can ever reach, and even in production the
-   * TV app's own serving origin isn't guaranteed to be the public site.
+   * preserves origin for its own UTM tracking). Keep the root URL shape here:
+   * the Android handoff already depends on it, while parsing below accepts
+   * encoded payloads for stricter iOS scanners.
    */
   async generatePairingQrUrl(code: string): Promise<string> {
     const payload: DeepLinkPayload = { path: "", type: "", qr_code: code };
     try {
       const encryptedHex = await encrypt(JSON.stringify(payload), true);
-      return `https://jojoapp.in/?data=${encryptedHex}`;
+      return `https://jojoapp.in/?data=${encodeURIComponent(encryptedHex)}`;
     } catch (error) {
       return "";
     }
