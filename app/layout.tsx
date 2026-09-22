@@ -87,6 +87,12 @@ export default function RootLayout({
   return (
     <html lang={defaultLocale} suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
+        <script
+          id="early-locale-boot"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var locale=localStorage.getItem("jojo_locale");if(locale==="gu"){document.documentElement.lang="gu";document.documentElement.classList.add("jojo-locale-booting");var style=document.createElement("style");style.id="early-locale-boot-style";style.textContent="html.jojo-locale-booting body{visibility:hidden!important;}";document.head.appendChild(style);}}catch(e){}})();`,
+          }}
+        />
         {/* LG webOS TV Web APIs script — self-hosted webOSTV.js from the webOS TV SDK */}
         <script src="/webOSTV.js" />
         {/* Preload critical authentication page background assets */}

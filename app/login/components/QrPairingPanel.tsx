@@ -8,11 +8,13 @@ import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
 import { generateQrCode, verifyQrCode } from "@/lib/api/pair";
 import { deepLinkManager } from "@/lib/deeplink/deepLinkManager";
 import { ROUTES } from "@/lib/constants/routes";
+import { tvNavigate } from "@/src/navigation/tvNavigate";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useProfileStore } from "@/store/useProfileStore";
 import { logger } from "@/lib/logger/logger";
 import { cn } from "@/lib/utils";
 import { CircleUser, Tv } from "lucide-react";
+import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
 
 const POLL_INTERVAL_MS = 3000;
 const CODE_LIFETIME_MS = 10 * 60 * 1000; // 10 minutes
@@ -22,6 +24,7 @@ export function QrPairingPanel() {
   const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
   const clearSelectedProfile = useProfileStore((state) => state.clearSelectedProfile);
+  const { isAppReady } = useBootstrap();
 
   const [code, setCode] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -77,8 +80,9 @@ export function QrPairingPanel() {
   };
 
   useEffect(() => {
+    if (!isAppReady) return;
     generateCode();
-  }, []);
+  }, [isAppReady]);
 
   // Poll for pairing status while a code is active and not expired
   useEffect(() => {
@@ -112,7 +116,7 @@ export function QrPairingPanel() {
           result.token || ""
         );
         logger.info("[QrPairingPanel] TV pairing successful via polling");
-        router.replace(ROUTES.WATCHING);
+        tvNavigate(ROUTES.WATCHING, router, { replace: true });
         return;
       }
 

@@ -29,7 +29,7 @@ const messagesMap: Record<Locale, Record<string, unknown>> = {
 export function Providers({ children, locale: serverLocale = "en", isMobileServer }: { children: ReactNode; locale?: Locale; isMobileServer?: boolean }) {
   const { locale, messages } = useLocaleStore();
 
-  const [initialLocale] = useState<Locale>(serverLocale);
+  const [initialLocale] = useState<Locale>(() => locale || serverLocale);
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
@@ -46,11 +46,14 @@ export function Providers({ children, locale: serverLocale = "en", isMobileServe
   useEffect(() => {
     if (isInitialized) {
       document.documentElement.lang = locale;
+      document.documentElement.classList.remove("jojo-locale-booting");
+      document.getElementById("early-locale-boot-style")?.remove();
     }
   }, [locale, isInitialized]);
 
-  // Before the async initLocale() resolves, use the server-synchronized locale
-  // and its pre-bundled messages so the first render matches the server exactly.
+  // Use the synchronously hydrated locale store before async initLocale() finishes.
+  // This prevents a brief English flash after logout/reload when Gujarati is already
+  // persisted in localStorage/cookie.
   const currentLocale = isInitialized ? locale : initialLocale;
   const currentMessages =
     isInitialized && messages ? messages : (messagesMap[currentLocale] || defaultMessages);
