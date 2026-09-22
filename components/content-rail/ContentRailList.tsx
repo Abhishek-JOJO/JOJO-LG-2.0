@@ -285,15 +285,29 @@ export function ContentRailList({
     });
   }, [items]);
 
+  const returnAssetId = useAssetDetailStore((s) => s.returnAssetId);
+
   // Reset spotlightIndex synchronously when the rail's items change (e.g. switching
-  // rails on ArrowUp/Down). Using React's documented "adjust state during render"
-  // pattern here — not an effect — so the very first paint after the switch already
-  // shows card 0 instead of flashing the previous rail's stale index for one frame.
+  // rails on ArrowUp/Down). If returning to a specific asset, prioritize its index.
   const [prevLeadItemId, setPrevLeadItemId] = useState(items?.[0]?.id);
   if (items?.[0]?.id !== prevLeadItemId) {
     setPrevLeadItemId(items?.[0]?.id);
-    setSpotlightIndex(0);
+    const targetCardIdx = returnAssetId
+      ? items?.findIndex((it) => String(it.id) === String(returnAssetId) || String(it.assetId) === String(returnAssetId))
+      : -1;
+    setSpotlightIndex(targetCardIdx !== -1 ? targetCardIdx : 0);
   }
+
+  // Also ensure spotlightIndex is synced with returnAssetId when returning from detail page
+  useEffect(() => {
+    if (!isSpotlightRail || isAssetDetailOpen || !returnAssetId || !items?.length) return;
+    const cardIdx = items.findIndex(
+      (it) => String(it.id) === String(returnAssetId) || String(it.assetId) === String(returnAssetId)
+    );
+    if (cardIdx !== -1 && cardIdx !== spotlightIndex) {
+      setSpotlightIndex(cardIdx);
+    }
+  }, [isSpotlightRail, isAssetDetailOpen, returnAssetId, items, spotlightIndex]);
 
   useEffect(() => {
     if (isSpotlightRail && listRef?.current) {

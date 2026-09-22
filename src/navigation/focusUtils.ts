@@ -30,6 +30,7 @@ const POLL_INTERVAL_MS = 100;
 export function restorePageFocus(preferredKey?: string | null) {
   if (typeof window === "undefined") return;
 
+  const returnAssetId = useAssetDetailStore.getState().returnAssetId;
   const originKey = preferredKey || useAssetDetailStore.getState().returnFocusKey;
 
   let attempts = 0;
@@ -52,6 +53,24 @@ export function restorePageFocus(preferredKey?: string | null) {
     }
 
     if (isSearchOpen) {
+      if (returnAssetId) {
+        const el = document.querySelector(
+          `[data-focuskey="MODAL_SEARCH"] [data-asset-id="${returnAssetId}"], [data-focuskey="MODAL_SEARCH"] [data-focuskey*="${returnAssetId}"]`
+        );
+        if (el) {
+          const fKey = el.getAttribute("data-focuskey");
+          if (fKey && doesFocusableExist(fKey)) {
+            setFocus(fKey);
+            if (el instanceof HTMLElement) {
+              el.focus({ preventScroll: true });
+              el.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
+            }
+            useAssetDetailStore.getState().clearReturnFocusKey();
+            clearInterval(interval);
+            return;
+          }
+        }
+      }
       if (originKey && doesFocusableExist(originKey)) {
         const el = document.querySelector(`[data-focuskey="${originKey}"]`);
         const insideSearch = el?.closest('[data-focuskey="MODAL_SEARCH"]');
@@ -75,7 +94,27 @@ export function restorePageFocus(preferredKey?: string | null) {
       return;
     }
 
-    // 1. Try to restore exact origin card/key the user came from (e.g. spotlight-lead-fixed on their active Content Rail)
+    // 1. Prioritize restoring focus to the specific asset card by returnAssetId if available
+    if (returnAssetId) {
+      const assetEl = document.querySelector(
+        `[data-asset-id="${returnAssetId}"]:not([data-focuskey^="MODAL"]), [data-focuskey*="${returnAssetId}"]:not([data-focuskey^="MODAL"])`
+      );
+      if (assetEl) {
+        const assetFocusKey = assetEl.getAttribute("data-focuskey");
+        if (assetFocusKey && doesFocusableExist(assetFocusKey)) {
+          setFocus(assetFocusKey);
+          if (assetEl instanceof HTMLElement) {
+            assetEl.focus({ preventScroll: true });
+            assetEl.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
+          }
+          useAssetDetailStore.getState().clearReturnFocusKey();
+          clearInterval(interval);
+          return;
+        }
+      }
+    }
+
+    // 2. Try to restore exact origin card/key the user came from (e.g. spotlight-lead-fixed on their active Content Rail)
     if (originKey && originKey !== ROOT_FOCUS_KEY && doesFocusableExist(originKey)) {
       const originEl = document.querySelector(`[data-focuskey="${originKey}"]`);
       const insideClosingModal = originEl?.closest(
@@ -85,6 +124,7 @@ export function restorePageFocus(preferredKey?: string | null) {
         setFocus(originKey);
         if (originEl instanceof HTMLElement) {
           originEl.focus({ preventScroll: true });
+          originEl.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
         }
         useAssetDetailStore.getState().clearReturnFocusKey();
         clearInterval(interval);
@@ -92,21 +132,7 @@ export function restorePageFocus(preferredKey?: string | null) {
       }
     }
 
-    // 2. Check if something already has spatial-nav focus outside any closing modal
-    const currentKey = getCurrentFocusKey();
-    if (currentKey && currentKey !== ROOT_FOCUS_KEY && doesFocusableExist(currentKey)) {
-      const currentEl = document.querySelector(`[data-focuskey="${currentKey}"]`);
-      const insideClosingModal = currentEl?.closest(
-        '[data-focuskey="MODAL_ASSET_DETAIL"], [data-focuskey="MODAL_SEARCH"]'
-      );
-      if (!insideClosingModal) {
-        clearInterval(interval);
-        return;
-      }
-    }
-
-    // 3. If no valid originKey or active key:
-    // If the active spotlight lead card exists on the page (spotlight-lead-fixed):
+    // 3. If the active spotlight lead card exists on the page (spotlight-lead-fixed):
     // Prioritize the active spotlight rail lead card over hero carousel so we NEVER jump away from the active Content Rail!
     if (document.querySelector('[data-focuskey="spotlight-lead-fixed"]')) {
       if (doesFocusableExist("spotlight-lead-fixed")) {
@@ -121,9 +147,8 @@ export function restorePageFocus(preferredKey?: string | null) {
       }
     }
 
-    // 4. Hero carousel, if present on this page — only commit once it's actually
-    // registered with the spatial-nav library; otherwise keep retrying.
-    if (document.querySelector('[data-focuskey="hero-carousel"]')) {
+    // 4. Hero carousel fallback — only if no asset card was requested or after initial attempts
+    if (!returnAssetId && attempts > 3 && document.querySelector('[data-focuskey="hero-carousel"]')) {
       if (doesFocusableExist("hero-carousel")) {
         setFocus("hero-carousel");
         useAssetDetailStore.getState().clearReturnFocusKey();

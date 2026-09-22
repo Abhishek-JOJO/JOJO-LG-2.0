@@ -121,8 +121,9 @@ interface AssetDetailState {
   historyCount: number;
   shouldScrollToBottom: boolean;
   returnFocusKey: string | null;
+  returnAssetId: string | null;
   clearReturnFocusKey: () => void;
-  openAssetDetail: (id: string, contentType: string | number, title: string, previewItem?: any) => void;
+  openAssetDetail: (id: string, contentType: string | number, title: string, previewItem?: any, customFocusKey?: string) => void;
   closeAssetDetail: () => void;
   navigateBackToAsset: (id: string, contentType: string | number, title: string) => void;
   resetScrollFlag: () => void;
@@ -162,24 +163,27 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => {
     historyCount: 0,
     shouldScrollToBottom: false,
     returnFocusKey: null,
-    clearReturnFocusKey: () => set({ returnFocusKey: null }),
+    returnAssetId: null,
+    clearReturnFocusKey: () => set({ returnFocusKey: null, returnAssetId: null }),
 
-  openAssetDetail: (id, contentType, title, previewItem) => {
+  openAssetDetail: (id, contentType, title, previewItem, customFocusKey) => {
     if (typeof window === "undefined") return;
 
     // Reset global card hover state when modal opens
     usePlayerStore.getState().setIsAnyCardHovered(false);
 
-    // If modal is not already open, capture the exact focused key to return to upon close
-    let currentKey: string | null = null;
-    try {
-      const spatialNav = require("@noriginmedia/norigin-spatial-navigation");
-      currentKey = spatialNav?.getCurrentFocusKey?.() || null;
-    } catch { }
+    // Capture the exact focused key and asset ID to return to upon close
+    const activeEl = typeof document !== "undefined" ? document.activeElement : null;
+    const activeElKey = activeEl?.getAttribute("data-focuskey") || null;
+    const activeElAssetId = activeEl?.getAttribute("data-asset-id") || null;
 
     const returnFocusKey = get().isOpen 
       ? get().returnFocusKey 
-      : (currentKey || (document.activeElement?.getAttribute("data-focuskey") || null));
+      : (customFocusKey || activeElKey || (id ? `card-asset-${id}` : null));
+
+    const returnAssetId = get().isOpen
+      ? get().returnAssetId
+      : (activeElAssetId || (id ? String(id) : null));
 
     const currentPath = window.location.pathname + window.location.search;
     const typeSlug = getAssetTypeSlug(contentType);
@@ -206,6 +210,7 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => {
       isOpen: true,
       originalPath,
       returnFocusKey,
+      returnAssetId,
       // Increment historyCount if we were already open
       historyCount: state.isOpen ? state.historyCount + 1 : 0,
       shouldScrollToBottom: false,
@@ -283,6 +288,8 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => {
       originalPath: null,
       historyCount: 0,
       shouldScrollToBottom: false,
+      returnFocusKey: null,
+      returnAssetId: null,
     });
   },
 };});

@@ -306,6 +306,20 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   const heroRail = isFirstHero ? mappedRails[0] : null;
   const contentRails = isFirstHero ? mappedRails.slice(1) : mappedRails;
 
+  const returnAssetId = useAssetDetailStore((s) => s.returnAssetId);
+  const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
+
+  // When returning from AssetDetailModal, ensure the active rail is set to the rail containing returnAssetId
+  useEffect(() => {
+    if (isAssetDetailOpen || !returnAssetId || !contentRails?.length) return;
+    const targetIdx = contentRails.findIndex((rail) =>
+      rail.items?.some((it) => String(it.id) === String(returnAssetId) || String(it.assetId) === String(returnAssetId))
+    );
+    if (targetIdx !== -1 && targetIdx !== activeRailIndexRef.current) {
+      setActiveRailIndex(targetIdx);
+    }
+  }, [isAssetDetailOpen, returnAssetId, contentRails]);
+
   const safeActiveRailIndex = Math.min(
     Math.max(0, activeRailIndex),
     Math.max(0, contentRails.length - 1)

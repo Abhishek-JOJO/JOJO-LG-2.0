@@ -485,6 +485,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       }}
       href={itemUrl}
       data-focuskey={focusKey}
+      data-asset-id={item?.id}
       onFocus={() => {
         setIsDomFocused(true);
         if (focusKeyProp) {
