@@ -73,7 +73,10 @@
     "qr_generating_code": "તમારો કોડ બની રહ્યો છે...",
     "qr_code_expired": "આ કોડની મુદત પૂરી થઈ ગઈ છે",
     "qr_get_new_code": "નવો કોડ મેળવો",
-    "get_otp": "OTP મેળવો"
+    "get_otp": "OTP મેળવો",
+    "cant_find_account_title": "એકાઉન્ટ મળ્યું નથી",
+    "cant_find_account_desc": "અમને {identifier} સાથેનું કોઈ એકાઉન્ટ મળ્યું નથી. બીજો ફોન નંબર અથવા ઈમેઇલ સરનામું અજમાવો, અથવા એકાઉન્ટ બનાવવા માટે મોબાઈલ કે વેબ એપ્લિકેશન પર જાઓ.",
+    "cant_find_account_btn": "ફરી પ્રયાસ કરો"
   },
   "otpPage": {
     "verify_registration": "નોંધણીની ચકાસણી",

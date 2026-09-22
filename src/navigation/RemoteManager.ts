@@ -53,7 +53,10 @@ export const useRemoteManager = () => {
             usePlayerStore.getState().isSearchOpen ||
             useAssetDetailStore.getState().isOpen ||
             useExitConfirmStore.getState().isOpen ||
-            (typeof document !== 'undefined' && !!document.querySelector('[data-focuskey="profile-dropdown-boundary"]'))
+            (typeof document !== 'undefined' && (
+              !!document.querySelector('[data-focuskey="profile-dropdown-boundary"]') ||
+              !!document.querySelector('[role="dialog"]')
+            ))
           ) {
             return;
           }

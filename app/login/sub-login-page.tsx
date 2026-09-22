@@ -20,7 +20,7 @@ import { useCountries } from "@features/country/hooks/useCountries";
 import { useGeoAvailability } from "@features/geo/hooks/useGeoAvailability";
 import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CountryWithEMailInput from "./components/CountryWithEmailInput";
 import SocialBtn from "./components/social-buttons";
 import { getErrorMessage, validate } from "./validate";
@@ -31,6 +31,7 @@ import { analyticsService } from "@/shared/analytics";
 import { useFocusable, setFocus, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 import { LoginModeToggle, LoginMode } from "./components/LoginModeToggle";
 import { QrPairingPanel } from "./components/QrPairingPanel";
+import { AccountNotFoundModal } from "./components/AccountNotFoundModal";
 
 import { tvNavigate } from "@/src/navigation/tvNavigate";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -81,7 +82,19 @@ function LoginPageContent() {
   );
   const [error, setError] = useState<ErrorKey | null>(null);
   const [touched, setTouched] = useState(false);
-  const autoSubmittedPhoneRef = useRef<string | null>(null);
+
+  const [isNotFoundModalOpen, setIsNotFoundModalOpen] = useState(false);
+  const [notFoundIdentifier, setNotFoundIdentifier] = useState("");
+
+  const handleCloseNotFoundModal = useCallback(() => {
+    setIsNotFoundModalOpen(false);
+    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    setTimeout(() => {
+      setFocus('login-input');
+    }, 60);
+  }, []);
 
   // ── Focus setup ──────────────────────────────────────────────────────────
   const { ref: pageRef, focusKey: pageFocusKey } = useFocusable({
@@ -91,6 +104,7 @@ function LoginPageContent() {
   });
   const { ref: inputRef, focused: inputFocused } = useFocusable({
     focusKey: 'login-input',
+    focusable: !isNotFoundModalOpen,
     onEnterPress: () => {
       // Trigger native keyboard or handle submit if valid
       const el = document.getElementById("login-input-field");
@@ -111,6 +125,7 @@ function LoginPageContent() {
 
   const { ref: submitRef, focused: submitFocused } = useFocusable({
     focusKey: 'login-submit',
+    focusable: !isNotFoundModalOpen,
     onEnterPress: () => {
       // Manually trigger form submit
       const form = document.getElementById("login-form") as HTMLFormElement;
@@ -125,8 +140,6 @@ function LoginPageContent() {
     onArrowPress: (direction) => {
       if (direction === 'up') {
         setFocus('login-input');
-        const el = document.getElementById("login-input-field");
-        if (el) el.focus();
         return false;
       }
       return true;
@@ -308,30 +321,6 @@ function LoginPageContent() {
     if (touched) {
       setError(validate(nextValue?.trim()));
     }
-
-    const nextDigits = nextValue.replace(REGEX?.NON_DIGIT, "");
-    const shouldAutoSubmitPhone =
-      mode === "remote" &&
-      nextDigits.length === 10 &&
-      isPossiblePhoneInput(nextValue.trim()) &&
-      !validate(nextValue.trim()) &&
-      !initiateOtp.isPending &&
-      !checkUserExists.isPending;
-
-    if (shouldAutoSubmitPhone && autoSubmittedPhoneRef.current !== nextDigits) {
-      autoSubmittedPhoneRef.current = nextDigits;
-      setTimeout(() => {
-        const form = document.getElementById("login-form") as HTMLFormElement | null;
-        if (!form) return;
-        if (typeof form.requestSubmit === "function") {
-          form.requestSubmit();
-        } else {
-          form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-        }
-      }, 100);
-    } else if (nextDigits.length < 10) {
-      autoSubmittedPhoneRef.current = null;
-    }
   };
 
   const handleBlur = () => {
@@ -414,77 +403,36 @@ function LoginPageContent() {
       };
     };
 
-    // OVERSEAS USER FLOW: Check if user exists first
-    if (!isAvailable) {
-      logger.info("[Login] Overseas user - checking if user exists first");
-
-      if (isPhone) {
-        try {
-          const phonePayload = getPhonePayload();
-          logger.info("phonePayload", phonePayload)
-          const result = await checkUserExists.mutateAsync({
-            phone: phonePayload.phone,
-            phoneCode: phonePayload.phoneCode,
-          });
-
-          if (!result.exists) {
-            logger.info("[Login] User not found, redirecting to register");
-            setError(ErrorKey.USER_NOT_FOUND);
-            return;
-          }
-
-          if (result.isSpecialUser) {
-            logger.info("[Login] Special user (overseas phone) detected, executing direct login");
-            await verifySpecialUser.mutateAsync({
-              phone: phonePayload.phone,
-              phoneCode: phonePayload.phoneCode,
-              isRegister: false,
-            });
-            clearSelectedProfile();
-            showToast(t("login_success") || "Special User Login Successful!", "success");
-            tvNavigate(ROUTES.WATCHING || "/watching", router);
-            return;
-          }
-
-          logger.info("[Login] User exists, sending OTP");
-
-          await initiateOtp.mutateAsync({
-            phone: phonePayload.phone,
-            phoneCode: phonePayload.phoneCode,
-          });
-
-          setAuthContext({
-            phone: phonePayload.phone,
-            phoneCode: phonePayload.phoneCode,
-            isRegister: false,
-          });
-
-          tvNavigate(ROUTES.LOGIN_OTP, router);
-        } catch (err) {
-          setError(ErrorKey.INVALID_PHONE);
-        }
-
-        return;
-      }
-
-      // Email flow
+    // TV FLOW: Restrict new account creation on TV.
+    // Call check-user first to check if user exists.
+    if (isPhone) {
       try {
+        const phonePayload = getPhonePayload();
+        const displayIdentifier =
+          phonePayload.internationalPhone ||
+          (phonePayload.phoneCode ? `+${phonePayload.phoneCode} ${phonePayload.phone}` : phonePayload.phone);
+
+        logger.info("[Login] Checking if phone user exists", phonePayload);
         const result = await checkUserExists.mutateAsync({
-          phone: trimmed,
-          phoneCode: "",
+          phone: phonePayload.phone,
+          phoneCode: phonePayload.phoneCode,
         });
 
-        if (!result.exists) {
-          logger.info("[Login] User not found, redirecting to register");
-          setError(ErrorKey.USER_NOT_FOUND);
+        if (!result?.exists) {
+          logger.info("[Login] Phone user not found on TV flow, showing restrict popup");
+          if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+          setNotFoundIdentifier(displayIdentifier);
+          setIsNotFoundModalOpen(true);
           return;
         }
 
         if (result.isSpecialUser) {
-          logger.info("[Login] Special user (overseas email) detected, executing direct login");
+          logger.info("[Login] Special user detected, executing direct login");
           await verifySpecialUser.mutateAsync({
-            phone: trimmed,
-            phoneCode: "",
+            phone: phonePayload.phone,
+            phoneCode: phonePayload.phoneCode,
             isRegister: false,
           });
           clearSelectedProfile();
@@ -493,60 +441,20 @@ function LoginPageContent() {
           return;
         }
 
-        logger.info("[Login] User exists, sending OTP");
-
+        logger.info("[Login] Existing user verified, sending OTP");
         await initiateOtp.mutateAsync({
-          phone: trimmed,
-          phoneCode: "",
+          phone: phonePayload.phone,
+          phoneCode: phonePayload.phoneCode,
         });
 
         setAuthContext({
-          email: trimmed,
+          phone: phonePayload.phone,
+          phoneCode: phonePayload.phoneCode,
           isRegister: false,
         });
 
         tvNavigate(ROUTES.LOGIN_OTP, router);
       } catch (err) {
-        setError(ErrorKey.INVALID_EMAIL);
-      }
-
-        return;
-    }
-
-    // INDIA USER FLOW: Send OTP directly
-    if (isPhone) {
-      try {
-        const phonePayload = getPhonePayload();
-
-        const result = await initiateOtp.mutateAsync({
-          phone: phonePayload.phone,
-          phoneCode: phonePayload.phoneCode,
-        });
-
-        // SPECIAL USER BYPASS FLOW
-        if (result?.isSpecialUser) {
-          logger.info("[Login] Special user detected, initiating direct passwordless login");
-          await verifySpecialUser.mutateAsync({
-            phone: phonePayload.phone,
-            phoneCode: phonePayload.phoneCode,
-            isRegister: !result.isExists,
-          });
-          clearSelectedProfile();
-          showToast(t("login_success") || "Special User Login Successful!", "success");
-          tvNavigate(ROUTES.WATCHING || "/watching", router);
-          return;
-        }
-
-        const isRegister = !result?.isExists;
-
-        setAuthContext({
-          phone: phonePayload?.phone,
-          phoneCode: phonePayload?.phoneCode,
-          isRegister,
-        });
-
-        tvNavigate(ROUTES.LOGIN_OTP, router);
-      } catch {
         setError(ErrorKey.INVALID_PHONE);
       }
 
@@ -555,9 +463,24 @@ function LoginPageContent() {
 
     // Email flow
     try {
-      const result = await checkUserExists.mutateAsync({ phone: trimmed, phoneCode: "" });
-      if (result?.isSpecialUser) {
-        logger.info("[Login] Special user (email) detected, initiating direct passwordless login");
+      logger.info("[Login] Checking if email user exists", { email: trimmed });
+      const result = await checkUserExists.mutateAsync({
+        phone: trimmed,
+        phoneCode: "",
+      });
+
+      if (!result?.exists) {
+        logger.info("[Login] Email user not found on TV flow, showing restrict popup");
+        if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        setNotFoundIdentifier(trimmed);
+        setIsNotFoundModalOpen(true);
+        return;
+      }
+
+      if (result.isSpecialUser) {
+        logger.info("[Login] Special user (email) detected, executing direct login");
         await verifySpecialUser.mutateAsync({
           phone: trimmed,
           phoneCode: "",
@@ -569,15 +492,19 @@ function LoginPageContent() {
         return;
       }
 
-      const isRegister = !result?.exists;
+      logger.info("[Login] Existing email user verified, sending OTP");
+      await initiateOtp.mutateAsync({
+        phone: trimmed,
+        phoneCode: "",
+      });
 
       setAuthContext({
         email: trimmed,
-        isRegister,
+        isRegister: false,
       });
 
       tvNavigate(ROUTES.LOGIN_OTP, router);
-    } catch {
+    } catch (err) {
       setError(ErrorKey.INVALID_EMAIL);
     }
   };
@@ -616,9 +543,9 @@ function LoginPageContent() {
                   ref={inputRef as any}
                   className={cn(
                     "relative w-full rounded-full transition-all duration-200",
-                    inputFocused ? "scale-[1.02] z-10" : ""
+                    inputFocused && !isNotFoundModalOpen ? "scale-[1.02] z-10" : ""
                   )}
-                  style={inputFocused ? {
+                  style={inputFocused && !isNotFoundModalOpen ? {
                     boxShadow: "0 0 0 3px #ffffff, 0 0 16px rgba(255, 255, 255, 0.5)",
                   } : undefined}
                 >
@@ -674,9 +601,9 @@ function LoginPageContent() {
                 ref={submitRef as any}
                 className={cn(
                   "relative w-full rounded-full transition-all duration-200",
-                  submitFocused ? "scale-[1.02] z-10" : ""
+                  submitFocused && !isNotFoundModalOpen ? "scale-[1.02] z-10" : ""
                 )}
-                style={submitFocused ? {
+                style={submitFocused && !isNotFoundModalOpen ? {
                   boxShadow: "0 0 0 3px #ffffff, 0 0 16px rgba(255, 255, 255, 0.5)",
                 } : undefined}
               >
@@ -703,6 +630,13 @@ function LoginPageContent() {
         <span className="fixed bottom-3 right-6 text-[11px] font-mono text-white/30 pointer-events-none select-none z-50">
           v2.2.32
         </span>
+
+        {/* Account Not Found Modal */}
+        <AccountNotFoundModal
+          isOpen={isNotFoundModalOpen}
+          onClose={handleCloseNotFoundModal}
+          identifier={notFoundIdentifier}
+        />
       </div>
     </FocusContext.Provider>
   );

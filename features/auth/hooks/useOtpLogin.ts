@@ -51,9 +51,13 @@ export function useCheckUserExists() {
           identifier: phone,
           phoneCode: phoneCode
         };
-      } catch (error) {
+      } catch (error: any) {
         // Handle 404 - user doesn't exist
-        if (error instanceof AppError && error.status === HttpStatus.NOT_FOUND) {
+        if (
+          (error instanceof AppError && error.status === HttpStatus.NOT_FOUND) ||
+          error?.status === 404 ||
+          error?.status === HttpStatus.NOT_FOUND
+        ) {
           return {
             exists: false,
             isSpecialUser: false,

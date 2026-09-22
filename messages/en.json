@@ -73,7 +73,10 @@
     "qr_generating_code": "Generating your code...",
     "qr_code_expired": "This code has expired",
     "qr_get_new_code": "Get New Code",
-    "get_otp": "Get OTP"
+    "get_otp": "Get OTP",
+    "cant_find_account_title": "Can’t find account",
+    "cant_find_account_desc": "We can’t find an account with {identifier}. Try another phone number or email address, or go to the mobile or web app to create an account.",
+    "cant_find_account_btn": "Try Again"
   },
   "otpPage": {
     "verify_registration": "Verify Registration",
