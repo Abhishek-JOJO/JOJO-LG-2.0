@@ -61,7 +61,7 @@ interface Props {
 // device. That's a hardware/display-pipeline limitation below the DOM, not
 // something any CSS/JS/HLS-path change from here can reach. Left disabled;
 // the static poster crossfade (unaffected, glitch-free) carries the feature.
-const ENABLE_HERO_BACKGROUND_VIDEO = false;
+const ENABLE_HERO_BACKGROUND_VIDEO = true;
 
 export function HeroCarouselCard({ item, config, index, isActive, onClick, onHoverChange, onVideoPlayChange, batchPricing }: Props) {
   const t = useTranslations("contentRails");
@@ -90,6 +90,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
   const { data: assetDetails } = useAsset(item.id, isActive);
 
   const isShow = item.assetType === "SHOW" || assetDetails?.assetType === "SHOW";
+  const heroPreviewUrl = item?.previewUrl || (item as any)?.preview_url || assetDetails?.previewUrl || null;
   const displayCertification = assetDetails?.certification || item?.certification || item?.ageRating;
   const displayDuration = isShow
     ? (assetDetails?.seasons?.length
@@ -286,7 +287,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
     return () => {
       clearRevealTimeout();
     };
-  }, [shouldPlay, isMuted, item.previewUrl, setMuted, isActive]);
+  }, [shouldPlay, isMuted, heroPreviewUrl, setMuted, isActive]);
 
   useEffect(() => {
     if (isActive && isVideoLoaded) {
@@ -347,13 +348,13 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
         className="absolute inset-0 w-full h-full z-0 pointer-events-none"
       >
         {/* Background preview video — right-aligned, 80% visible, never cropped at any breakpoint */}
-        {ENABLE_HERO_BACKGROUND_VIDEO && item?.previewUrl && (
+        {ENABLE_HERO_BACKGROUND_VIDEO && heroPreviewUrl && (
           <div
             className={`absolute inset-0 w-full h-full z-0 transition-none ${isVideoLoaded ? "translate-x-0" : "translate-x-[200%]"}`}
           >
             <JOJOCommonVideo
               ref={videoRef}
-              src={isActive && isSlideSettled ? item.previewUrl : undefined}
+              src={isActive && isSlideSettled ? heroPreviewUrl : undefined}
               // `poster` is the video element's own content before playback
               // begins — standard image rendering, not decoder output — so it's
               // always correct even during the window the wrapper above has it
@@ -432,14 +433,14 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
 
 
       <div
-        className={`absolute bottom-14 sm:bottom-[4.5rem] lg:bottom-[5.5rem] left-7 sm:left-10 lg:left-16 right-[120px] max-w-5xl text-left z-20 transition-all duration-700 ease-out ${isActive ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        className={`absolute bottom-10 sm:bottom-12 lg:bottom-16 left-7 sm:left-10 lg:left-16 right-[120px] max-w-6xl text-left z-20 transition-all duration-700 ease-out ${isActive ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
       >
         {/* Title/Logo */}
         {config?.showTitle && (
           <div className={`mb-4 transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-100`}>
             {item?.title_image ? (
-              <div className="relative w-full max-w-[320px] sm:max-w-[430px] md:max-w-[520px] lg:max-w-[600px] h-[72px] sm:h-[100px] md:h-[125px] lg:h-[145px]">
+              <div className="relative w-full max-w-[380px] sm:max-w-[500px] md:max-w-[620px] lg:max-w-[720px] h-[86px] sm:h-[118px] md:h-[145px] lg:h-[168px]">
                 <JOJOCommonImage
                   src={item.title_image}
                   alt={item.title}
@@ -451,7 +452,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
                 />
               </div>
             ) : (
-              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-white tracking-wide leading-tight drop-shadow-md">
+              <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-[6rem] font-bold text-white tracking-wide leading-tight drop-shadow-md">
                 {item?.title}
               </h1>
             )}
@@ -460,35 +461,35 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
 
         {/* Top Left Badge moved below title */}
         {item?.asset_tags_badgeText && item.asset_tags_badgeText.toLowerCase().includes("new") && (
-          <div className={`mb-3 inline-flex items-center bg-[#251307] px-3 py-1 rounded-full transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-150`}>
+          <div className={`mb-4 inline-flex items-center bg-[#251307] px-4 py-1.5 rounded-full transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-150`}>
             <span className="text-[#FF6A00] font-bold text-xs sm:text-sm tracking-wider uppercase">{item.asset_tags_badgeText}</span>
           </div>
         )}
 
         {/* Certificate, Year, Duration */}
-        <div className={`mb-3 flex flex-wrap items-center gap-2 transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-200`}>
+        <div className={`mb-4 flex flex-wrap items-center gap-3 transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-200`}>
           {displayCertification && (
-            <span className="bg-white/20 text-neutral-300 font-semibold text-xs sm:text-sm lg:text-base px-3 py-1 rounded-full drop-shadow-md backdrop-blur-sm">
+            <span className="bg-white/20 text-neutral-100 font-semibold text-sm sm:text-base lg:text-xl px-4 py-1.5 rounded-full drop-shadow-md backdrop-blur-sm">
               {displayCertification}
             </span>
           )}
           {item?.year && (
-            <span className="bg-white/20 text-neutral-300 font-semibold text-xs sm:text-sm lg:text-base px-3 py-1 rounded-full drop-shadow-md backdrop-blur-sm">
+            <span className="bg-white/20 text-neutral-100 font-semibold text-sm sm:text-base lg:text-xl px-4 py-1.5 rounded-full drop-shadow-md backdrop-blur-sm">
               {item.year}
             </span>
           )}
           {displayDuration && (
-            <span className="bg-white/20 text-neutral-300 font-semibold text-xs sm:text-sm lg:text-base px-3 py-1 rounded-full drop-shadow-md backdrop-blur-sm">
+            <span className="bg-white/20 text-neutral-100 font-semibold text-sm sm:text-base lg:text-xl px-4 py-1.5 rounded-full drop-shadow-md backdrop-blur-sm">
               {displayDuration}
             </span>
           )}
         </div>
 
         {/* Metadata String: Genre 1 • Genre 2 */}
-        <div className={`flex flex-wrap items-center font-bold text-white text-base sm:text-lg md:text-xl lg:text-2xl transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-300`}>
+        <div className={`flex flex-wrap items-center font-bold text-white text-xl sm:text-2xl md:text-3xl lg:text-[2.15rem] transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-300`}>
           {item?.genres?.map((genre, i) => (
             <span key={i} className="flex items-center drop-shadow-md">
-              {i > 0 && <span className="mx-2 text-white">•</span>}
+              {i > 0 && <span className="mx-3 text-white">•</span>}
               {genre}
             </span>
           ))}
