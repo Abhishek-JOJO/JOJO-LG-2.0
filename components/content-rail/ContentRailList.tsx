@@ -501,20 +501,32 @@ export function ContentRailList({
     onFocus: () => {
       // D-pad focus should stop autoplay just like mouse hover does
       setIsAutoplayPaused(true);
-      useActiveRailStore.getState().setActiveSectionIndex(0);
       if (typeof window !== "undefined") {
-        // Belt-and-suspenders alongside the restorePageFocus() fix (see
-        // src/navigation/focusUtils.ts) for the real bug: debounce so a
-        // transient/spurious refocus of the hero can't snap the page back to
-        // top on its own either. onBlur below cancels it the instant focus
-        // moves on, so a real, intentional focus of the hero still scrolls
-        // to top exactly as before.
+        // Do NOT scroll to top or reset activeSectionIndex if we are returning from asset detail to a card below
+        const isReturningToCard = Boolean(
+          useAssetDetailStore.getState().returnAssetId ||
+          useAssetDetailStore.getState().returnFocusKey ||
+          useAssetDetailStore.getState().returnScrollY ||
+          (window as any).__returnScrollY
+        );
+        if (isReturningToCard) {
+          return;
+        }
+
+        useActiveRailStore.getState().setActiveSectionIndex(0);
         if (heroFocusScrollTimeoutRef.current) {
           clearTimeout(heroFocusScrollTimeoutRef.current);
         }
         heroFocusScrollTimeoutRef.current = setTimeout(() => {
           heroFocusScrollTimeoutRef.current = null;
-          window.scrollTo({ top: 0, behavior: "auto" });
+          if (
+            !useAssetDetailStore.getState().returnAssetId &&
+            !useAssetDetailStore.getState().returnFocusKey &&
+            !useAssetDetailStore.getState().returnScrollY &&
+            !(window as any).__returnScrollY
+          ) {
+            window.scrollTo({ top: 0, behavior: "auto" });
+          }
         }, 120);
       }
     },

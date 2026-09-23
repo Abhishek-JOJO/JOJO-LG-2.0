@@ -122,6 +122,7 @@ interface AssetDetailState {
   shouldScrollToBottom: boolean;
   returnFocusKey: string | null;
   returnAssetId: string | null;
+  returnScrollY: number | null;
   clearReturnFocusKey: () => void;
   openAssetDetail: (id: string, contentType: string | number, title: string, previewItem?: any, customFocusKey?: string) => void;
   closeAssetDetail: () => void;
@@ -164,7 +165,11 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => {
     shouldScrollToBottom: false,
     returnFocusKey: null,
     returnAssetId: null,
-    clearReturnFocusKey: () => set({ returnFocusKey: null, returnAssetId: null }),
+    returnScrollY: null,
+    clearReturnFocusKey: () => {
+      if (typeof window !== "undefined") (window as any).__returnScrollY = null;
+      set({ returnFocusKey: null, returnAssetId: null, returnScrollY: null });
+    },
 
   openAssetDetail: (id, contentType, title, previewItem, customFocusKey) => {
     if (typeof window === "undefined") return;
@@ -172,10 +177,11 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => {
     // Reset global card hover state when modal opens
     usePlayerStore.getState().setIsAnyCardHovered(false);
 
-    // Capture the exact focused key and asset ID to return to upon close
+    // Capture the exact focused key, asset ID, and scroll position to return to upon close
     const activeEl = typeof document !== "undefined" ? document.activeElement : null;
     const activeElKey = activeEl?.getAttribute("data-focuskey") || null;
     const activeElAssetId = activeEl?.getAttribute("data-asset-id") || null;
+    const currentScrollY = typeof window !== "undefined" ? (window.scrollY || window.pageYOffset || 0) : 0;
 
     const returnFocusKey = get().isOpen 
       ? get().returnFocusKey 
@@ -184,6 +190,10 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => {
     const returnAssetId = get().isOpen
       ? get().returnAssetId
       : (activeElAssetId || (id ? String(id) : null));
+
+    const returnScrollY = get().isOpen
+      ? get().returnScrollY
+      : currentScrollY;
 
     const currentPath = window.location.pathname + window.location.search;
     const typeSlug = getAssetTypeSlug(contentType);
@@ -202,6 +212,10 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => {
     // from attempting to fetch an un-generated static route in 'output: export' mode.
     window.history.pushState({ type: "asset-detail", id, contentType: typeSlug, title }, "", window.location.href);
 
+    if (typeof window !== "undefined") {
+      (window as any).__returnScrollY = returnScrollY;
+    }
+
     set((state) => ({
       activeAssetId: id,
       activeContentType: typeSlug,
@@ -211,6 +225,7 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => {
       originalPath,
       returnFocusKey,
       returnAssetId,
+      returnScrollY,
       // Increment historyCount if we were already open
       historyCount: state.isOpen ? state.historyCount + 1 : 0,
       shouldScrollToBottom: false,
@@ -279,6 +294,7 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => {
   },
 
   resetAssetDetailModal: () => {
+    if (typeof window !== "undefined") (window as any).__returnScrollY = null;
     set({
       activeAssetId: null,
       activeContentType: null,
@@ -290,6 +306,7 @@ export const useAssetDetailStore = create<AssetDetailState>((set, get) => {
       shouldScrollToBottom: false,
       returnFocusKey: null,
       returnAssetId: null,
+      returnScrollY: null,
     });
   },
 };});

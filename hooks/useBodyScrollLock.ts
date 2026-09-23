@@ -65,7 +65,9 @@ export function useBodyScrollLock(lock: boolean) {
         document.body.style.paddingRight = savedBodyStyles.paddingRight;
 
         // Restore exact scroll position
-        window.scrollTo(0, savedScrollY);
+        const assetReturnScrollY = (typeof window !== "undefined" && (window as any)?.__returnScrollY) ?? null;
+        const targetY = typeof assetReturnScrollY === "number" && assetReturnScrollY > 0 ? assetReturnScrollY : savedScrollY;
+        window.scrollTo(0, targetY);
       }
     };
   }, [lock]);

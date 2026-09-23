@@ -120,6 +120,26 @@ export function restorePageFocus(preferredKey?: string | null) {
       return;
     }
 
+    const savedScrollY =
+      useAssetDetailStore.getState().returnScrollY ??
+      ((typeof window !== "undefined" && (window as any)?.__returnScrollY) ?? null);
+
+    const scrollToSectionIfNeeded = (el: HTMLElement) => {
+      const currentSection = el.closest("section");
+      if (currentSection) {
+        const sIndex = currentSection.getAttribute("data-section-index");
+        if (sIndex && Number(sIndex) > 0) {
+          const rect = currentSection.getBoundingClientRect();
+          const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + rect.top - 105);
+          window.scrollTo({ top: targetTop, behavior: "auto" });
+          return;
+        }
+      }
+      if (typeof savedScrollY === "number" && savedScrollY > 0) {
+        window.scrollTo({ top: savedScrollY, behavior: "auto" });
+      }
+    };
+
     // 1. Prioritize restoring focus to the specific asset card by returnAssetId if available
     if (returnAssetId) {
       const assetEl = document.querySelector(
@@ -131,7 +151,7 @@ export function restorePageFocus(preferredKey?: string | null) {
           setFocus(assetFocusKey);
           if (assetEl instanceof HTMLElement) {
             assetEl.focus({ preventScroll: true });
-            assetEl.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
+            scrollToSectionIfNeeded(assetEl);
           }
           useAssetDetailStore.getState().clearReturnFocusKey();
           clearInterval(interval);
@@ -150,7 +170,7 @@ export function restorePageFocus(preferredKey?: string | null) {
         setFocus(originKey);
         if (originEl instanceof HTMLElement) {
           originEl.focus({ preventScroll: true });
-          originEl.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
+          scrollToSectionIfNeeded(originEl);
         }
         useAssetDetailStore.getState().clearReturnFocusKey();
         clearInterval(interval);
@@ -166,6 +186,7 @@ export function restorePageFocus(preferredKey?: string | null) {
         const leadEl = document.querySelector('[data-focuskey="spotlight-lead-fixed"]');
         if (leadEl instanceof HTMLElement) {
           leadEl.focus({ preventScroll: true });
+          scrollToSectionIfNeeded(leadEl);
         }
         useAssetDetailStore.getState().clearReturnFocusKey();
         clearInterval(interval);
