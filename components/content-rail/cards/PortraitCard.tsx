@@ -1,6 +1,8 @@
 import React, { useCallback } from "react";
 import { BaseContentCard } from "./BaseContentCard";
 import { useTranslations } from "next-intl";
+import { useActivePathname } from "@/hooks/useActivePathname";
+import { ROUTES } from "@/lib/constants/routes";
 
 import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
 import { ContentRailItem, RailCardVariant } from "../config/contentRail.types";
@@ -195,7 +197,9 @@ export const PortraitCard = React.memo(function PortraitCard({
   }
 
   // 3. Handle Top 10 and Standard Portrait sub-variants
-  const isTopTen = config.variant === RailCardVariant.TOP_TEN;
+  const pathname = useActivePathname();
+  const isHomePage = !pathname || pathname === "/" || pathname === "/home" || pathname === ROUTES.HOME || pathname === ROUTES.HOMEPAGE;
+  const isTopTen = isHomePage && config.variant === RailCardVariant.TOP_TEN;
   // Prefer the dedicated ratio_id===4 poster crop; when the asset doesn't
   // have one, fall back to the existing portrait image resolution untouched.
   const imageUrl = item.posterImageRatio4 || item.portraitImage || item.image;

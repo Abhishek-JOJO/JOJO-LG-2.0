@@ -11,6 +11,8 @@ import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.con
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { tvSoundManager } from "@/lib/webos/tvSoundManager";
+import { useActivePathname } from "@/hooks/useActivePathname";
+import { ROUTES } from "@/lib/constants/routes";
 
 interface BaseContentCardProps {
   item: ContentRailItem;
@@ -80,6 +82,8 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   const [isFocusExpanded, setIsFocusExpanded] = useState(false);
   const cardRef = useRef<HTMLAnchorElement>(null);
   const t = useTranslations("contentRails");
+  const pathname = useActivePathname();
+  const isHomePage = !pathname || pathname === "/" || pathname === "/home" || pathname === ROUTES.HOME || pathname === ROUTES.HOMEPAGE;
   const { ref: focusRef, focused, focusKey } = useFocusable({
     focusKey: focusKeyProp,
     focusable,
@@ -328,9 +332,8 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
       )}
 
-      {/* Top 10 rank badge — shows the item's actual rank (1, 2, 3…), not a
-          fixed "10" for every card, matching how real OTT Top 10 rows work. */}
-      {config?.variant !== RailCardVariant?.TOP_TEN && item?.isTop10 && (
+      {/* Top 10 rank badge — shows the item's actual rank (1, 2, 3…), only on the home page */}
+      {isHomePage && config?.variant !== RailCardVariant?.TOP_TEN && item?.isTop10 && (
         <div
           className={`absolute top-0 left-0 z-30 flex font-bold flex-col items-center leading-none text-theme_1 ${isLandscapeCard
             ? "px-4 pt-3 pb-2.5 rounded-br-2xl shadow-xl"

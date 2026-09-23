@@ -3,6 +3,7 @@
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
 import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
 import { ROUTES } from "@/lib/constants/routes";
+import { useActivePathname } from "@/hooks/useActivePathname";
 import { VIDEO_CONSTANTS, isHlsUrl } from "@/lib/constants/video";
 import { cn } from "@/lib/utils";
 import { usePlayerStore } from "@/store/usePlayerStore";
@@ -60,6 +61,8 @@ export function HoverCard({
 }: HoverCardProps) {
   const router = useRouter();
   const tButton = useTranslations("contentRails");
+  const pathname = useActivePathname();
+  const isHomePage = !pathname || pathname === "/" || pathname === "/home" || pathname === ROUTES.HOME || pathname === ROUTES.HOMEPAGE;
   // ── Sizing & Positioning logic ─────────────────────────────────────────────
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPositioned, setIsPositioned] = useState(false);
@@ -760,7 +763,7 @@ export function HoverCard({
             </div>
           ) : (
             <>
-              {(displayDuration || displayYear || displayCertification || item?.isTop10 || assetDetails?.isInTop10 || (item?.asset_tags_badgeText && item.asset_tags_badgeText.toLowerCase().includes("new"))) && (
+              {(displayDuration || displayYear || displayCertification || (isHomePage && (item?.isTop10 || assetDetails?.isInTop10 || item?.numberintop10 || assetDetails?.numberintop10)) || (item?.asset_tags_badgeText && item.asset_tags_badgeText.toLowerCase().includes("new"))) && (
                 <div className="flex flex-col gap-2">
                   <div className="flex flex-wrap items-center gap-1.5 mt-1">
                     {/* here show newly added tag */}
@@ -769,7 +772,7 @@ export function HoverCard({
                         {item.asset_tags_badgeText}
                       </span>
                     )}
-                    {(item?.isTop10 || assetDetails?.isInTop10 || item?.numberintop10 || assetDetails?.numberintop10) && (
+                    {isHomePage && (item?.isTop10 || assetDetails?.isInTop10 || item?.numberintop10 || assetDetails?.numberintop10) && (
                       <span className="px-2 py-0.5 rounded-md bg-theme_9 text-theme_01 font-bold caption-sm-semibold uppercase">
                         {`TOP ${item?.numberintop10 || assetDetails?.numberintop10 || item?.rank || 10}`}
                       </span>

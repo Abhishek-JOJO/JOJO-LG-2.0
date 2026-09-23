@@ -145,6 +145,14 @@ export default function NataksPage() {
   // Check if first rail is a Hero Carousel
   const firstRail = mapApiRail(rails[0], 0);
   const hasHero = firstRail?.type === ContentRailType.HERO_CAROUSEL;
+  if (firstRail?.items) {
+    firstRail.items = firstRail.items.map((item) => ({
+      ...item,
+      isTop10: false,
+      numberintop10: undefined,
+      rank: undefined,
+    }));
+  }
 
   // Rails to be rendered in the grid
   const gridRails = hasHero ? rails.slice(1) : rails;
@@ -159,7 +167,12 @@ export default function NataksPage() {
       rail.items.forEach((item) => {
         if (item.id && !seenIds.has(item.id)) {
           seenIds.add(item.id);
-          items.push(item);
+          items.push({
+            ...item,
+            isTop10: false,
+            numberintop10: undefined,
+            rank: undefined,
+          });
         }
       });
     }

@@ -46,6 +46,8 @@ import { useAppNavigation } from "@/features/navigation/hooks/useAppNavigation";
 import { useDragScroll } from "@/hooks/useDragScroll";
 import { transformTVODToPaymentPlan } from "@/lib/utils/tvodPaymentTransformer";
 import { TvodIcon } from "@/public/svg/TVODIcon";
+import { useActivePathname } from "@/hooks/useActivePathname";
+import { ROUTES } from "@/lib/constants/routes";
 import { useBootstrap } from "@lib/bootstrap/BootstrapContext";
 import { AnimatePresence } from "framer-motion";
 import { analyticsService } from "@/shared/analytics";
@@ -200,6 +202,8 @@ interface AssetDetailViewProps {
 
 export function AssetDetailView({ assetId, onClose, isStandalone = false, initialAsset }: AssetDetailViewProps) {
   const router = useRouter();
+  const pathname = useActivePathname();
+  const isHomePage = !pathname || pathname === "/" || pathname === "/home" || pathname === ROUTES.HOME || pathname === ROUTES.HOMEPAGE;
   const topRef = useRef<HTMLDivElement>(null);
   const t = useTranslations("hoverCard");
   const tButton = useTranslations("contentRails");
@@ -1870,7 +1874,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 {asset.asset_tags_badgeText}
               </span>
             )}
-            {asset.isInTop10 && (
+            {isHomePage && asset.isInTop10 && (
               <span className="px-3 py-1 rounded-md bg-theme_9 text-theme_1 text-xs font-bold uppercase">
                 {t("top", { rank: asset?.numberintop10 || 10 })}
               </span>

@@ -324,6 +324,22 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
           rail.type === ContentRailType.GENRE ||
           rail.title?.toLowerCase()?.trim() === "genre";
         return !(isGenreRail && isHomePage);
+      })
+      .map((rail) => {
+        if (!isHomePage) {
+          const isTop10Rail = rail.type === ContentRailType.TOP_10;
+          return {
+            ...rail,
+            type: isTop10Rail ? ContentRailType.PORTRAIT : rail.type,
+            items: rail.items?.map((item) => ({
+              ...item,
+              isTop10: false,
+              numberintop10: undefined,
+              rank: undefined,
+            })),
+          };
+        }
+        return rail;
       });
 
     const cwRailIndex = rails.findIndex((rail) => rail.type === ContentRailType.CONTINUE_WATCHING);

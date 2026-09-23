@@ -24,6 +24,8 @@ import { extractDominantAmbientColor } from "@/lib/utils/colorExtractor";
 import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 import { preloadImageUrl, preloadRailItems } from "./utils/imagePreloader";
 import { tvSoundManager } from "@/lib/webos/tvSoundManager";
+import { useNavStore } from "@/store/useNavStore";
+import { ROUTES } from "@/lib/constants/routes";
 
 interface ContentRailListProps {
   items: ContentRailItem[];
@@ -77,7 +79,9 @@ function renderSpotlightRailItem(
   const isContinueWatching =
     config.variant === RailCardVariant.CONTINUE_WATCHING ||
     Boolean((config as any)?.showProgress);
-  const isTopTen = config.variant === RailCardVariant.TOP_TEN;
+  const activeTab = typeof window !== "undefined" ? useNavStore.getState().activeBrowseTab : null;
+  const isHomeBrowse = !activeTab || activeTab === "/" || activeTab === "/home" || activeTab === ROUTES.HOME || activeTab === ROUTES.HOMEPAGE;
+  const isTopTen = isHomeBrowse && config.variant === RailCardVariant.TOP_TEN;
 
   if (slotIdx === 0) {
     const slot0Config: RailCardDesignConfig = {
@@ -668,9 +672,12 @@ export function ContentRailList({
     );
   }
 
+  const activeNavTab = typeof window !== "undefined" ? useNavStore.getState().activeBrowseTab : null;
+  const isHomeNav = !activeNavTab || activeNavTab === "/" || activeNavTab === "/home" || activeNavTab === ROUTES.HOME || activeNavTab === ROUTES.HOMEPAGE;
+
   const standardCardConfig: RailCardDesignConfig = {
     ...config,
-    variant: config.variant === RailCardVariant.TOP_TEN ? RailCardVariant.TOP_TEN : RailCardVariant.PORTRAIT,
+    variant: (isHomeNav && config.variant === RailCardVariant.TOP_TEN) ? RailCardVariant.TOP_TEN : RailCardVariant.PORTRAIT,
     width: 325.77 as any,
     height: 490 as any,
     aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,
