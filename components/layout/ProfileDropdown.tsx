@@ -200,20 +200,12 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       }
       if (direction === 'right') return false;
       if (direction === 'down') {
-        if (isDropdownOpen) {
-          setFocus('profile-menu-switch');
-          return false;
+        if (!isDropdownOpen) {
+          isNavigatingUpFromMenuRef.current = false;
+          openDropdown();
         }
-        if (document.getElementById('hero-carousel-container')) {
-          setFocus('hero-carousel');
-          return false;
-        }
-        const entry = document.getElementById('page-focus-entry');
-        const entryFocusKey = entry?.getAttribute('data-focuskey');
-        if (entryFocusKey) {
-          setFocus(entryFocusKey);
-          return false;
-        }
+        retrySetFocus('profile-menu-switch');
+        return false;
       }
       return true;
     },
@@ -243,7 +235,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
           ref={focusableRef as any}
           onClick={toggleDropdown}
           className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full ${
-            focused ? "scale-110" : "hover:scale-105"
+            focused ? "scale-110 ring-2 ring-white" : "hover:scale-105"
           }`}
           aria-label="Profile Menu"
         >
@@ -318,11 +310,48 @@ function ProfileDropdownMenu({
 
         <ProfileMenuSwitchItem onSwitch={onSwitchProfile} onArrowUp={onArrowUp} t={t} />
 
-        <ProfileMenuAction onEnter={onAccountSettings}>
+        <ProfileMenuAction
+          focusKey="profile-menu-account"
+          onEnter={onAccountSettings}
+          onArrowPress={(direction) => {
+            if (direction === 'up') {
+              setFocus('profile-menu-switch');
+              return false;
+            }
+            if (direction === 'down') {
+              setFocus('profile-menu-exit');
+              return false;
+            }
+            if (direction === 'left') {
+              onArrowUp?.();
+              return false;
+            }
+            if (direction === 'right') return false;
+            return true;
+          }}
+        >
           {t("account_settings")}
         </ProfileMenuAction>
 
-        <ProfileMenuAction onEnter={onExit}>
+        <ProfileMenuAction
+          focusKey="profile-menu-exit"
+          onEnter={onExit}
+          onArrowPress={(direction) => {
+            if (direction === 'up') {
+              setFocus('profile-menu-account');
+              return false;
+            }
+            if (direction === 'down') {
+              return false;
+            }
+            if (direction === 'left') {
+              onArrowUp?.();
+              return false;
+            }
+            if (direction === 'right') return false;
+            return true;
+          }}
+        >
           {t("exit") || "Exit"}
         </ProfileMenuAction>
       </div>
@@ -346,6 +375,15 @@ function ProfileMenuSwitchItem({
         onArrowUp?.();
         return false;
       }
+      if (direction === 'down') {
+        setFocus('profile-menu-account');
+        return false;
+      }
+      if (direction === 'left') {
+        onArrowUp?.();
+        return false;
+      }
+      if (direction === 'right') return false;
       return true;
     },
     onEnterPress: onSwitch,
@@ -357,11 +395,11 @@ function ProfileMenuSwitchItem({
       ref={ref as any}
       onClick={onSwitch}
       className={cn(
-        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular",
+        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular border-2 border-transparent",
         "text-theme_5",
         "hover:bg-theme_11_samecolour hover:text-theme_13_samecolour",
         "transition-all duration-200 cursor-pointer",
-        focused ? "bg-theme_11_samecolour text-theme_13_samecolour" : ""
+        focused ? "bg-theme_11_samecolour border-white text-theme_13_samecolour font-bold" : ""
       )}
     >
       {t("switch_profile") || "Switch Profile"}
@@ -369,21 +407,34 @@ function ProfileMenuSwitchItem({
   );
 }
 
-function ProfileMenuAction({ onEnter, children }: { onEnter: () => void; children: React.ReactNode }) {
+function ProfileMenuAction({
+  focusKey,
+  onEnter,
+  onArrowPress,
+  children,
+}: {
+  focusKey: string;
+  onEnter: () => void;
+  onArrowPress?: (direction: string) => boolean;
+  children: React.ReactNode;
+}) {
   const { ref, focused } = useFocusable({
+    focusKey,
+    onArrowPress,
     onEnterPress: onEnter,
   });
 
   return (
     <div
+      id={focusKey}
       ref={ref as any}
       onClick={onEnter}
       className={cn(
-        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular",
+        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular border-2 border-transparent",
         "text-theme_5",
         "hover:bg-theme_11_samecolour hover:text-theme_13_samecolour",
         "transition-all duration-200 cursor-pointer",
-        focused ? "bg-theme_11_samecolour text-theme_13_samecolour" : ""
+        focused ? "bg-theme_11_samecolour border-white text-theme_13_samecolour font-bold" : ""
       )}
     >
       {children}
