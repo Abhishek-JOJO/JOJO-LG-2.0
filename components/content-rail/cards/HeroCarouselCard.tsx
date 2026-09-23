@@ -32,6 +32,7 @@ interface Props {
   config: RailCardDesignConfig;
   index: number;
   isActive: boolean;
+  isFocused?: boolean;
   onClick?: () => void;
   onHoverChange?: (isHovered: boolean) => void;
   onVideoPlayChange?: (isPlaying: boolean) => void;
@@ -63,7 +64,7 @@ interface Props {
 // the static poster crossfade (unaffected, glitch-free) carries the feature.
 const ENABLE_HERO_BACKGROUND_VIDEO = true;
 
-export function HeroCarouselCard({ item, config, index, isActive, onClick, onHoverChange, onVideoPlayChange, batchPricing }: Props) {
+export function HeroCarouselCard({ item, config, index, isActive, isFocused = false, onClick, onHoverChange, onVideoPlayChange, batchPricing }: Props) {
   const t = useTranslations("contentRails");
   const heroImageUrl = item?.heroImage || item?.landscapeImage || item?.posterImage || item?.image;
   const hasImage = !!heroImageUrl;
@@ -261,47 +262,52 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
     };
   }, []);
 
-  const shouldPlay = ENABLE_HERO_BACKGROUND_VIDEO && heavyActive && isSlideSettled && isIntersecting && !isAnyCardHovered && !isSearchOpen && !isAssetDetailOpen && !isSessionExpiredVisible;
+  const shouldPlay = ENABLE_HERO_BACKGROUND_VIDEO && isFocused && heavyActive && isSlideSettled && isIntersecting && !isAnyCardHovered && !isSearchOpen && !isAssetDetailOpen && !isSessionExpiredVisible;
+  const showVideo = Boolean(shouldPlay && isVideoLoaded);
 
-  // Unmute hero carousel by default when mounting
+  // Unmute hero carousel by default when mounting and focused
   useEffect(() => {
-    if (heavyActive) setMuted(false);
-  }, [heavyActive, setMuted]);
+    if (heavyActive && isFocused) setMuted(false);
+  }, [heavyActive, isFocused, setMuted]);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (shouldPlay) {
-      // Sync the muted property on the DOM element
-      video.muted = isMuted;
-
-      // If slide just became active, reset time and loading state
-      if (!wasActiveRef.current) {
-        video.currentTime = 0;
-        clearRevealTimeout();
-        setIsVideoLoaded(false);
-      }
-      wasActiveRef.current = true;
-
-      // Play the video
-      video.play().catch(() => {
-        // Fallback to DOM muted playback if autoplay unmuted is blocked by browser
-        if (!isMuted) {
-          video.muted = true;
-          setMuted(true);
-          video.play().catch(() => { });
-        }
-      });
-    } else {
+    if (!shouldPlay) {
       clearRevealTimeout();
       setIsVideoLoaded(false);
-      video.muted = true;
-      video.pause();
+      const video = videoRef.current;
+      if (video) {
+        video.muted = true;
+        video.pause();
+      }
       if (!isActive) {
         wasActiveRef.current = false;
       }
+      return;
     }
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Sync the muted property on the DOM element
+    video.muted = isMuted;
+
+    // If slide just became active, reset time and loading state
+    if (!wasActiveRef.current) {
+      video.currentTime = 0;
+      clearRevealTimeout();
+      setIsVideoLoaded(false);
+    }
+    wasActiveRef.current = true;
+
+    // Play the video
+    video.play().catch(() => {
+      // Fallback to DOM muted playback if autoplay unmuted is blocked by browser
+      if (!isMuted) {
+        video.muted = true;
+        setMuted(true);
+        video.play().catch(() => { });
+      }
+    });
 
     return () => {
       clearRevealTimeout();
@@ -309,7 +315,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
   }, [shouldPlay, isMuted, heroPreviewUrl, setMuted, isActive]);
 
   useEffect(() => {
-    if (isActive && isVideoLoaded) {
+    if (isActive && showVideo) {
       onVideoPlayChange?.(true);
     } else {
       onVideoPlayChange?.(false);
@@ -317,7 +323,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
     return () => {
       onVideoPlayChange?.(false);
     };
-  }, [isActive, isVideoLoaded, onVideoPlayChange]);
+  }, [isActive, showVideo, onVideoPlayChange]);
 
   const handleShare = async () => {
     if (typeof window !== "undefined") {
@@ -369,11 +375,11 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
         {/* Background preview video — right-aligned, 80% visible, never cropped at any breakpoint */}
         {ENABLE_HERO_BACKGROUND_VIDEO && heroPreviewUrl && (
           <div
-            className={`absolute inset-0 w-full h-full z-0 transition-none ${isVideoLoaded ? "translate-x-0" : "translate-x-[200%]"}`}
+            className={`absolute inset-0 w-full h-full z-0 transition-none ${showVideo ? "translate-x-0" : "translate-x-[200%]"}`}
           >
             <JOJOCommonVideo
               ref={videoRef}
-              src={heavyActive && isSlideSettled ? heroPreviewUrl : undefined}
+              src={heavyActive && isSlideSettled && isFocused ? heroPreviewUrl : undefined}
               // `poster` is the video element's own content before playback
               // begins — standard image rendering, not decoder output — so it's
               // always correct even during the window the wrapper above has it
@@ -390,8 +396,8 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
               // while MediaSource is available, which it always is here.
               preferNativeHls
               preferConservativeQuality
-              autoPlay={heavyActive && isIntersecting && !isAnyCardHovered && !isAssetDetailOpen && !isSessionExpiredVisible}
-              muted={!(heavyActive && isIntersecting && !isAnyCardHovered && !isAssetDetailOpen && !isSessionExpiredVisible) || isMuted}
+              autoPlay={shouldPlay}
+              muted={!shouldPlay || isMuted}
               loop
               playsInline
               // onPlaying only means "not paused" — it fires whether or not any
@@ -423,7 +429,7 @@ export function HeroCarouselCard({ item, config, index, isActive, onClick, onHov
         {/* Background poster image — bg-neutral-900 behind it always, so the browser's
             default white canvas never flashes through while the image is still
             downloading (it also swallows the focus border's contrast otherwise). */}
-        <div className={`absolute inset-0 w-full h-full z-0 bg-neutral-900 transition-opacity duration-1000 ${isVideoLoaded ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+        <div className={`absolute inset-0 w-full h-full z-0 bg-neutral-900 transition-opacity ${showVideo ? "duration-500 opacity-0 pointer-events-none" : "duration-0 opacity-100"}`}>
           {hasImage ? (
             <JOJOCommonImage
               src={heroImageUrl}

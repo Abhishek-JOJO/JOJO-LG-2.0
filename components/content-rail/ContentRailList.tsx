@@ -360,6 +360,7 @@ export function ContentRailList({
 
   const [isAutoplayPaused, setIsAutoplayPaused] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isHeroHovered, setIsHeroHovered] = useState(false);
   // See onFocus/onBlur on the hero's useFocusable below — debounces the
   // scroll-to-top so a transient/spurious refocus during fast D-pad
   // scrolling can't snap the page back to the hero.
@@ -528,12 +529,16 @@ export function ContentRailList({
   if (isHeroVariant) {
     if (!items?.length) return null;
 
+    const isHeroActiveFocus = Boolean(focused || isHeroHovered);
+
     return (
       <div
         id="hero-carousel-container"
         ref={focusKeyRef}
         data-focuskey={focusKey}
         tabIndex={0}
+        onMouseEnter={() => setIsHeroHovered(true)}
+        onMouseLeave={() => setIsHeroHovered(false)}
         className={`relative overflow-hidden w-[calc(100%-2rem)] sm:w-[calc(100%-4rem)] lg:w-[calc(100%-5rem)] mx-auto select-none h-[78vh] mt-2 sm:mt-3 rounded-[32px] bg-neutral-950 transition-all duration-300 ${focused ? "z-[99]" : ""}`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
@@ -562,6 +567,7 @@ export function ContentRailList({
                   item={item}
                   index={index}
                   isActive={isActive}
+                  isFocused={isHeroActiveFocus}
                   config={config}
                   onClick={() => onItemClick?.(item)}
                   onHoverChange={setIsAutoplayPaused}
