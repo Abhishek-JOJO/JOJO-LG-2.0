@@ -2416,18 +2416,14 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
     <div
       ref={ref as any}
       onClick={onWatch}
-      className={`group flex flex-col sm:flex-row items-center gap-4 sm:gap-6 p-2.5 sm:p-3.5 rounded-2xl cursor-pointer transition-all duration-200 outline-none select-none ${
-        focused
-          ? "bg-white/10 shadow-xl ring-1 ring-white/20"
-          : "hover:bg-white/5"
-      }`}
+      className="group flex flex-col sm:flex-row items-center gap-4 sm:gap-6 p-2.5 sm:p-3.5 rounded-2xl cursor-pointer outline-none select-none hover:bg-white/5 transition-colors duration-150"
     >
-      {/* Thumbnail Container: Only this gets the TV focus ring, scale & glow */}
+      {/* Thumbnail: focus ring + orange border lives ONLY here */}
       <div
-        className={`relative w-full sm:w-[260px] lg:w-[320px] aspect-video rounded-xl overflow-hidden shrink-0 bg-neutral-900 transition-all duration-200 ${
+        className={`relative w-full sm:w-[260px] lg:w-[320px] aspect-video rounded-xl overflow-hidden shrink-0 bg-neutral-900 transition-all duration-150 ${
           focused
-            ? "border-2 border-white ring-4 ring-white/50 shadow-2xl scale-105 z-10"
-            : "border-2 border-transparent group-hover:border-white/30"
+            ? "border-[3px] border-theme_13_samecolour scale-[1.04] z-10"
+            : "border-2 border-transparent group-hover:border-white/25"
         }`}
       >
         {epPosterUrl ? (
@@ -2435,19 +2431,20 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
             src={epPosterUrl}
             alt={ep.title}
             fill
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            className="object-cover"
             wrapperClassName="w-full h-full"
           />
         ) : (
           <div className="w-full h-full bg-neutral-800" />
         )}
+        {/* Play overlay — only visible when thumbnail is focused */}
         <div
-          className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-200 ${
+          className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-150 ${
             focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           }`}
         >
           <div
-            className={`w-12 h-12 rounded-full bg-theme_13_samecolour text-white flex items-center justify-center shadow-xl transition-transform duration-200 ${
+            className={`w-12 h-12 rounded-full bg-theme_13_samecolour text-white flex items-center justify-center shadow-xl transition-transform duration-150 ${
               focused ? "scale-110" : ""
             }`}
           >
@@ -2456,17 +2453,17 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
         </div>
       </div>
 
-      {/* Episode Details */}
+      {/* Episode Details — no focus highlight, stays neutral */}
       <div className="flex flex-col flex-1 justify-center min-w-0">
         <h4
-          className={`text-base sm:text-lg lg:text-xl font-bold transition-colors line-clamp-1 mb-1 ${
+          className={`text-base sm:text-lg lg:text-xl font-bold line-clamp-1 mb-1 transition-colors duration-150 ${
             focused ? "text-theme_13_samecolour" : "text-white group-hover:text-theme_13_samecolour"
           }`}
         >
           {ep.title}
         </h4>
         <div className="text-xs sm:text-sm font-semibold text-neutral-400 mb-2 flex items-center gap-2">
-          <span className={focused ? "text-white/90" : "text-neutral-400"}>S{selectedSeasonIndex + 1} EP{ep.episodeNumber || index + 1}</span>
+          <span>S{selectedSeasonIndex + 1} EP{ep.episodeNumber || index + 1}</span>
           {durationText && (
             <>
               <span>•</span>
@@ -2474,7 +2471,7 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
             </>
           )}
         </div>
-        <p className={`text-xs sm:text-sm leading-relaxed line-clamp-2 sm:line-clamp-3 ${focused ? "text-neutral-300" : "text-neutral-400"}`}>
+        <p className="text-xs sm:text-sm leading-relaxed line-clamp-2 sm:line-clamp-3 text-neutral-400">
           {stripHtml(ep.description) || t("no_description_episode")}
         </p>
       </div>
