@@ -89,7 +89,7 @@ function FocusablePlanCard({ onClick, children, isSelected, isMultiMonth, has3Or
                 ${has3OrMorePlans ? "flex flex-row items-center justify-between p-4 sm:p-5" : "flex-1 flex flex-col items-start gap-1 p-4 sm:p-4"}
                 ${cardRoundingClass}
                 ${cardStyleClass}
-                ${focused ? "border-white scale-[1.03]" : "border-transparent"}
+                ${focused ? "scale-[1.03]" : ""}
             `}
             style={{
                 background: isSelected && !isMultiMonth
@@ -149,28 +149,8 @@ function getQrPlanTitle(product: any) {
     return product.label || product.name || "JOJO Gold";
 }
 
-function PlanFeatureIcon({ src, alt, isSelected }: { src?: string; alt?: string; isSelected: boolean }) {
-    if (isSelected && src) {
-        const maskUrl = `url("${String(src).replace(/"/g, '\\"')}")`;
-        return (
-            <div
-                role="img"
-                aria-label={alt || undefined}
-                className="h-9 w-9 bg-black"
-                style={{
-                    WebkitMaskImage: maskUrl,
-                    WebkitMaskRepeat: "no-repeat",
-                    WebkitMaskPosition: "center",
-                    WebkitMaskSize: "contain",
-                    maskImage: maskUrl,
-                    maskRepeat: "no-repeat",
-                    maskPosition: "center",
-                    maskSize: "contain",
-                }}
-            />
-        );
-    }
-
+function PlanFeatureIcon({ src, alt }: { src?: string; alt?: string }) {
+    if (!src) return null;
     return (
         <div className="relative h-9 w-9">
             <JOJOCommonImage
@@ -184,10 +164,72 @@ function PlanFeatureIcon({ src, alt, isSelected }: { src?: string; alt?: string;
     );
 }
 
+function FocusableQrPlanCard({
+    product,
+    isSelected,
+    onSelect,
+    focusKey,
+    index,
+}: {
+    product: any;
+    isSelected: boolean;
+    onSelect: () => void;
+    focusKey: string;
+    index: number;
+}) {
+    const handleArrowPress = (direction: string) => {
+        if (direction === "up" && index === 0) {
+            setFocus("navbar-get-gold");
+            return false;
+        }
+        return true;
+    };
+
+    const { ref, focused } = useFocusable({
+        focusKey,
+        focusable: true,
+        onArrowPress: handleArrowPress,
+        onEnterPress: onSelect,
+    });
+
+    const sku = product?.skus?.[0];
+    if (!sku) return null;
+    const title = getQrPlanTitle(product);
+    const featureLimit = product.validityCount === 1 ? 3 : 4;
+
+    return (
+        <button
+            ref={ref as any}
+            onClick={onSelect}
+            className={`w-full rounded-2xl border border-white/25 px-7 py-6 text-left transition-all outline-none bg-black/28 text-white backdrop-blur-md ${focused ? "scale-[1.02]" : ""}`}
+        >
+            <div className="mb-7 flex items-center justify-between gap-4">
+                <span className="text-2xl font-extrabold">{title}</span>
+                <span className="text-2xl font-extrabold">
+                    {sku.currencySymbol}{formatPrice(sku.price)} / month
+                </span>
+            </div>
+
+            <div className={`grid gap-4 ${featureLimit >= 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+                {product.features?.slice(0, featureLimit).map((feature: any, idx: number) => (
+                    <div key={feature.featureId || idx} className="flex min-w-0 flex-col items-center gap-2 text-center">
+                        <PlanFeatureIcon src={feature.featureImageUrl} alt={feature.featureName} />
+                        <span className="text-sm font-bold leading-tight text-white/90">{String(feature.featureName || "").replace("Upto", "Upto ")}</span>
+                    </div>
+                ))}
+            </div>
+        </button>
+    );
+}
+
 function SubscriptionQrPage({ products, selectedProduct, onSelectProduct }: { products: any[]; selectedProduct: any; onSelectProduct: (productId: string) => void }) {
     const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
     const selectedSku = selectedProduct?.skus?.[0];
     const selectedPlanTitle = getQrPlanTitle(selectedProduct);
+
+    useEffect(() => {
+        retrySetFocus("qr-plan-0");
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -231,44 +273,16 @@ function SubscriptionQrPage({ products, selectedProduct, onSelectProduct }: { pr
                     <p className="mb-6 text-center text-2xl font-bold text-white">Premium Deals, Unlimited Entertainment!</p>
 
                     <div className="flex w-full max-w-[560px] flex-col gap-5">
-                        {products.map((product) => {
-                            const sku = product?.skus?.[0];
-                            if (!sku) return null;
-                            const isSelected = product.productId === selectedProduct?.productId;
-                            const title = getQrPlanTitle(product);
-                            const featureLimit = product.validityCount === 1 ? 3 : 4;
-
-                            return (
-                                <button
-                                    key={product.productId}
-                                    onClick={() => onSelectProduct(product.productId)}
-                                    className={`w-full rounded-2xl border px-7 py-6 text-left transition-all ${
-                                        isSelected
-                                            ? "border-[#FAAF3F] bg-gradient-to-r from-[#FAAF3F] via-[#FFD691] to-[#FAAF3F] text-black [&_*]:text-black"
-                                            : "border-white/25 bg-black/28 text-white backdrop-blur-md"
-                                    }`}
-                                >
-                                    <div className="mb-7 flex items-center justify-between gap-4">
-                                        <div className="flex items-center gap-3">
-                                            {isSelected && <span className="h-3 w-3 rounded-full bg-black" />}
-                                            <span className="text-2xl font-extrabold">{title}</span>
-                                        </div>
-                                        <span className="text-2xl font-extrabold">
-                                            {sku.currencySymbol}{formatPrice(sku.price)} / month
-                                        </span>
-                                    </div>
-
-                                    <div className={`grid gap-4 ${featureLimit >= 4 ? "grid-cols-4" : "grid-cols-3"}`}>
-                                        {product.features?.slice(0, featureLimit).map((feature: any, idx: number) => (
-                                            <div key={feature.featureId || idx} className="flex min-w-0 flex-col items-center gap-2 text-center">
-                                                <PlanFeatureIcon src={feature.featureImageUrl} alt={feature.featureName} isSelected={isSelected} />
-                                                <span className="text-sm font-bold leading-tight">{String(feature.featureName || "").replace("Upto", "Upto ")}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </button>
-                            );
-                        })}
+                        {products.map((product, index) => (
+                            <FocusableQrPlanCard
+                                key={product.productId}
+                                product={product}
+                                isSelected={product.productId === selectedProduct?.productId}
+                                onSelect={() => onSelectProduct(product.productId)}
+                                focusKey={`qr-plan-${index}`}
+                                index={index}
+                            />
+                        ))}
                     </div>
                 </div>
 
@@ -289,7 +303,7 @@ function SubscriptionQrPage({ products, selectedProduct, onSelectProduct }: { pr
                     </div>
 
                     <p className="max-w-[620px] text-center text-3xl font-extrabold leading-tight text-white">
-                        Scan the QR code to continue with the {selectedPlanTitle} plan.
+                        Continue with JOJO Gold Plan
                     </p>
                     <p className="mt-5 max-w-[650px] text-center text-base font-semibold leading-snug text-white/82">
                         Use the QR code to open the JOJO app and finish your purchase with the same account as your TV. Restart the app to start watching.
