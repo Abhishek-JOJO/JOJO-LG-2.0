@@ -6,6 +6,6 @@ export const metadata: Metadata = {
   description: "Select your profile to start watching JOJO.",
 };
 
-export default async function WatchingPage() {
+export default function WatchingPage() {
     return <WatchingClient />;
 }

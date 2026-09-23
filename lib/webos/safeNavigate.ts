@@ -28,6 +28,9 @@ const APP_ROOT_HREF_KEY = "__jojo_app_root_href__";
 
 function getAppRootHref(): string {
   if (typeof window === "undefined") return "";
+  if ((window as any).__WEBOS_APP_BASE__) {
+    return (window as any).__WEBOS_APP_BASE__;
+  }
   try {
     const stored = sessionStorage.getItem(APP_ROOT_HREF_KEY);
     if (stored) return stored;

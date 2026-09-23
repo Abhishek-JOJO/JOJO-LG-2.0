@@ -527,14 +527,13 @@ export function AppProvider({ children }: AppProviderProps) {
     // HAS SELECTED PROFILE
     logger.info('[AppProvider] ✅ Has selected profile', { name: selectedProfile.profile_name });
 
-    // Redirect after auth — only from /login or /watching.
+    // Redirect after auth — only from /login.
     // /register, /register/otp, /landing are handled by the auth-only guard above.
     const isLoginRoute =
       normalizedPath === ROUTES.LOGIN ||
       (normalizedPath.startsWith(`${ROUTES.LOGIN}/`) && normalizedPath !== ROUTES.LOGIN_OTP);
-    const isWatchingRoute = normalizedPath === ROUTES.WATCHING;
 
-    if (isLoginRoute || isWatchingRoute) {
+    if (isLoginRoute) {
       let destination = shouldRedirectAuthenticatedUsersToHome(isMobile)
         ? ROUTES.HOME
         : getProfileSelectionRoute(isMobile);

@@ -21,6 +21,7 @@ import { StorageKey } from "@/enums/storage.enum";
 import { useToastStore } from "@/store/useToastStore";
 import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
 import { ROUTES } from "@/lib/constants/routes";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
 import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { useOverseasDetection } from "@/features/geo/hooks/useOverseasDetection";
 import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
@@ -48,9 +49,22 @@ function retrySetFocus(focusKey: string, attempts = 8, intervalMs = 100) {
 }
 
 function FocusablePlanCard({ onClick, children, isSelected, isMultiMonth, has3OrMorePlans, badge, cardStyleClass, cardRoundingClass, product, focusKey }: any) {
+    const handleArrowPress = (direction: string) => {
+        if (direction === "down") {
+            setFocus("subscription-proceed-btn");
+            return false;
+        }
+        if (direction === "up") {
+            setFocus("navbar-get-gold");
+            return false;
+        }
+        return true;
+    };
+
     const { ref, focused } = useFocusable({
         focusKey,
         focusable: true,
+        onArrowPress: handleArrowPress,
         onEnterPress: onClick
     });
 
@@ -60,11 +74,6 @@ function FocusablePlanCard({ onClick, children, isSelected, isMultiMonth, has3Or
             id={`plan-${product?.productId}`}
             data-focuskey={focusKey}
             onClick={onClick}
-            // A ring/box-shadow-based focus indicator gets clipped by this page's
-            // overflow-hidden ancestor the same way it did on the asset-detail
-            // tabs — a real border is part of the element's own box model and
-            // can never be clipped by an ancestor's overflow. border-transparent
-            // by default reserves the same space so focusing never shifts layout.
             className={`z-1
                 relative w-full cursor-pointer text-left border-2
                 ${has3OrMorePlans ? "flex flex-row items-center justify-between p-4 sm:p-5" : "flex-1 flex flex-col items-start gap-1 p-4 sm:p-4"}
@@ -87,10 +96,19 @@ function FocusablePlanCard({ onClick, children, isSelected, isMultiMonth, has3Or
     );
 }
 
-function FocusableProceedButton({ onClick, children, className, style, focusKey, ...props }: any) {
+function FocusableProceedButton({ onClick, children, className, style, focusKey, upKey, ...props }: any) {
+    const handleArrowPress = (direction: string) => {
+        if (direction === "up" && upKey) {
+            setFocus(upKey);
+            return false;
+        }
+        return true;
+    };
+
     const { ref, focused } = useFocusable({
         focusKey,
         focusable: true,
+        onArrowPress: handleArrowPress,
         onEnterPress: onClick
     });
 
@@ -194,9 +212,9 @@ export default function SubscriptionPage() {
         const handleAlreadyGoldClose = () => {
             if (returnWatchAssetId) {
                 sessionStorage.removeItem("return_watch_asset_id");
-                router.replace(ROUTES.WATCH(returnWatchAssetId));
+                safeNavigate(router, ROUTES.WATCH(returnWatchAssetId), { replace: true });
             } else {
-                router.replace(ROUTES.HOME);
+                safeNavigate(router, ROUTES.HOME, { replace: true });
             }
         };
 
@@ -247,7 +265,11 @@ export default function SubscriptionPage() {
 
     return (
         <div className="relative min-h-screen overflow-hidden bg-theme_12 flex flex-col justify-between">
-            <div className="relative z-10 flex-1 flex flex-col items-center justify-center pt-32 sm:pt-36 lg:pt-40 px-4 sm:px-6 lg:px-8 py-8 md:py-12 lg:py-16">
+            <div
+                id="page-focus-entry"
+                data-focuskey={selectedProduct ? `plan-card-${selectedProduct.productId}` : "subscription-proceed-btn"}
+                className="relative z-10 flex-1 flex flex-col items-center justify-center pt-32 sm:pt-36 lg:pt-40 px-4 sm:px-6 lg:px-8 py-8 md:py-12 lg:py-16"
+            >
                 <div className="flex flex-col lg:flex-row items-center justify-center gap-12 xl:gap-20 w-full max-w-full mx-auto">
                     <div className="hidden lg:flex relative w-full max-w-[480px] xl:max-w-[740px] aspect-[4/3] h-[35rem] rounded-3xl overflow-hidden bg-theme_12 border border-theme_1/5 items-center justify-center flex-shrink-0 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
                         {plansData?.headerMediaUrl ? (
@@ -468,6 +490,7 @@ export default function SubscriptionPage() {
                         <FocusableProceedButton
                             id="subscription-proceed-btn"
                             focusKey="subscription-proceed-btn"
+                            upKey={selectedProduct ? `plan-card-${selectedProduct.productId}` : undefined}
                             onClick={() => {
                                 try {
                                     if (selectedProduct) {
@@ -478,7 +501,7 @@ export default function SubscriptionPage() {
 
                                         // Save selected plan in sessionStorage and redirect to checkout
                                         sessionStorage.setItem("selected_payment_plan", JSON.stringify(selectedProduct));
-                                        router.push(ROUTES.PAYMENT);
+                                        safeNavigate(router, ROUTES.PAYMENT);
                                     }
                                 } catch (e) { }
                             }}

@@ -60,7 +60,7 @@ export function Providers({ children, locale: serverLocale = "en", isMobileServe
 
   return (
     <ReactQueryProvider>
-      <NextIntlClientProvider key={currentLocale} locale={currentLocale} messages={currentMessages} timeZone={TIME_ZONE}>
+      <NextIntlClientProvider locale={currentLocale} messages={currentMessages} timeZone={TIME_ZONE}>
 
         <BootstrapProvider>
           <AnalyticsProvider>

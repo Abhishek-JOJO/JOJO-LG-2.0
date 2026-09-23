@@ -121,11 +121,14 @@ export function useVerifyOtp() {
     },
     onSuccess: (data) => {
       // Update auth store with session_id as token
+      const id = data.user_id ?? (data.user && data.user.id) ?? '';
+      const phone = data.phone ?? (data.user && data.user.phone) ?? '';
+      const email = data.email ?? (data.user && data.user.email) ?? '';
       setAuth(
         {
-          id: data.user_id,
-          phone: data.phone,
-          email: data.email,
+          id,
+          phone,
+          email,
           isGuest: false,
           createdAt: new Date().toISOString(),
         },

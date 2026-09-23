@@ -135,7 +135,12 @@ export const FocusableNavLink = React.memo(({
           }
         }
 
-        if (!isItemActive) {
+        // Only auto-switch tabs on focus if the user is already on a browse route.
+        // On subpages like /subscription, /account-settings, /watchlist, etc., focusing
+        // a nav link must not trigger auto-navigation; navigation requires Enter or click.
+        const normCurrent = typeof window !== "undefined" ? normalizePathname(window.location.pathname) : "";
+        const isCurrentBrowse = BROWSE_ROUTES.includes(normCurrent);
+        if (!isItemActive && isCurrentBrowse) {
           navigateTab();
         }
       });

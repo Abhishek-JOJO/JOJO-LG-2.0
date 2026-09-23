@@ -104,6 +104,12 @@ function LogoutModalButtons({
 
   const { ref: logoutBtnRef, focused: logoutFocused } = useFocusable({
     focusKey: "logout-modal-confirm-btn",
+    onArrowPress: (direction) => {
+      if (direction === "right") {
+        setFocus("logout-modal-cancel-btn");
+      }
+      return false;
+    },
     onEnterPress: () => {
       if (!isLoggingOut) onLogout();
     },
@@ -111,6 +117,12 @@ function LogoutModalButtons({
 
   const { ref: cancelBtnRef, focused: cancelFocused } = useFocusable({
     focusKey: "logout-modal-cancel-btn",
+    onArrowPress: (direction) => {
+      if (direction === "left") {
+        setFocus("logout-modal-confirm-btn");
+      }
+      return false;
+    },
     onEnterPress: () => {
       if (!isLoggingOut) onCancel();
     },
@@ -126,7 +138,7 @@ function LogoutModalButtons({
         disabled={isLoggingOut}
         className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${
           logoutFocused
-            ? "bg-red-600 text-white scale-105 shadow-xl ring-4 ring-white z-50"
+            ? "bg-theme_13_samecolour text-white scale-105 shadow-xl ring-4 ring-white z-50"
             : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
         }`}
       >

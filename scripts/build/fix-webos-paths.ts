@@ -365,14 +365,24 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
         modified = true;
       }
 
-      // Fix Turbopack chunk key resolution on file:// protocol URLs (matching D(q(n)).resolve() key with M() loader key)
+      // Fix Turbopack chunk key resolution on file:// protocol URLs (matching D(N(n)).resolve() key with M() loader key)
       if (content.includes('r.startsWith(t)?r.slice(t.length):r')) {
-        const oldCode = `let n=function(e){if("string"==typeof e)return e;let r=decodeURIComponent(e.src.replace(/[?#].*$/,""));return r.startsWith(t)?r.slice(t.length):r}(e);if(D("string"==typeof e?q(e):e.src).resolve()`;
-        const newCode = `let n=function(e){if("string"==typeof e)return e;let r=decodeURIComponent(e.src.replace(/[?#].*$/,""));let i=r.indexOf("_next/");return i!==-1?r.slice(i+6):r.startsWith(t)?r.slice(t.length):r}(e);if(D(q(n)).resolve(),("object"==typeof e&&e&&e.src&&D(e.src).resolve())`;
-        if (content.includes(oldCode)) {
-          content = content.replace(oldCode, newCode);
+        const regex = /let n=function\(e\)\{[\s\S]*?r\.startsWith\(t\)\?r\.slice\(t\.length\):r\}\(e\);if\(D\("string"==typeof e\?([a-zA-Z0-9_$]+)\(e\):e\.src\)\.resolve\(\)/;
+        const match = content.match(regex);
+        if (match) {
+          const fnName = match[1];
+          const newCode = `let n=function(e){if("string"==typeof e)return e;let r=decodeURIComponent((e&&e.src?e.src:"").replace(/[?#].*$/,""));let i=r.indexOf("_next/");return i!==-1?r.slice(i+6):r.startsWith(t)?r.slice(t.length):r}(e);if(D(${fnName}(n)).resolve(),D(n).resolve(),("object"==typeof e&&e&&e.src&&D(e.src).resolve()),("string"==typeof e&&D(e).resolve()),(()=>{try{if(e&&e.src){let u=new URL(e.src,document.baseURI||location.href).href;D(u).resolve()}}catch(_){}})()`;
+          content = content.replace(match[0], newCode);
           modified = true;
         }
+      }
+
+      if (content.includes('throw Error("chunk path empty but not in a worker")')) {
+        content = content.replace(
+          'throw Error("chunk path empty but not in a worker")',
+          'return{src:""}'
+        );
+        modified = true;
       }
 
       // Ensure loadChunkCached normalizes absolute /_next/ chunk paths to local file:// URL
@@ -384,11 +394,11 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
         modified = true;
       }
 
-      // Ensure R.L normalizes chunk paths passed to M
-      if (content.includes('R.L=function(e){return M(i.Parent,this.m.id,e)}')) {
+      // Ensure R.L / S.L normalizes chunk paths passed to M
+      if (content.includes('.L=function(e){return M(i.Parent,this.m.id,e)}')) {
         content = content.replace(
-          'R.L=function(e){return M(i.Parent,this.m.id,e)}',
-          'R.L=function(e){let normE=(typeof e=="string"&&e.startsWith("/")&&typeof window!=="undefined"&&window.__WEBOS_APP_BASE__)?(window.__WEBOS_APP_BASE__+e.slice(1)):(typeof e=="string"&&e.startsWith("/")&&typeof document!=="undefined"&&(document.baseURI||location.href))?new URL("."+e,document.baseURI||location.href).href:e;return M(i.Parent,this.m.id,normE)}'
+          /([a-zA-Z0-9_$]+)\.L=function\(e\)\{return M\(i\.Parent,this\.m\.id,e\)\}/g,
+          '$1.L=function(e){let normE=(typeof e=="string"&&e.startsWith("/")&&typeof window!=="undefined"&&window.__WEBOS_APP_BASE__)?(window.__WEBOS_APP_BASE__+e.slice(1)):(typeof e=="string"&&e.startsWith("/")&&typeof document!=="undefined"&&(document.baseURI||location.href))?new URL("."+e,document.baseURI||location.href).href:e;return M(i.Parent,this.m.id,normE)}'
         );
         modified = true;
       }

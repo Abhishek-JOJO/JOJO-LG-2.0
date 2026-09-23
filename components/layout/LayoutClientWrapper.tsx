@@ -69,10 +69,14 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
 
   const isKidsPage = normalizedPath === ROUTES.KIDS;
   const isHotAndNewPage = normalizedPath === ROUTES.HOT_AND_NEW;
+  const isAccountSettingsPage =
+    normalizedPath === ROUTES.ACCOUNT_SETTINGS ||
+    normalizedPath.startsWith(ROUTES.ACCOUNT_SETTINGS + "/");
 
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
   const hideBrowseChrome = isStandalonePage || isAssetDetailOpen;
   const hideHeaderFooter = hideBrowseChrome || isMobileLegalPage;
+  const hideAmbientGlow = hideBrowseChrome || isAccountSettingsPage;
 
   let mainClassName = "min-h-screen flex flex-col max-lg:pb-20";
   if (isMobileLegalPage) {
@@ -84,9 +88,9 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   return (
     <>
       {/* Warm hover/focus-tinted glow meant to sit behind browse/home rail
-          content — on standalone pages and full-screen modal overlays,
+          content — on standalone pages, account settings, and full-screen modal overlays,
           hide it completely to prevent gradient bleed-through. */}
-      {!hideBrowseChrome && <AmbientBackground />}
+      {!hideAmbientGlow && <AmbientBackground />}
       {showNavbar && !hideHeaderFooter && !hideBrowseChrome && <Navbar />}
       <main
         className={`${mainClassName} bg-transparent`}

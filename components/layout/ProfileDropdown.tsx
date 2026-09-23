@@ -142,7 +142,6 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
 
   const handleSwitchProfile = () => {
     closeDropdown();
-    useProfileStore.getState().clearSelectedProfile();
     tvNavigate(ROUTES.WATCHING, router);
   };
 

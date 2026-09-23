@@ -21,6 +21,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { useOtpStore } from "@/app/login/otp/store";
 import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { useProfileStore } from "@/store/useProfileStore";
+import { deepLinkManager } from "@/lib/deeplink/useDeepLinkHandler";
+import { tvNavigate } from "@/src/navigation/tvNavigate";
 
 export default function WatchingPage() {
   const t = useTranslations("watchingPage");
@@ -30,6 +33,7 @@ export default function WatchingPage() {
   const selectProfile = useSelectProfile();
   const { show: showToast } = useToastStore();
   const { isMobile, isReady: isMobileReady } = useIsMobile();
+  const selectedProfile = useProfileStore((s) => s.selectedProfile);
 
   // Track failed profile selection for retry UI
   const [failedProfileId, setFailedProfileId] = useState<string | null>(null);
@@ -61,14 +65,17 @@ export default function WatchingPage() {
 
   const profiles = profilesQuery?.data?.profiles || [];
 
-  // Focus the first profile when profiles load
+  // Focus the current profile (or first profile) when profiles load
   useEffect(() => {
     if (profiles.length > 0) {
+      const targetId = selectedProfile?.profile_id && profiles.some((p: any) => p.profile_id === selectedProfile.profile_id)
+        ? selectedProfile.profile_id
+        : profiles[0].profile_id;
       setTimeout(() => {
-        setFocus(`profile-${profiles[0].profile_id}`);
-      }, 300);
+        setFocus(`profile-${targetId}`);
+      }, 150);
     }
-  }, [profiles.length]);
+  }, [profiles.length, selectedProfile?.profile_id]);
 
   // Check if user can add more profiles (max 4)
   const canAddMoreProfiles = profiles?.length < MAX_PROFILES;
@@ -84,6 +91,18 @@ export default function WatchingPage() {
         shouldShowDownloadAppAfterProfileSelection(isMobile)
       ) {
         router.replace(getMobileDownloadAppRoute());
+      } else {
+        const stashedAsset = typeof window !== "undefined" ? localStorage.getItem("deepLinkAsset") : null;
+        if (stashedAsset) {
+          try {
+            const parsed = JSON.parse(stashedAsset);
+            localStorage.removeItem("deepLinkAsset");
+            const destination = deepLinkManager.getAssetUrl(parsed);
+            tvNavigate(destination, router);
+            return;
+          } catch (e) {}
+        }
+        tvNavigate(ROUTES.HOME, router);
       }
     } catch (error) {
       // Component-level logging for debugging
