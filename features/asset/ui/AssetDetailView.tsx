@@ -930,6 +930,32 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
   const activeSeason = seasonsOption[selectedSeasonIndex];
 
+  const [lastFocusedEpisodeAssetId, setLastFocusedEpisodeAssetId] = useState<string | null>(null);
+
+  const resetContentScroll = useCallback(() => {
+    const scrollArea = typeof document !== "undefined" ? document.getElementById("asset-detail-content-scroll") : null;
+    if (scrollArea) {
+      scrollArea.scrollTop = 0;
+    }
+  }, []);
+
+  const handleSeasonSelect = useCallback((idx: number) => {
+    handleSeasonChange(idx);
+    setLastFocusedEpisodeAssetId(null);
+    resetContentScroll();
+  }, [handleSeasonChange, resetContentScroll]);
+
+  useEffect(() => {
+    setLastFocusedEpisodeAssetId(null);
+    resetContentScroll();
+  }, [selectedSeasonIndex, resetContentScroll]);
+
+  useEffect(() => {
+    if (displayedEpisodes?.length > 0 && !lastFocusedEpisodeAssetId) {
+      resetContentScroll();
+    }
+  }, [displayedEpisodes, resetContentScroll, lastFocusedEpisodeAssetId]);
+
   const isShowAsset = useMemo(() => {
     if (!asset) return false;
     return asset.assetType === "SHOW" || (asset.seasons && asset.seasons.length > 0);
@@ -2032,13 +2058,20 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                                 ? `${s.episodes.length} ${t("episodes")}`
                                 : undefined
                             }
-                            onClick={() => handleSeasonChange(idx)}
+                            onClick={() => handleSeasonSelect(idx)}
                             seasonsCount={seasonsOption.length}
-                            firstEpisodeAssetId={
-                              idx === selectedSeasonIndex
-                                ? displayedEpisodes?.[0]?.assetId
-                                : s.episodes?.[0]?.assetId
-                            }
+                            onArrowRight={() => {
+                              const targetId =
+                                lastFocusedEpisodeAssetId && displayedEpisodes?.some((e) => e.assetId === lastFocusedEpisodeAssetId)
+                                  ? lastFocusedEpisodeAssetId
+                                  : displayedEpisodes?.[0]?.assetId;
+                              if (targetId) {
+                                if (!lastFocusedEpisodeAssetId) {
+                                  resetContentScroll();
+                                }
+                                retrySetFocus(`episode-${targetId}`, 6, 40);
+                              }
+                            }}
                           />
                         ))}
                       </div>
@@ -2077,6 +2110,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                                 hasMore={hasMore}
                                 isLoadingMore={episodesLoading}
                                 onLoadMore={loadMoreEpisodes}
+                                onEpisodeFocus={(id: string) => setLastFocusedEpisodeAssetId(id)}
                               />
                             );
                           })}
@@ -2285,7 +2319,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
 // ── Subcomponents for Focusable Items ────────────────────────────────────────
 
-function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex, seasonsCount, t, onWatch, hasMore, isLoadingMore, onLoadMore }: any) {
+function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex, seasonsCount, t, onWatch, hasMore, isLoadingMore, onLoadMore, onEpisodeFocus }: any) {
   // Infinite scroll: once focus is within the last few loaded episodes, quietly
   // kick off the next page so it's (usually) already there by the time the
   // user presses Down enough times to reach it — no "Load More" button needed.
@@ -2315,15 +2349,6 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
           setFocus(`episode-${nextEp.assetId}`);
           return false;
         } else if (hasMore) {
-          // Last loaded episode but more exist on the server — make sure the
-          // fetch is (still) in flight; once it lands, the newly appended
-          // episodes just extend this same list and a subsequent Down works
-          // normally, matching how loading is only ever triggered by focus,
-          // not mount, above. Must return false here too (not fall through to
-          // norigin's default nearest-neighbor search) — there's nothing below
-          // the last episode in the DOM yet, so letting the default search run
-          // while the fetch is in flight sends focus somewhere unpredictable
-          // instead of holding still until the new page actually lands.
           onLoadMore?.();
           return false;
         }
@@ -2335,7 +2360,17 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
       return true;
     },
     onFocus: () => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      onEpisodeFocus?.(ep.assetId);
+      if (index === 0) {
+        const scrollArea = typeof document !== "undefined" ? document.getElementById("asset-detail-content-scroll") : null;
+        if (scrollArea && scrollArea.scrollTop > 0) {
+          scrollArea.scrollTop = 0;
+        } else {
+          ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      } else {
+        ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       maybeLoadMore();
     }
   });
@@ -2352,13 +2387,17 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
     <div
       ref={ref as any}
       onClick={onWatch}
-      className="group flex flex-col sm:flex-row items-center gap-4 sm:gap-6 p-2 sm:p-3 rounded-2xl cursor-pointer transition-colors duration-200"
+      className={`group flex flex-col sm:flex-row items-center gap-4 sm:gap-6 p-2.5 sm:p-3.5 rounded-2xl cursor-pointer transition-all duration-200 outline-none select-none ${
+        focused
+          ? "bg-white/10 shadow-xl ring-1 ring-white/20"
+          : "hover:bg-white/5"
+      }`}
     >
       {/* Thumbnail Container: Only this gets the TV focus ring, scale & glow */}
       <div
         className={`relative w-full sm:w-[260px] lg:w-[320px] aspect-video rounded-xl overflow-hidden shrink-0 bg-neutral-900 transition-all duration-200 ${
           focused
-            ? "border-2 border-white ring-4 ring-white shadow-2xl scale-105 z-10"
+            ? "border-2 border-white ring-4 ring-white/50 shadow-2xl scale-105 z-10"
             : "border-2 border-transparent group-hover:border-white/30"
         }`}
       >
@@ -2398,7 +2437,7 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
           {ep.title}
         </h4>
         <div className="text-xs sm:text-sm font-semibold text-neutral-400 mb-2 flex items-center gap-2">
-          <span>S{selectedSeasonIndex + 1} EP{ep.episodeNumber || index + 1}</span>
+          <span className={focused ? "text-white/90" : "text-neutral-400"}>S{selectedSeasonIndex + 1} EP{ep.episodeNumber || index + 1}</span>
           {durationText && (
             <>
               <span>•</span>
@@ -2406,7 +2445,7 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
             </>
           )}
         </div>
-        <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed line-clamp-2 sm:line-clamp-3">
+        <p className={`text-xs sm:text-sm leading-relaxed line-clamp-2 sm:line-clamp-3 ${focused ? "text-neutral-300" : "text-neutral-400"}`}>
           {stripHtml(ep.description) || t("no_description_episode")}
         </p>
       </div>
@@ -2738,10 +2777,13 @@ function FocusableTabButton({
   );
 }
 
-function FocusableSeasonListItem({ idx, isSelected, label, subtitle, onClick, seasonsCount, firstEpisodeAssetId }: any) {
+function FocusableSeasonListItem({ idx, isSelected, label, subtitle, onClick, seasonsCount, onArrowRight }: any) {
   const { ref, focused } = useFocusable({
     focusKey: `season-item-${idx}`,
-    onEnterPress: onClick,
+    onEnterPress: () => {
+      onClick?.();
+      onArrowRight?.();
+    },
     onArrowPress: (direction) => {
       if (direction === "up") {
         if (idx > 0) {
@@ -2758,32 +2800,48 @@ function FocusableSeasonListItem({ idx, isSelected, label, subtitle, onClick, se
         return false;
       }
       if (direction === "right") {
-        if (firstEpisodeAssetId) {
-          setFocus(`episode-${firstEpisodeAssetId}`);
-        }
+        onArrowRight?.();
         return false;
       }
       return true;
     },
     onFocus: () => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      onClick?.();
+      const parent = ref.current?.parentElement;
+      if (parent && parent.scrollHeight > parent.clientHeight) {
+        const itemTop = ref.current.offsetTop;
+        const itemBottom = itemTop + ref.current.offsetHeight;
+        if (itemTop < parent.scrollTop || itemBottom > parent.scrollTop + parent.clientHeight) {
+          ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      }
     }
   });
 
   return (
     <div
       ref={ref as any}
-      onClick={onClick}
-      className={`flex items-center gap-2 px-5 py-3.5 rounded-2xl cursor-pointer transition-all duration-200 outline-none select-none ${isSelected
-        ? "bg-white text-neutral-950 font-bold shadow-lg"
-        : focused
-          ? "bg-white/20 text-white font-semibold ring-2 ring-white"
-          : "bg-white/10 text-white/80 font-semibold hover:bg-white/15"
-        } ${focused ? "scale-[1.02] ring-2 ring-white" : ""}`}
+      onClick={() => {
+        onClick?.();
+        onArrowRight?.();
+      }}
+      className={`relative flex items-center gap-2 px-5 py-3.5 rounded-2xl cursor-pointer transition-colors duration-150 outline-none select-none border-2 ${
+        focused
+          ? isSelected
+            ? "bg-white text-neutral-950 font-bold border-white ring-2 ring-white/60 shadow-xl"
+            : "bg-white/20 text-white font-bold border-white ring-2 ring-white/60 shadow-xl"
+          : isSelected
+            ? "bg-white text-neutral-950 font-bold border-transparent shadow-md"
+            : "bg-white/10 text-white/80 font-semibold border-transparent hover:bg-white/15"
+      }`}
     >
-      <span className="text-sm sm:text-base">{label}</span>
+      <span className="text-sm sm:text-base truncate">{label}</span>
       {subtitle && (
-        <span className={`text-xs sm:text-sm font-medium shrink-0 ${isSelected ? "text-neutral-600" : "text-neutral-400"}`}>
+        <span
+          className={`text-xs sm:text-sm font-medium shrink-0 ${
+            isSelected ? "text-neutral-600" : "text-neutral-400"
+          }`}
+        >
           • {subtitle}
         </span>
       )}
