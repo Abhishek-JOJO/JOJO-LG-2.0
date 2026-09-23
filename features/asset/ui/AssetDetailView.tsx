@@ -2017,10 +2017,10 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   and back just rebuilds cheap presentational DOM from data already in memory
                   — no re-fetch, no lost state. */}
               {hasEpisodesTab && effectiveTab === "episodes" && (
-                <div className="flex gap-6 sm:gap-8 pb-8">
-                    {/* Left Column: Season List */}
+                <div className="flex items-start gap-6 sm:gap-8 pb-8">
+                    {/* Left Column: Season List — stays fixed/sticky while scrolling episodes */}
                     {seasonsOption.length > 0 && (
-                      <div className="flex flex-col gap-2.5 w-[220px] sm:w-[260px] shrink-0">
+                      <div className="sticky top-0 z-10 flex flex-col gap-2.5 w-[220px] sm:w-[260px] shrink-0 self-start max-h-[calc(100vh-140px)] overflow-y-auto scrollbar-none">
                         {seasonsOption.map((s: any, idx: number) => (
                           <FocusableSeasonListItem
                             key={s.assetId || idx}
