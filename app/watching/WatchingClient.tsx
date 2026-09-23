@@ -25,7 +25,11 @@ import { useProfileStore } from "@/store/useProfileStore";
 import { deepLinkManager } from "@/lib/deeplink/useDeepLinkHandler";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
 
-export default function WatchingPage() {
+interface WatchingPageProps {
+  onProfileSelected?: () => void;
+}
+
+export default function WatchingPage({ onProfileSelected }: WatchingPageProps = {}) {
   const t = useTranslations("watchingPage");
   const router = useRouter();
   const { isAppReady } = useBootstrap();
@@ -85,6 +89,11 @@ export default function WatchingPage() {
     try {
       setFailedProfileId(null); // Clear any previous failure
       await selectProfile.mutateAsync(profile);
+
+      if (onProfileSelected) {
+        onProfileSelected();
+        return;
+      }
 
       if (
         isMobileReady &&

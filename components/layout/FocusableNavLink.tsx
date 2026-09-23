@@ -12,6 +12,7 @@ import { getContentRails } from "@/features/content-rail/api/getContentRails";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useLocaleStore } from "@/store/useLocaleStore";
 import { appConfig } from "@/lib/config/app.config";
+import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 
 interface FocusableNavLinkProps {
   item: any;
@@ -40,11 +41,16 @@ export const FocusableNavLink = React.memo(({
     const normCurrent = typeof window !== "undefined" ? normalizePathname(window.location.pathname) : "";
     const isTargetBrowse = BROWSE_ROUTES.includes(normTarget);
     const isCurrentBrowse = BROWSE_ROUTES.includes(normCurrent);
+    const tvOverlay = useTvOverlayStore.getState();
+    const isTvOverlayOpen = typeof window !== "undefined" && window.location.protocol === "file:" && !!tvOverlay.screen;
 
-    if (isTargetBrowse && isCurrentBrowse) {
+    if (isTargetBrowse && (isCurrentBrowse || isTvOverlayOpen)) {
       const navStore = useNavStore.getState();
       if (navStore.activeBrowseTab !== normTarget) {
         navStore.setActiveBrowseTab(normTarget);
+      }
+      if (isTvOverlayOpen) {
+        tvOverlay.close();
       }
       if (window.scrollY > 0) {
         window.scrollTo({ top: 0, behavior: "auto" });
@@ -198,17 +204,17 @@ export const FocusableNavLink = React.memo(({
       data-focuskey={`nav-link-${index}`}
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}
-      className={`relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none border ${
+      className={`relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none ${
         focused
-          ? "bg-white text-black scale-105 shadow-md border-transparent"
+          ? "bg-white/15 text-white scale-105 shadow-md"
           : isItemActive
-          ? "bg-white/15 border-white/25 text-white scale-100"
-          : "text-white/75 hover:text-white scale-100 border-transparent"
+          ? "bg-white/15 text-white scale-100"
+          : "text-white/75 hover:text-white scale-100"
       }`}
     >
       <span
         className={`relative z-10 text-base sm:text-lg font-bold tracking-wide whitespace-nowrap ${
-          focused ? "text-black font-extrabold" : isItemActive ? "text-white" : ""
+          focused ? "text-white font-extrabold" : isItemActive ? "text-white" : ""
         }`}
       >
         {item?.title}

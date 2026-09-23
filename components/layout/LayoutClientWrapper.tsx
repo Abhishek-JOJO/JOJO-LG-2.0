@@ -16,9 +16,27 @@ import { AmbientBackground } from "@/components/common/AmbientBackground";
 import { SearchModal } from "@/components/search/SearchModal";
 import { ExitConfirmModal } from "@/components/layout/ExitConfirmModal";
 import { usePlayerStore } from "@/store/usePlayerStore";
+import { useTvOverlayStore } from "@/store/useTvOverlayStore";
+import { useNavStore } from "@/store/useNavStore";
+import AccountSettingsPage from "@/app/account-settings/page";
+import WatchingClient from "@/app/watching/WatchingClient";
 export function LayoutClientWrapper({ children }: { children: React.ReactNode }) {
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
   const setSearchOpen = usePlayerStore((s) => s.setSearchOpen);
+  const tvOverlayScreen = useTvOverlayStore((s) => s.screen);
+  const closeTvOverlay = useTvOverlayStore((s) => s.close);
+  const clearTvOverlay = useTvOverlayStore((s) => s.clear);
+  const setActiveBrowseTab = useNavStore((s) => s.setActiveBrowseTab);
+  const isTvOverlayOpen =
+    typeof window !== "undefined" &&
+    window.location.protocol === "file:" &&
+    tvOverlayScreen !== null;
+
+  useEffect(() => {
+    const handlePopState = () => clearTvOverlay();
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [clearTvOverlay]);
 
   // Reopens the asset-detail modal for whatever show/movie a page scheduled
   // before doing a hard navigation away from itself — see
@@ -76,7 +94,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
   const hideBrowseChrome = isStandalonePage || isAssetDetailOpen;
   const hideHeaderFooter = hideBrowseChrome || isMobileLegalPage;
-  const hideAmbientGlow = hideBrowseChrome || isAccountSettingsPage;
+  const hideAmbientGlow = hideBrowseChrome || isAccountSettingsPage || isTvOverlayOpen;
 
   let mainClassName = "min-h-screen flex flex-col max-lg:pb-20";
   if (isMobileLegalPage) {
@@ -92,8 +110,23 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
           hide it completely to prevent gradient bleed-through. */}
       {!hideAmbientGlow && <AmbientBackground />}
       {showNavbar && !hideHeaderFooter && !hideBrowseChrome && <Navbar />}
+      {isTvOverlayOpen && (
+        <main className={`${mainClassName} bg-transparent`}>
+          {tvOverlayScreen === "account-settings" ? (
+            <AccountSettingsPage />
+          ) : (
+            <WatchingClient
+              onProfileSelected={() => {
+                setActiveBrowseTab(ROUTES.HOME);
+                closeTvOverlay();
+              }}
+            />
+          )}
+        </main>
+      )}
       <main
         className={`${mainClassName} bg-transparent`}
+        style={isTvOverlayOpen ? { display: "none" } : undefined}
       >
         {children}
       </main>
@@ -103,7 +136,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
       <GuestLoginPopup />
       <SessionExpiredModal />
       <ExitConfirmModal />
-      {showFooter && !hideHeaderFooter && <Footer />}
+      {showFooter && !hideHeaderFooter && !isTvOverlayOpen && <Footer />}
       <StatusLine />
     </>
   );

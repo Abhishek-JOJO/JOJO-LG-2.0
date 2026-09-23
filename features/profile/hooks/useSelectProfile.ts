@@ -34,7 +34,13 @@ export function useSelectProfile() {
           return key !== "verify-subscription" && key !== "appNavigation";
         },
       });
-      router.refresh();
+      // A file:// webOS build cannot perform Next.js RSC refresh requests.
+      // The optimistic store update and query invalidation above already update
+      // every profile-dependent client view; refreshing here only tears through
+      // the route loading state on TV.
+      if (typeof window === "undefined" || window.location.protocol !== "file:") {
+        router.refresh();
+      }
     },
     onError: (error, profile) => {
       logger.error('[Select Profile Hook] Profile selection failed', {

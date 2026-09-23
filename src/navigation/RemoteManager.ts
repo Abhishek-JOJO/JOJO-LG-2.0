@@ -10,6 +10,7 @@ import { tvSoundManager } from '@/lib/webos/tvSoundManager';
 import { doesFocusableExist, getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { tvNavigate } from './tvNavigate';
 import { ROUTES } from '@/lib/constants/routes';
+import { useTvOverlayStore } from '@/store/useTvOverlayStore';
 
 // LG webOS Remote Key Codes
 export const WEBOS_KEYS = {
@@ -44,6 +45,11 @@ export const useRemoteManager = () => {
       // Map webOS specific keys to actions
       switch (e.keyCode) {
         case WEBOS_KEYS.BACK:
+          if (useTvOverlayStore.getState().screen) {
+            e.preventDefault();
+            useTvOverlayStore.getState().close();
+            return;
+          }
           const currentPathForBack = typeof window !== 'undefined' ? normalizePathname(window.location.pathname) : '';
           // A full-screen overlay (search, asset detail, the exit-confirm popup
           // itself) owns the Back key while it's open — its own listener closes

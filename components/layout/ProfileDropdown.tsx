@@ -13,10 +13,11 @@ import { useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ProfileMenuLink } from "../ui/ProfileDropdownList";
 import { useExitConfirmStore } from "@/store/useExitConfirmStore";
 import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
+import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 
 // The dropdown mounts several focusables at once (menu links) the
 // moment it opens, via a React portal. norigin's setFocus/addFocusable share a
@@ -135,6 +136,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
   }, [isDropdownOpen]);
 
   const openExit = useExitConfirmStore((state) => state.open);
+  const openTvOverlay = useTvOverlayStore((state) => state.open);
   const handleExit = () => {
     closeDropdown();
     openExit();
@@ -142,7 +144,20 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
 
   const handleSwitchProfile = () => {
     closeDropdown();
+    if (typeof window !== "undefined" && window.location.protocol === "file:") {
+      openTvOverlay("watching");
+      return;
+    }
     tvNavigate(ROUTES.WATCHING, router);
+  };
+
+  const handleAccountSettings = () => {
+    closeDropdown();
+    if (typeof window !== "undefined" && window.location.protocol === "file:") {
+      openTvOverlay("account-settings");
+      return;
+    }
+    safeNavigate(router, ROUTES.ACCOUNT_SETTINGS);
   };
 
   const handleArrowUpFromMenu = () => {
@@ -159,6 +174,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       t={t}
       onExit={handleExit}
       onSwitchProfile={handleSwitchProfile}
+      onAccountSettings={handleAccountSettings}
       onArrowUp={handleArrowUpFromMenu}
     />
   ) : null;
@@ -226,8 +242,8 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
           id="navbar-profile-trigger"
           ref={focusableRef as any}
           onClick={toggleDropdown}
-          className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full border-2 ${
-            focused ? "scale-110 border-white" : "border-transparent hover:scale-105"
+          className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full ${
+            focused ? "scale-110" : "hover:scale-105"
           }`}
           aria-label="Profile Menu"
         >
@@ -264,6 +280,7 @@ function ProfileDropdownMenu({
   t,
   onExit,
   onSwitchProfile,
+  onAccountSettings,
   onArrowUp,
 }: any) {
   const { ref: dropdownBoundaryRef, focusKey: dropdownBoundaryKey } = useFocusable({
@@ -301,9 +318,9 @@ function ProfileDropdownMenu({
 
         <ProfileMenuSwitchItem onSwitch={onSwitchProfile} onArrowUp={onArrowUp} t={t} />
 
-        <ProfileMenuLink href={ROUTES.ACCOUNT_SETTINGS}>
+        <ProfileMenuAction onEnter={onAccountSettings}>
           {t("account_settings")}
-        </ProfileMenuLink>
+        </ProfileMenuAction>
 
         <ProfileMenuAction onEnter={onExit}>
           {t("exit") || "Exit"}
@@ -340,11 +357,11 @@ function ProfileMenuSwitchItem({
       ref={ref as any}
       onClick={onSwitch}
       className={cn(
-        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular border-2 border-transparent",
+        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular",
         "text-theme_5",
         "hover:bg-theme_11_samecolour hover:text-theme_13_samecolour",
         "transition-all duration-200 cursor-pointer",
-        focused ? "bg-theme_11_samecolour border-white text-theme_13_samecolour" : ""
+        focused ? "bg-theme_11_samecolour text-theme_13_samecolour" : ""
       )}
     >
       {t("switch_profile") || "Switch Profile"}
@@ -362,11 +379,11 @@ function ProfileMenuAction({ onEnter, children }: { onEnter: () => void; childre
       ref={ref as any}
       onClick={onEnter}
       className={cn(
-        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular border-2 border-transparent",
+        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular",
         "text-theme_5",
         "hover:bg-theme_11_samecolour hover:text-theme_13_samecolour",
         "transition-all duration-200 cursor-pointer",
-        focused ? "bg-theme_11_samecolour border-white text-theme_13_samecolour" : ""
+        focused ? "bg-theme_11_samecolour text-theme_13_samecolour" : ""
       )}
     >
       {children}
