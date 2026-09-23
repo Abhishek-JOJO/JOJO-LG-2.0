@@ -13,6 +13,7 @@ import { ROUTES } from "@/lib/constants/routes";
 import { localStorageManager } from "@/lib/localStorage/localStorage.manager";
 import { StorageKey } from "@/enums/storage.enum";
 import { useSubscriptionStore } from "@/store/useSubscriptionStore";
+import { normalizePathname } from "@/lib/utils/pathname";
 
 export function useNavbar() {
   const pathname = useActivePathname();
@@ -85,18 +86,31 @@ export function useNavbar() {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
+  const normalizedPath = pathname ? normalizePathname(pathname) : "/";
+  const isWatch =
+    normalizedPath === ROUTES.WATCH_BASE ||
+    normalizedPath.startsWith(ROUTES.WATCH_BASE + "/") ||
+    normalizedPath.startsWith("/watch") ||
+    pathname?.includes("/watch") ||
+    (typeof window !== "undefined" && (
+      window.location.pathname.includes("/watch") ||
+      window.location.href.includes("/watch") ||
+      window.location.search.includes("?v=") ||
+      window.location.search.includes("&v=")
+    ));
+
   const isLanding = pathname === ROUTES.LANDING;
   const isRegister = pathname.startsWith(ROUTES.REGISTER);
   const isRegisterOtp = pathname === ROUTES.REGISTER_OTP;
   const isCreateAccount = pathname.startsWith(ROUTES.REGISTER_CREATE_ACCOUNT);
   const isAddProfile = pathname.startsWith(ROUTES.ADD_PROFILE);
-  const isWatching = pathname === ROUTES.WATCHING;
+  const isWatching = pathname === ROUTES.WATCHING || isWatch;
   const isAvatar = pathname === ROUTES.AVATAR;
   const isDownloadApp = pathname === ROUTES.DOWNLOAD_APP || pathname === ROUTES.APP_INSTALL || pathname === "/appInstall" || pathname === "/app-install";
   const isHome = pathname.startsWith(ROUTES.HOME);
 
   const showActions = (isLanding || isRegister) && !isCreateAccount;
-  const showNavLogin = (!isLanding || !heroLoginVisible) && !isCreateAccount && !isWatching && !isRegisterOtp;
+  const showNavLogin = (!isLanding || !heroLoginVisible) && !isCreateAccount && !isWatching && !isWatch && !isRegisterOtp;
 
   const handleExplore = async () => {
     if (isAuthenticated) {
@@ -118,6 +132,7 @@ export function useNavbar() {
     !pathname.startsWith(ROUTES.LOGIN) &&
     !pathname.startsWith(ROUTES.REGISTER) &&
     !isWatching &&
+    !isWatch &&
     !isAddProfile &&
     !isCreateAccount &&
     !isRegisterOtp &&

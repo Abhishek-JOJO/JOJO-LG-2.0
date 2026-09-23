@@ -20,7 +20,7 @@ export function PlayerLoadingView({ title, onBack }: { title?: string; onBack?: 
 
   return (
     <div
-      className="relative w-screen h-screen overflow-hidden bg-black bg-cover bg-center"
+      className="fixed inset-0 z-[1000] w-screen h-screen overflow-hidden bg-black bg-cover bg-center"
       style={{ backgroundImage: "var(--playback-startup-artwork, none)" }}
       aria-busy="true"
       aria-label="Preparing playback"

@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
+import { normalizePathname } from "@/lib/utils/pathname";
 
 function LogoSkeleton({ isGoldSlot = false }: { isGoldSlot?: boolean }) {
   return (
@@ -228,6 +229,23 @@ export function Navbar() {
     isBrowsingMode,
     guestLoginPending
   } = useNavbar();
+
+  const normalizedPath = pathname ? normalizePathname(pathname) : "/";
+  const isWatchPage =
+    normalizedPath === ROUTES.WATCH_BASE ||
+    normalizedPath.startsWith(ROUTES.WATCH_BASE + "/") ||
+    normalizedPath.startsWith("/watch") ||
+    pathname?.includes("/watch") ||
+    (typeof window !== "undefined" && (
+      window.location.pathname.includes("/watch") ||
+      window.location.href.includes("/watch") ||
+      window.location.search.includes("?v=") ||
+      window.location.search.includes("&v=")
+    ));
+
+  if (isWatchPage) {
+    return null;
+  }
 
   const shouldDelayLogoUntilGoldStatus = isGoldStatusPending;
   const useGoldLogoSlot = isGold || shouldDelayLogoUntilGoldStatus;

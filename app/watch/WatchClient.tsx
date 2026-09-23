@@ -218,7 +218,7 @@ function WatchContent() {
 
   if (redirectingToAsset) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
+      <div className="fixed inset-0 z-[1000] w-screen h-screen flex items-center justify-center bg-black">
         <Loader />
       </div>
     );
@@ -227,7 +227,7 @@ function WatchContent() {
   // No ID provided
   if (!id) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-black px-6 text-center">
+      <div className="fixed inset-0 z-[1000] w-screen h-screen flex flex-col items-center justify-center bg-black px-6 text-center">
         <div className="text-5xl mb-4">🎬</div>
         <h2 className="text-xl font-semibold text-theme_1 mb-2">
           No Content Selected
@@ -237,7 +237,7 @@ function WatchContent() {
         </p>
         <div
           onClick={() => safeNavigate(router, ROUTES.HOME)}
-          className="px-6 py-2 bg-theme_13_samecolour text-theme_1 rounded-full text-sm font-medium hover:opacity-90 transition-opacity"
+          className="px-6 py-2 bg-theme_13_samecolour text-theme_1 rounded-full text-sm font-medium hover:opacity-90 transition-opacity cursor-pointer"
         >
           Go Home
         </div>
@@ -248,7 +248,7 @@ function WatchContent() {
   // GATE: Blocked — show loader while redirect fires
   if (gateStatus === "blocked") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
+      <div className="fixed inset-0 z-[1000] w-screen h-screen flex items-center justify-center bg-black">
         <Loader />
       </div>
     );
@@ -279,8 +279,8 @@ function WatchContent() {
   // ALLOWED — render the player
   // ═══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-black flex flex-col">
-      <div className="w-full">
+    <div className="fixed inset-0 z-[1000] w-screen h-screen bg-black overflow-hidden flex flex-col">
+      <div className="w-full h-full">
         <OTTPlayer
           video={video}
           seasons={seasonsData as any}

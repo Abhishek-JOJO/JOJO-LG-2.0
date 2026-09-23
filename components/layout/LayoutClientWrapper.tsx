@@ -22,6 +22,8 @@ import { setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navi
 import AccountSettingsPage from "@/app/account-settings/page";
 import WatchingClient from "@/app/watching/WatchingClient";
 import SubscriptionPage from "@/app/subscription/SubscriptionClient";
+import { normalizePathname } from "@/lib/utils/pathname";
+
 export function LayoutClientWrapper({ children }: { children: React.ReactNode }) {
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
   const setSearchOpen = usePlayerStore((s) => s.setSearchOpen);
@@ -89,7 +91,19 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   const isMobileDevice = searchParams?.get("device") === "mobile";
   const isMobileLegalPage = isLegalPage && isMobileDevice;
 
-  const normalizedPath = pathname ? (pathname.replace(/\/$/, "") || "/") : "/";
+  const normalizedPath = pathname ? normalizePathname(pathname) : "/";
+
+  const isWatchPage =
+    normalizedPath === ROUTES.WATCH_BASE ||
+    normalizedPath.startsWith(ROUTES.WATCH_BASE + "/") ||
+    normalizedPath.startsWith("/watch") ||
+    pathname?.includes("/watch") ||
+    (typeof window !== "undefined" && (
+      window.location.pathname.includes("/watch") ||
+      window.location.href.includes("/watch") ||
+      window.location.search.includes("?v=") ||
+      window.location.search.includes("&v=")
+    ));
 
   const isAuthPage =
     normalizedPath.startsWith(ROUTES.LOGIN) ||
@@ -97,12 +111,11 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
 
   const isStandalonePage =
     isAuthPage ||
+    isWatchPage ||
     normalizedPath === ROUTES.DOWNLOAD_APP ||
     normalizedPath === ROUTES.APP_INSTALL ||
     normalizedPath === "/appInstall" ||
-    normalizedPath === "/app-install" ||
-    normalizedPath === ROUTES.WATCH_BASE ||
-    normalizedPath.startsWith(ROUTES.WATCH_BASE + "/");
+    normalizedPath === "/app-install";
 
   const isKidsPage = normalizedPath === ROUTES.KIDS;
   const isHotAndNewPage = normalizedPath === ROUTES.HOT_AND_NEW;
