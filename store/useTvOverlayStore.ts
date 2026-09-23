@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type TvOverlayScreen = "account-settings" | "watching";
+export type TvOverlayScreen = "account-settings" | "watching" | "subscription";
 
 interface TvOverlayState {
   screen: TvOverlayScreen | null;
@@ -47,4 +47,3 @@ export const useTvOverlayStore = create<TvOverlayState>((set, get) => ({
   // so no second history.back() must be issued.
   clear: () => set({ screen: null }),
 }));
-

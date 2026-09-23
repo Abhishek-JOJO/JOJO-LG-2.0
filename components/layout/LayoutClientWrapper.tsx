@@ -20,6 +20,7 @@ import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 import { useNavStore } from "@/store/useNavStore";
 import AccountSettingsPage from "@/app/account-settings/page";
 import WatchingClient from "@/app/watching/WatchingClient";
+import SubscriptionPage from "@/app/subscription/SubscriptionClient";
 export function LayoutClientWrapper({ children }: { children: React.ReactNode }) {
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
   const setSearchOpen = usePlayerStore((s) => s.setSearchOpen);
@@ -114,6 +115,8 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
         <main className={`${mainClassName} bg-transparent`}>
           {tvOverlayScreen === "account-settings" ? (
             <AccountSettingsPage />
+          ) : tvOverlayScreen === "subscription" ? (
+            <SubscriptionPage />
           ) : (
             <WatchingClient
               onProfileSelected={() => {

@@ -22,6 +22,7 @@ import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { usePlayerStore } from "@/store/usePlayerStore";
+import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 
 function LogoSkeleton({ isGoldSlot = false }: { isGoldSlot?: boolean }) {
   return (
@@ -36,6 +37,15 @@ function LogoSkeleton({ isGoldSlot = false }: { isGoldSlot?: boolean }) {
 
 function FocusableGetGold({ totalNavItems }: { totalNavItems: number }) {
   const router = useRouter();
+  const openTvOverlay = useTvOverlayStore((state) => state.open);
+
+  const handleOpen = () => {
+    if (typeof window !== "undefined" && window.location.protocol === "file:") {
+      openTvOverlay("subscription");
+      return;
+    }
+    safeNavigate(router, ROUTES.SUBSCRIPTION);
+  };
 
   const handleArrowPress = (direction: string) => {
     if (direction === 'up') return false;
@@ -67,7 +77,7 @@ function FocusableGetGold({ totalNavItems }: { totalNavItems: number }) {
   const { ref, focused } = useFocusable({
     focusKey: 'navbar-get-gold',
     onArrowPress: handleArrowPress,
-    onEnterPress: () => safeNavigate(router, ROUTES.SUBSCRIPTION),
+    onEnterPress: handleOpen,
   });
 
   return (
@@ -75,7 +85,7 @@ function FocusableGetGold({ totalNavItems }: { totalNavItems: number }) {
       ref={ref as any}
       tabIndex={0}
       data-focuskey="navbar-get-gold"
-      onClick={() => safeNavigate(router, ROUTES.SUBSCRIPTION)}
+      onClick={handleOpen}
       className={`cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 text-base sm:text-lg font-bold whitespace-nowrap rounded-full transition-all duration-200 shrink-0 text-black bg-gradient-to-r from-[#FAAF3F] via-[#FFD691] to-[#FAAF3F] ${focused
           ? "scale-105 ring-2 ring-white"
           : "hover:brightness-105"
