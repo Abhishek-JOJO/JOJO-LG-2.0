@@ -11,10 +11,11 @@ import { useProfileStore } from "@/store/useProfileStore";
 import { UserCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useExitConfirmStore } from "@/store/useExitConfirmStore";
-import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, FocusContext, setFocus, doesFocusableExist, getCurrentFocusKey } from "@noriginmedia/norigin-spatial-navigation";
+import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
 import { safeNavigate } from "@/lib/webos/safeNavigate";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
@@ -50,6 +51,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
   const triggerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const unmountTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const openTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isNavigatingUpFromMenuRef = useRef(false);
 
   // isDropdownOpen = should be open, isVisible = controls CSS animation
@@ -60,8 +62,16 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
   const [dropdownPos, setDropdownPos] = useState({ top: 80, right: 40 });
   const t = useTranslations("profile-dropdown");
 
+  const cancelPendingOpen = useCallback(() => {
+    if (openTimerRef.current) {
+      clearTimeout(openTimerRef.current);
+      openTimerRef.current = null;
+    }
+  }, []);
+
   // Open: cancel any pending unmount, measure trigger, mount immediately
-  const openDropdown = () => {
+  const openDropdown = useCallback(() => {
+    cancelPendingOpen();
     if (unmountTimerRef.current) {
       clearTimeout(unmountTimerRef.current);
       unmountTimerRef.current = null;
@@ -78,10 +88,22 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     requestAnimationFrame(() => {
       setIsVisible(true);
     });
-  };
+  }, [cancelPendingOpen]);
+
+  // Debounced open on focus to prevent accidental opening during fast navigation
+  const scheduleOpenDropdown = useCallback(() => {
+    cancelPendingOpen();
+    openTimerRef.current = setTimeout(() => {
+      openTimerRef.current = null;
+      if (!isNavigatingUpFromMenuRef.current) {
+        openDropdown();
+      }
+    }, 180);
+  }, [cancelPendingOpen, openDropdown]);
 
   // Close: remove visible class first, unmount after transition ends
-  const closeDropdown = () => {
+  const closeDropdown = useCallback(() => {
+    cancelPendingOpen();
     setIsVisible(false);
     setIsDropdownOpen(false);
     if (unmountTimerRef.current) {
@@ -91,7 +113,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       setIsMounted(false);
       unmountTimerRef.current = null;
     }, 200);
-  };
+  }, [cancelPendingOpen]);
 
   const toggleDropdown = () => {
     if (isDropdownOpen) {
@@ -105,6 +127,63 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     closeDropdown();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+
+  // Close immediately during fast scroll, mouse wheel, or touchmove
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+
+    const handleScrollOrMove = () => {
+      closeDropdown();
+    };
+
+    window.addEventListener("scroll", handleScrollOrMove, { capture: true, passive: true });
+    window.addEventListener("wheel", handleScrollOrMove, { capture: true, passive: true });
+    window.addEventListener("touchmove", handleScrollOrMove, { capture: true, passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScrollOrMove, { capture: true } as any);
+      window.removeEventListener("wheel", handleScrollOrMove, { capture: true } as any);
+      window.removeEventListener("touchmove", handleScrollOrMove, { capture: true } as any);
+    };
+  }, [isDropdownOpen, closeDropdown]);
+
+  // Close immediately when user navigates to rail sections below
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+    const unsub = useActiveRailStore.subscribe((state) => {
+      if (state.activeSectionIndex !== null && state.activeSectionIndex > 0) {
+        closeDropdown();
+      }
+    });
+    return () => unsub();
+  }, [isDropdownOpen, closeDropdown]);
+
+  // Close during fast remote/keyboard navigation if focus leaves the profile section
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+
+    const checkFocus = () => {
+      const currentKey = getCurrentFocusKey();
+      if (!currentKey) return;
+      const isProfileFocus =
+        currentKey === 'navbar-profile-trigger' ||
+        currentKey === 'profile-dropdown-boundary' ||
+        currentKey === 'profile-menu-switch' ||
+        currentKey === 'profile-menu-account' ||
+        currentKey === 'profile-menu-exit';
+      if (!isProfileFocus) {
+        closeDropdown();
+      }
+    };
+
+    window.addEventListener('keydown', checkFocus, { passive: true });
+    window.addEventListener('keyup', checkFocus, { passive: true });
+
+    return () => {
+      window.removeEventListener('keydown', checkFocus);
+      window.removeEventListener('keyup', checkFocus);
+    };
+  }, [isDropdownOpen, closeDropdown]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -132,8 +211,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       document.removeEventListener("mousedown", handleClickOutside);
       window.removeEventListener("keydown", handleBackKey, { capture: true });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDropdownOpen]);
+  }, [isDropdownOpen, closeDropdown]);
 
   const openExit = useExitConfirmStore((state) => state.open);
   const openTvOverlay = useTvOverlayStore((state) => state.open);
@@ -166,6 +244,19 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
     setFocus('navbar-profile-trigger');
   };
 
+  const handleArrowDownFromMenu = useCallback(() => {
+    closeDropdown();
+    if (document.getElementById('hero-carousel-container')) {
+      setFocus('hero-carousel');
+      return;
+    }
+    const entry = document.getElementById('page-focus-entry');
+    const entryFocusKey = entry?.getAttribute('data-focuskey');
+    if (entryFocusKey) {
+      setFocus(entryFocusKey);
+    }
+  }, [closeDropdown]);
+
   const dropdownContent = isMounted ? (
     <ProfileDropdownMenu
       dropdownRef={dropdownRef}
@@ -176,6 +267,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       onSwitchProfile={handleSwitchProfile}
       onAccountSettings={handleAccountSettings}
       onArrowUp={handleArrowUpFromMenu}
+      onArrowDownExit={handleArrowDownFromMenu}
     />
   ) : null;
 
@@ -185,14 +277,28 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       if (isNavigatingUpFromMenuRef.current) {
         return;
       }
-      openDropdown();
+      scheduleOpenDropdown();
     },
     onBlur: () => {
       isNavigatingUpFromMenuRef.current = false;
+      cancelPendingOpen();
+      // When focus leaves the trigger, check if it moved into the dropdown menu.
+      // If it moved anywhere else (e.g. Search, Hero, or during fast navigation), close immediately.
+      setTimeout(() => {
+        const currentKey = getCurrentFocusKey();
+        const isInsideMenu =
+          currentKey === 'profile-menu-switch' ||
+          currentKey === 'profile-menu-account' ||
+          currentKey === 'profile-menu-exit';
+        if (!isInsideMenu && currentKey !== 'navbar-profile-trigger') {
+          closeDropdown();
+        }
+      }, 40);
     },
     onArrowPress: (direction) => {
       if (direction === 'up') return false;
       if (direction === 'left') {
+        cancelPendingOpen();
         isNavigatingUpFromMenuRef.current = false;
         closeDropdown();
         setFocus('navbar-search');
@@ -200,16 +306,28 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       }
       if (direction === 'right') return false;
       if (direction === 'down') {
-        if (!isDropdownOpen) {
-          isNavigatingUpFromMenuRef.current = false;
-          openDropdown();
+        cancelPendingOpen();
+        if (isDropdownOpen) {
+          retrySetFocus('profile-menu-switch');
+          return false;
         }
-        retrySetFocus('profile-menu-switch');
-        return false;
+        // If dropdown is closed, allow direct down navigation into page content
+        if (document.getElementById('hero-carousel-container')) {
+          setFocus('hero-carousel');
+          return false;
+        }
+        const entry = document.getElementById('page-focus-entry');
+        const entryFocusKey = entry?.getAttribute('data-focuskey');
+        if (entryFocusKey) {
+          setFocus(entryFocusKey);
+          return false;
+        }
+        return true;
       }
       return true;
     },
     onEnterPress: () => {
+      cancelPendingOpen();
       isNavigatingUpFromMenuRef.current = false;
       if (!isDropdownOpen) {
         openDropdown();
@@ -221,11 +339,12 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
   useEffect(() => {
     if (focused && !isDropdownOpen) {
       if (!isNavigatingUpFromMenuRef.current) {
-        openDropdown();
+        scheduleOpenDropdown();
       }
+    } else if (!focused) {
+      cancelPendingOpen();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focused, isDropdownOpen]);
+  }, [focused, isDropdownOpen, scheduleOpenDropdown, cancelPendingOpen]);
 
   return (
     <>
@@ -274,6 +393,7 @@ function ProfileDropdownMenu({
   onSwitchProfile,
   onAccountSettings,
   onArrowUp,
+  onArrowDownExit,
 }: any) {
   const { ref: dropdownBoundaryRef, focusKey: dropdownBoundaryKey } = useFocusable({
     focusKey: 'profile-dropdown-boundary',
@@ -342,6 +462,7 @@ function ProfileDropdownMenu({
               return false;
             }
             if (direction === 'down') {
+              onArrowDownExit?.();
               return false;
             }
             if (direction === 'left') {
