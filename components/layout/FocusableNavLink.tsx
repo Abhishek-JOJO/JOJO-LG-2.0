@@ -34,7 +34,7 @@ export const FocusableNavLink = React.memo(({
   isAuthenticated = false
 }: FocusableNavLinkProps) => {
   const router = useRouter();
-  const rafRef = useRef<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const navigateTab = useCallback(() => {
     const normTarget = normalizePathname(targetUrl);
@@ -73,9 +73,9 @@ export const FocusableNavLink = React.memo(({
     }
 
     if (direction === 'down') {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
       if (!isItemActive) {
         navigateTab();
@@ -118,52 +118,51 @@ export const FocusableNavLink = React.memo(({
   }, [index, totalNavItems, isGold, isItemActive, navigateTab]);
 
   const handleFocus = useCallback(() => {
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    // Give the focus highlight a paint before changing the content tree. A
-    // single rAF still runs before paint; the second frame separates the work.
-    // Blur cancels tabs that the user only passes through on the way elsewhere.
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = requestAnimationFrame(() => {
-        rafRef.current = null;
-        if (getCurrentFocusKey() !== `nav-link-${index}`) return;
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
 
-        const subnavId = item?.subnav_id;
-        if (subnavId) {
-          const sessionId = useAuthStore.getState().token;
-          const locale = useLocaleStore.getState().locale || "en";
-          if (sessionId) {
-            getQueryClient().prefetchInfiniteQuery({
-              queryKey: ["contentRails", subnavId, sessionId, locale, 20],
-              queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
-              initialPageParam: 1,
-              staleTime: appConfig.STALE_TIME,
-            }).catch(() => {});
-          }
-        }
+    // 220ms debounce: allows rapid remote navigation across tabs without
+    // freezing the TV CPU by mounting/unmounting page trees on every step
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      if (getCurrentFocusKey() !== `nav-link-${index}`) return;
 
-        // Only auto-switch tabs on focus if the user is already on a browse route.
-        // On subpages like /subscription, /account-settings, /watchlist, etc., focusing
-        // a nav link must not trigger auto-navigation; navigation requires Enter or click.
-        const normCurrent = typeof window !== "undefined" ? normalizePathname(window.location.pathname) : "";
-        const isCurrentBrowse = BROWSE_ROUTES.includes(normCurrent);
-        if (!isItemActive && isCurrentBrowse) {
-          navigateTab();
+      const subnavId = item?.subnav_id;
+      if (subnavId) {
+        const sessionId = useAuthStore.getState().token;
+        const locale = useLocaleStore.getState().locale || "en";
+        if (sessionId) {
+          getQueryClient().prefetchInfiniteQuery({
+            queryKey: ["contentRails", subnavId, sessionId, locale, 20],
+            queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
+            initialPageParam: 1,
+            staleTime: appConfig.STALE_TIME,
+          }).catch(() => {});
         }
-      });
-    });
+      }
+
+      // Only auto-switch tabs on focus if the user is already on a browse route.
+      const normCurrent = typeof window !== "undefined" ? normalizePathname(window.location.pathname) : "";
+      const isCurrentBrowse = BROWSE_ROUTES.includes(normCurrent);
+      if (!isItemActive && isCurrentBrowse) {
+        navigateTab();
+      }
+    }, 220);
   }, [index, item?.subnav_id, isItemActive, navigateTab]);
 
   const handleBlur = useCallback(() => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
   }, []);
 
   const handleEnterPress = useCallback(() => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
     navigateTab();
   }, [navigateTab]);
@@ -178,16 +177,17 @@ export const FocusableNavLink = React.memo(({
 
   useEffect(() => {
     return () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
     };
   }, []);
 
   const handleClick = useCallback(() => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
     navigateTab();
   }, [navigateTab]);
@@ -206,15 +206,19 @@ export const FocusableNavLink = React.memo(({
       onMouseEnter={handleMouseEnter}
       className={`relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none ${
         focused
-          ? "bg-white/15 text-white scale-105 shadow-md"
+          ? "bg-white text-black scale-105"
           : isItemActive
-          ? "bg-white/15 text-white scale-100"
-          : "text-white/75 hover:text-white scale-100"
+          ? "text-white font-bold"
+          : "text-white/70 hover:text-white"
       }`}
     >
       <span
-        className={`relative z-10 text-base sm:text-lg font-bold tracking-wide whitespace-nowrap ${
-          focused ? "text-white font-extrabold" : isItemActive ? "text-white" : ""
+        className={`relative z-10 text-base sm:text-lg tracking-wide whitespace-nowrap ${
+          focused
+            ? "text-black font-extrabold"
+            : isItemActive
+            ? "text-white font-bold"
+            : "text-white/70"
         }`}
       >
         {item?.title}
