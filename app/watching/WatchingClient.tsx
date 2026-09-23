@@ -20,7 +20,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { useOtpStore } from "@/app/login/otp/store";
-import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { useProfileStore } from "@/store/useProfileStore";
 import { deepLinkManager } from "@/lib/deeplink/useDeepLinkHandler";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
@@ -112,6 +112,16 @@ export default function WatchingPage({ onProfileSelected }: WatchingPageProps = 
           } catch (e) {}
         }
         tvNavigate(ROUTES.HOME, router);
+        let attempts = 0;
+        const tryFocusHome = () => {
+          attempts++;
+          if (doesFocusableExist("nav-link-0")) {
+            setFocus("nav-link-0");
+          } else if (attempts < 20) {
+            setTimeout(tryFocusHome, 50);
+          }
+        };
+        setTimeout(tryFocusHome, 80);
       }
     } catch (error) {
       // Component-level logging for debugging

@@ -234,8 +234,8 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
           id="navbar-profile-trigger"
           ref={focusableRef as any}
           onClick={toggleDropdown}
-          className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full ${
-            focused ? "scale-110 ring-2 ring-white" : "hover:scale-105"
+          className={`relative flex items-center justify-center cursor-pointer focus:outline-none transition-all duration-200 p-[2px] rounded-full border-2 ${
+            focused ? "scale-110 border-white" : "border-transparent hover:scale-105"
           }`}
           aria-label="Profile Menu"
         >
@@ -395,11 +395,10 @@ function ProfileMenuSwitchItem({
       ref={ref as any}
       onClick={onSwitch}
       className={cn(
-        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular border-2 border-transparent",
-        "text-theme_5",
-        "hover:bg-theme_11_samecolour hover:text-theme_13_samecolour",
-        "transition-all duration-200 cursor-pointer",
-        focused ? "bg-theme_11_samecolour border-white text-theme_13_samecolour font-bold" : ""
+        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular transition-all duration-200 cursor-pointer",
+        focused
+          ? "bg-theme_11_samecolour border-2 border-white text-theme_13_samecolour font-bold"
+          : "border-2 border-transparent text-theme_5 hover:bg-theme_11_samecolour hover:text-theme_13_samecolour"
       )}
     >
       {t("switch_profile") || "Switch Profile"}
@@ -430,11 +429,10 @@ function ProfileMenuAction({
       ref={ref as any}
       onClick={onEnter}
       className={cn(
-        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular border-2 border-transparent",
-        "text-theme_5",
-        "hover:bg-theme_11_samecolour hover:text-theme_13_samecolour",
-        "transition-all duration-200 cursor-pointer",
-        focused ? "bg-theme_11_samecolour border-white text-theme_13_samecolour font-bold" : ""
+        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular transition-all duration-200 cursor-pointer",
+        focused
+          ? "bg-theme_11_samecolour border-2 border-white text-theme_13_samecolour font-bold"
+          : "border-2 border-transparent text-theme_5 hover:bg-theme_11_samecolour hover:text-theme_13_samecolour"
       )}
     >
       {children}

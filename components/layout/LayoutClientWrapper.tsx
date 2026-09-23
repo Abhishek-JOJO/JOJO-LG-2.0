@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -18,6 +18,7 @@ import { ExitConfirmModal } from "@/components/layout/ExitConfirmModal";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 import { useNavStore } from "@/store/useNavStore";
+import { setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import AccountSettingsPage from "@/app/account-settings/page";
 import WatchingClient from "@/app/watching/WatchingClient";
 import SubscriptionPage from "@/app/subscription/SubscriptionClient";
@@ -32,6 +33,23 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
     typeof window !== "undefined" &&
     window.location.protocol === "file:" &&
     tvOverlayScreen !== null;
+
+  const prevTvOverlayOpenRef = useRef(isTvOverlayOpen);
+  useEffect(() => {
+    if (prevTvOverlayOpenRef.current && !isTvOverlayOpen) {
+      let attempts = 0;
+      const tryRestoreFocus = () => {
+        attempts++;
+        if (doesFocusableExist("nav-link-0")) {
+          setFocus("nav-link-0");
+        } else if (attempts < 20) {
+          setTimeout(tryRestoreFocus, 50);
+        }
+      };
+      setTimeout(tryRestoreFocus, 50);
+    }
+    prevTvOverlayOpenRef.current = isTvOverlayOpen;
+  }, [isTvOverlayOpen]);
 
   useEffect(() => {
     const handlePopState = () => clearTvOverlay();
@@ -122,6 +140,16 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
               onProfileSelected={() => {
                 setActiveBrowseTab(ROUTES.HOME);
                 closeTvOverlay();
+                let attempts = 0;
+                const tryFocusHome = () => {
+                  attempts++;
+                  if (doesFocusableExist("nav-link-0")) {
+                    setFocus("nav-link-0");
+                  } else if (attempts < 20) {
+                    setTimeout(tryFocusHome, 50);
+                  }
+                };
+                setTimeout(tryFocusHome, 50);
               }}
             />
           )}
