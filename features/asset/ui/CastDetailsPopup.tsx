@@ -16,14 +16,17 @@ import { useTranslations } from "next-intl";
 import { safeNavigate } from "@/lib/webos/safeNavigate";
 import { WEBOS_KEYS } from "@/src/navigation/RemoteManager";
 
-const GRID_COLS = 4;
-
-function retrySetFocus(focusKey: string, attempts = 6, intervalMs = 90) {
+function retrySetFocus(focusKey: string, attempts = 5, intervalMs = 60) {
+  if (doesFocusableExist(focusKey)) {
+    setFocus(focusKey);
+    return;
+  }
   let tries = 0;
   const attempt = () => {
     tries += 1;
     if (doesFocusableExist(focusKey)) {
       setFocus(focusKey);
+      return;
     }
     if (tries < attempts) {
       setTimeout(attempt, intervalMs);
@@ -166,7 +169,13 @@ export function CastDetailsPopup({
 
         {/* TV Top Header Bar */}
         <div className="relative shrink-0 z-30 flex items-center justify-between px-8 sm:px-12 lg:px-16 pt-8 pb-5">
-          <FocusableCastPopupBackButton onClose={onClose} hasAssets={assets.length > 0} />
+          <FocusableCastPopupBackButton
+            onClose={onClose}
+            hasAssets={assets.length > 0}
+            onFocused={() => {
+              scrollContainerRef.current?.scrollTo({ top: 0, behavior: "auto" });
+            }}
+          />
           <span className="text-xs uppercase tracking-widest text-neutral-400 font-semibold">
             {t("cast_details")}
           </span>
@@ -320,16 +329,27 @@ export function CastDetailsPopup({
   );
 }
 
-function FocusableCastPopupBackButton({ onClose, hasAssets }: { onClose: () => void; hasAssets?: boolean }) {
+function FocusableCastPopupBackButton({
+  onClose,
+  hasAssets,
+  onFocused,
+}: {
+  onClose: () => void;
+  hasAssets?: boolean;
+  onFocused?: () => void;
+}) {
   const { ref, focused } = useFocusable({
     focusKey: "cast-popup-back-btn",
     onEnterPress: onClose,
     onArrowPress: (direction) => {
       if (direction === "down" && hasAssets) {
-        retrySetFocus("cast-popup-asset-0");
+        setFocus("cast-popup-asset-0");
         return false;
       }
       return false;
+    },
+    onFocus: () => {
+      onFocused?.();
     },
   });
 
@@ -337,7 +357,7 @@ function FocusableCastPopupBackButton({ onClose, hasAssets }: { onClose: () => v
     <button
       ref={ref as any}
       onClick={onClose}
-      className={`flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-150 outline-none cursor-pointer select-none ${
+      className={`flex items-center gap-2 px-5 py-2.5 rounded-full transition-transform duration-150 outline-none cursor-pointer select-none ${
         focused
           ? "bg-white text-neutral-950 font-bold ring-4 ring-white/60 shadow-2xl scale-105"
           : "bg-white/10 text-white/90 border border-white/15 hover:bg-white/20"
@@ -355,40 +375,24 @@ function FocusableCastPopupAssetItem({ idx, total, title, imgUrl, onSelect }: an
     focusKey: `cast-popup-asset-${idx}`,
     onEnterPress: onSelect,
     onArrowPress: (direction) => {
-      const row = Math.floor(idx / GRID_COLS);
-      const col = idx % GRID_COLS;
       if (direction === "up") {
-        if (row === 0) {
-          retrySetFocus("cast-popup-back-btn");
-        } else {
-          retrySetFocus(`cast-popup-asset-${idx - GRID_COLS}`);
+        // If element is on the top visual row, navigate to the Back button
+        const el = ref.current as HTMLElement | null;
+        const parent = el?.parentElement;
+        const firstChild = parent?.firstElementChild as HTMLElement | null;
+        const isTopRow = !el || !firstChild || Math.abs(el.offsetTop - firstChild.offsetTop) < 15;
+
+        if (isTopRow) {
+          setFocus("cast-popup-back-btn");
+          return false;
         }
-        return false;
       }
-      if (direction === "down") {
-        if (idx + GRID_COLS < total) {
-          retrySetFocus(`cast-popup-asset-${idx + GRID_COLS}`);
-        } else if (row < Math.floor((total - 1) / GRID_COLS)) {
-          retrySetFocus(`cast-popup-asset-${total - 1}`);
-        }
-        return false;
-      }
-      if (direction === "left") {
-        if (col > 0) {
-          retrySetFocus(`cast-popup-asset-${idx - 1}`);
-        }
-        return false;
-      }
-      if (direction === "right") {
-        if (col < GRID_COLS - 1 && idx + 1 < total) {
-          retrySetFocus(`cast-popup-asset-${idx + 1}`);
-        }
-        return false;
-      }
-      return false;
+      // For all other directions (down, left, right, or up from row 2+),
+      // allow Norigin 2D spatial navigation to calculate instantly with 0ms delay.
+      return true;
     },
     onFocus: () => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      ref.current?.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
     },
   });
 
@@ -396,7 +400,7 @@ function FocusableCastPopupAssetItem({ idx, total, title, imgUrl, onSelect }: an
     <div
       ref={ref as any}
       onClick={onSelect}
-      className={`group relative aspect-video rounded-xl overflow-hidden cursor-pointer bg-neutral-900 transition-all duration-200 ${
+      className={`group relative aspect-video rounded-xl overflow-hidden cursor-pointer bg-neutral-900 transition-transform duration-150 will-change-transform ${
         focused
           ? "border-2 border-white ring-4 ring-white/50 scale-105 shadow-2xl z-10"
           : "border border-white/10 hover:border-white/20"
@@ -407,7 +411,7 @@ function FocusableCastPopupAssetItem({ idx, total, title, imgUrl, onSelect }: an
           src={imgUrl}
           alt={title}
           fill
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
+          className="object-cover"
           wrapperClassName="w-full h-full"
         />
       ) : (
@@ -416,7 +420,7 @@ function FocusableCastPopupAssetItem({ idx, total, title, imgUrl, onSelect }: an
         </div>
       )}
       <div
-        className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-opacity duration-200 flex items-end p-4 ${
+        className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-opacity duration-150 flex items-end p-4 ${
           focused ? "opacity-100" : "opacity-80"
         }`}
       >
@@ -424,13 +428,15 @@ function FocusableCastPopupAssetItem({ idx, total, title, imgUrl, onSelect }: an
           {title}
         </span>
       </div>
-      {focused && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-12 h-12 rounded-full bg-theme_13_samecolour text-black flex items-center justify-center shadow-2xl">
-            <Play size={20} fill="currentColor" className="ml-0.5" />
-          </div>
+      <div
+        className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-150 ${
+          focused ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <div className="w-12 h-12 rounded-full bg-theme_13_samecolour text-black flex items-center justify-center shadow-2xl">
+          <Play size={20} fill="currentColor" className="ml-0.5" />
         </div>
-      )}
+      </div>
     </div>
   );
 }
