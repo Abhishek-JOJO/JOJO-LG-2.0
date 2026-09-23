@@ -935,6 +935,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const activeSeason = seasonsOption[selectedSeasonIndex];
 
   const [lastFocusedEpisodeAssetId, setLastFocusedEpisodeAssetId] = useState<string | null>(null);
+  const isEpisodeFocusedRef = useRef(false);
 
   const resetContentScroll = useCallback(() => {
     const scrollArea = typeof document !== "undefined" ? document.getElementById("asset-detail-content-scroll") : null;
@@ -944,10 +945,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   }, []);
 
   const handleSeasonSelect = useCallback((idx: number) => {
-    handleSeasonChange(idx);
-    setLastFocusedEpisodeAssetId(null);
-    resetContentScroll();
-  }, [handleSeasonChange, resetContentScroll]);
+    if (idx !== selectedSeasonIndex) {
+      handleSeasonChange(idx);
+      setLastFocusedEpisodeAssetId(null);
+      resetContentScroll();
+    }
+  }, [handleSeasonChange, resetContentScroll, selectedSeasonIndex]);
 
   useEffect(() => {
     setLastFocusedEpisodeAssetId(null);
@@ -1226,6 +1229,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // Dismisses the full-screen content overlay sheet and returns focus to the
   // primary Hero CTA (Watch Now / Play / Rent or Add to Watchlist).
   const closeContentOverlay = useCallback(() => {
+    isEpisodeFocusedRef.current = false;
     const watchNowKey = `asset-watch-now-${assetId}`;
     const watchlistKey = `asset-watchlist-${assetId}`;
     const targetKey =
@@ -1288,12 +1292,22 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         return;
       }
 
-      // 4. If the Content Overlay sheet is open, close it and return to the Asset Detail hero!
+      // 4. If the Content Overlay sheet is open:
       const isOverlayActive =
         contentOverlayOpenRef.current ||
         contentOverlayRef.current?.getAttribute("data-overlay-open") === "true";
 
       if (isOverlayActive) {
+        // If focus is currently inside the episode list, navigate back to the season selector first
+        if (isEpisodeFocusedRef.current && seasonsOption.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          isEpisodeFocusedRef.current = false;
+          retrySetFocus(`season-item-${selectedSeasonIndex}`, 5, 30);
+          return;
+        }
+
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -2062,9 +2076,13 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                                 ? `${s.episodes.length} ${t("episodes")}`
                                 : undefined
                             }
-                            onClick={() => handleSeasonSelect(idx)}
+                            onClick={() => {
+                              isEpisodeFocusedRef.current = false;
+                              handleSeasonSelect(idx);
+                            }}
                             seasonsCount={seasonsOption.length}
                             onArrowRight={() => {
+                              isEpisodeFocusedRef.current = true;
                               const targetId =
                                 lastFocusedEpisodeAssetId && displayedEpisodes?.some((e) => e.assetId === lastFocusedEpisodeAssetId)
                                   ? lastFocusedEpisodeAssetId
@@ -2114,7 +2132,13 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                                 hasMore={hasMore}
                                 isLoadingMore={episodesLoading}
                                 onLoadMore={loadMoreEpisodes}
-                                onEpisodeFocus={(id: string) => setLastFocusedEpisodeAssetId(id)}
+                                onEpisodeFocus={(id: string) => {
+                                  setLastFocusedEpisodeAssetId(id);
+                                  isEpisodeFocusedRef.current = true;
+                                }}
+                                onEpisodeFocusLost={() => {
+                                  isEpisodeFocusedRef.current = false;
+                                }}
                               />
                             );
                           })}
@@ -2323,7 +2347,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
 // ── Subcomponents for Focusable Items ────────────────────────────────────────
 
-function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex, seasonsCount, t, onWatch, hasMore, isLoadingMore, onLoadMore, onEpisodeFocus }: any) {
+function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex, seasonsCount, t, onWatch, hasMore, isLoadingMore, onLoadMore, onEpisodeFocus, onEpisodeFocusLost }: any) {
   // Infinite scroll: once focus is within the last few loaded episodes, quietly
   // kick off the next page so it's (usually) already there by the time the
   // user presses Down enough times to reach it — no "Load More" button needed.
@@ -2358,7 +2382,8 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
         }
       }
       if (direction === "left" && seasonsCount > 0) {
-        setFocus(`season-item-${selectedSeasonIndex}`);
+        onEpisodeFocusLost?.();
+        retrySetFocus(`season-item-${selectedSeasonIndex}`, 5, 30);
         return false;
       }
       return true;
@@ -2815,8 +2840,10 @@ function FocusableSeasonListItem({ idx, isSelected, label, subtitle, onClick, se
       if (parent && parent.scrollHeight > parent.clientHeight) {
         const itemTop = ref.current.offsetTop;
         const itemBottom = itemTop + ref.current.offsetHeight;
-        if (itemTop < parent.scrollTop || itemBottom > parent.scrollTop + parent.clientHeight) {
-          ref.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        if (itemTop < parent.scrollTop) {
+          parent.scrollTop = itemTop;
+        } else if (itemBottom > parent.scrollTop + parent.clientHeight) {
+          parent.scrollTop = itemBottom - parent.clientHeight;
         }
       }
     }
@@ -2829,11 +2856,11 @@ function FocusableSeasonListItem({ idx, isSelected, label, subtitle, onClick, se
         onClick?.();
         onArrowRight?.();
       }}
-      className={`relative flex items-center gap-2 px-5 py-3.5 rounded-2xl cursor-pointer transition-colors duration-150 outline-none select-none border-2 ${
+      className={`relative flex items-center justify-between gap-3 px-5 py-3.5 rounded-2xl cursor-pointer transition-colors duration-150 outline-none select-none border-2 ${
         focused
           ? isSelected
-            ? "bg-white text-neutral-950 font-bold border-white ring-2 ring-white/60 shadow-xl"
-            : "bg-white/20 text-white font-bold border-white ring-2 ring-white/60 shadow-xl"
+            ? "bg-white text-neutral-950 font-bold border-theme_13_samecolour ring-2 ring-theme_13_samecolour shadow-lg"
+            : "bg-white/20 text-white font-bold border-theme_13_samecolour ring-2 ring-theme_13_samecolour shadow-lg"
           : isSelected
             ? "bg-white text-neutral-950 font-bold border-transparent shadow-md"
             : "bg-white/10 text-white/80 font-semibold border-transparent hover:bg-white/15"
@@ -2843,10 +2870,16 @@ function FocusableSeasonListItem({ idx, isSelected, label, subtitle, onClick, se
       {subtitle && (
         <span
           className={`text-xs sm:text-sm font-medium shrink-0 ${
-            isSelected ? "text-neutral-600" : "text-neutral-400"
+            focused && isSelected
+              ? "text-neutral-700"
+              : isSelected
+                ? "text-neutral-600"
+                : focused
+                  ? "text-white/90"
+                  : "text-neutral-400"
           }`}
         >
-          • {subtitle}
+          {subtitle}
         </span>
       )}
     </div>

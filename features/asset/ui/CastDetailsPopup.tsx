@@ -1,26 +1,23 @@
 "use client";
 
 import { useProfessionalAssets } from "@/features/content/hooks/useProfessionalAssets";
-import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
+import JOJOCommonImage, {
+  JOJOImagePreset,
+  JOJOImagePosition,
+  JOJOImageContentMode,
+} from "@/components/ui/JOJOCommonImage";
 import { Loader } from "@/components/common/Loader";
-import { ChevronLeft, X, Play } from "lucide-react";
+import { ChevronLeft, Play } from "lucide-react";
 import { getAssetTypeSlug, slugify } from "@/features/asset/store/useAssetDetailStore";
-import { motion } from "framer-motion";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import { useFocusable, setFocus, doesFocusableExist, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
-
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useTranslations } from "next-intl";
 import { safeNavigate } from "@/lib/webos/safeNavigate";
 import { WEBOS_KEYS } from "@/src/navigation/RemoteManager";
 
-// Fixed column count the asset grid renders at on TV — used for Up/Down/Left/Right
-// math below. See the matching retrySetFocus in AssetDetailView.tsx: this popup
-// stays mounted over a page that keeps re-rendering in the background (hero
-// preview video ticks), which can drop norigin's focus pointer right after
-// this popup (and its focusables) mount — retry a few times instead of hoping
-// a single setFocus lands.
-const GRID_COLS = 3;
+const GRID_COLS = 4;
+
 function retrySetFocus(focusKey: string, attempts = 6, intervalMs = 90) {
   let tries = 0;
   const attempt = () => {
@@ -77,8 +74,6 @@ export function CastDetailsPopup({
 }: CastDetailsPopupProps) {
   const t = useTranslations("hoverCard");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isKnownForExpanded, setIsKnownForExpanded] = useState(false);
   const { data, isLoading, isError } = useProfessionalAssets(professionalId);
 
   const professional = data?.professional;
@@ -88,29 +83,13 @@ export function CastDetailsPopup({
     ? `${professional.first_name || ""} ${professional.last_name || ""}`.trim() || professional.professional_name
     : "";
 
-  const CHAR_LIMIT = 180;
   const description = professional?.description || "";
-  const shouldTruncate = description.length > CHAR_LIMIT;
-  const displayDescription = shouldTruncate && !isExpanded
-    ? `${description.slice(0, CHAR_LIMIT)}...`
-    : description;
-
   const knownForText = professional?.known_for || "";
-  const shouldTruncateKnownFor = knownForText.length > 75;
-  const displayKnownFor = shouldTruncateKnownFor && !isKnownForExpanded
-    ? `${knownForText.slice(0, 75)}...`
-    : knownForText;
 
   // Lock body scroll when popup is open
   useBodyScrollLock(true);
 
   // Escape (browser testing) / webOS remote Back button support.
-  // Registered with capture:true so it runs before RemoteManager's own
-  // (bubble-phase) Back-key listener — that listener checks e.defaultPrevented
-  // and bails, but only if we've already called preventDefault by the time it
-  // runs. Without capture, RemoteManager's listener (mounted once at app root,
-  // long before this popup exists) fires first and navigates the whole page
-  // back instead of just closing this popup.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.keyCode === WEBOS_KEYS.BACK) {
@@ -129,12 +108,12 @@ export function CastDetailsPopup({
   const { ref: popupFocusRef, focusKey: popupFocusKey } = useFocusable({
     focusKey: "cast-details-popup",
     isFocusBoundary: true,
-    preferredChildFocusKey: "cast-popup-close-btn",
+    preferredChildFocusKey: "cast-popup-back-btn",
   });
 
-  // Auto-focus the close button so the remote has somewhere to land on open.
+  // Focus the TV Back button on open
   useEffect(() => {
-    retrySetFocus("cast-popup-close-btn");
+    retrySetFocus("cast-popup-back-btn");
   }, []);
 
   const handleAssetClick = (item: any) => {
@@ -154,151 +133,163 @@ export function CastDetailsPopup({
     }
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === scrollContainerRef.current) {
-      onClose();
-    }
+  // Safe helper to format professions without ever leaking missing keys like 'hoverCard.host'
+  const formatProfession = (prof: string) => {
+    if (!prof) return "";
+    const trimmed = prof.trim();
+    const key = trimmed.toLowerCase();
+    try {
+      if (typeof (t as any)?.has === "function" && (t as any).has(key)) {
+        return t(key);
+      }
+    } catch {}
+    return trimmed
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
   };
 
   return (
     <FocusContext.Provider value={popupFocusKey}>
-      <div ref={popupFocusRef as any} className="fixed inset-0 z-[100000] overflow-hidden">
-        {/* Backdrop Blur Overlay */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.28, ease: "easeInOut" }}
-          className="absolute inset-0 bg-black/45"
-          style={{ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
-          onClick={onClose}
+      <div
+        ref={popupFocusRef as any}
+        className="fixed inset-0 z-[100000] w-screen h-screen bg-[#070708] text-white flex flex-col overflow-hidden select-none"
+      >
+        {/* Subtle cinematic gradient overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-40"
+          style={{
+            background:
+              "radial-gradient(ellipse 80% 60% at 15% 10%, rgba(242, 110, 33, 0.12), transparent 70%), linear-gradient(to bottom, #111116 0%, #070708 30%, #040405 100%)",
+          }}
         />
 
-        {/* Scrollable Container */}
+        {/* TV Top Header Bar */}
+        <div className="relative shrink-0 z-30 flex items-center justify-between px-8 sm:px-12 lg:px-16 pt-8 pb-5">
+          <FocusableCastPopupBackButton onClose={onClose} hasAssets={assets.length > 0} />
+          <span className="text-xs uppercase tracking-widest text-neutral-400 font-semibold">
+            {t("cast_details")}
+          </span>
+        </div>
+
+        {/* Scrollable TV Content Canvas */}
         <div
           ref={scrollContainerRef}
-          onClick={handleBackdropClick}
-          className="absolute inset-0 overflow-y-auto flex items-start justify-center p-4 sm:p-6 overscroll-contain"
+          className="relative flex-1 overflow-y-auto px-8 sm:px-12 lg:px-16 pt-4 pb-24 w-full scrollbar-none"
         >
-          <motion.div
-            initial={{ y: "100vh", opacity: 0.9, scale: 0.98 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: "100vh", opacity: 0.9, scale: 0.98 }}
-            transition={{ type: "spring", damping: 26, stiffness: 200, mass: 0.85 }}
-            className="relative w-full max-w-[1100px] lg:max-w-[1300px] my-14 sm:my-16 bg-theme_10 text-white rounded-2xl overflow-hidden p-8 sm:p-10 lg:p-12 flex flex-col gap-8 z-10"
-          >
-            {/* Header Navigation */}
-            <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
-              <div className="flex items-center gap-2 text-white text-lg sm:text-xl font-bold">
-                <ChevronLeft size={22} />
-                <span>{t("cast_details")}</span>
-              </div>
-
-              <FocusableCastPopupCloseButton onClose={onClose} hasAssets={assets.length > 0} />
-            </div>
-
           {isLoading ? (
-            <div className="flex min-h-[300px] items-center justify-center">
+            <div className="flex min-h-[50vh] items-center justify-center">
               <Loader size="lg" />
             </div>
           ) : isError || !professional ? (
-            <div className="flex min-h-[300px] flex-col items-center justify-center text-center gap-3">
-              <span className="text-3xl">⚠️</span>
-              <p className="text-sm text-neutral-400">{t("failed_load_details")}</p>
+            <div className="flex min-h-[50vh] flex-col items-center justify-center text-center gap-4">
+              <span className="text-4xl">⚠️</span>
+              <p className="text-base text-neutral-400">{t("failed_load_details")}</p>
               <button
                 onClick={onClose}
-                className="px-5 py-2 bg-theme_13_samecolour rounded-full text-xs font-bold transition hover:opacity-90 mt-2"
+                className="px-6 py-2.5 bg-theme_13_samecolour text-white rounded-full text-sm font-bold transition hover:opacity-90 mt-2 cursor-pointer"
               >
                 {t("go_back")}
               </button>
             </div>
           ) : (
-            <div className="flex flex-col gap-8">
-              {/* Bio Row */}
-              <div className="flex flex-col sm:flex-row gap-8 items-center sm:items-start text-center sm:text-left">
-                {/* Avatar circle */}
-                <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-full overflow-hidden shrink-0 shadow-lg bg-neutral-900 flex items-center justify-center">
+            <div className="flex flex-col gap-10 max-w-[1700px] mx-auto">
+              {/* Artist Profile Header (Integrated TV Layout) */}
+              <div className="flex flex-col sm:flex-row gap-8 lg:gap-12 items-center sm:items-start pb-8 border-b border-white/10">
+                {/* Photo */}
+                <div className="relative w-40 h-40 sm:w-48 sm:h-48 lg:w-52 lg:h-52 rounded-full overflow-hidden shrink-0 shadow-2xl bg-neutral-900 ring-2 ring-white/15 flex items-center justify-center">
                   {professional.image ? (
                     <JOJOCommonImage
                       src={professional.image}
                       alt={professionalDisplayName}
                       fill
-                      className="object-cover"
-                      wrapperClassName="w-full h-full"
+                      width={400}
+                      height={400}
+                      preset={JOJOImagePreset.Avatar}
+                      contentMode={JOJOImageContentMode.Cover}
+                      position={JOJOImagePosition.Top}
+                      className="object-cover object-top"
+                      wrapperClassName="w-full h-full rounded-full"
+                      style={{ objectPosition: "center top" }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-neutral-400 font-bold text-5xl select-none">
+                    <div className="w-full h-full flex items-center justify-center bg-neutral-850 text-neutral-400 font-black text-6xl select-none">
                       {professionalDisplayName ? professionalDisplayName.charAt(0) : "?"}
                     </div>
                   )}
                 </div>
 
-                {/* Name & Professions Info */}
-                <div className="flex-1 flex flex-col justify-center sm:justify-start pt-1">
-                  <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-2 tracking-tight">
-                    {professionalDisplayName}
-                  </h2>
-                  <div className="text-sm sm:text-base text-theme_13_samecolour font-bold uppercase tracking-wider mb-4">
+                {/* Details */}
+                <div className="flex-1 flex flex-col justify-center sm:justify-start text-center sm:text-left">
+                  {/* Profession */}
+                  <div className="text-xs sm:text-sm font-bold text-theme_13_samecolour uppercase tracking-wider mb-2">
                     {professional.professions && professional.professions.length > 0
-                      ? professional.professions.map((prof: string) => {
-                          const key = prof.toLowerCase();
-                          return t(key, { defaultValue: prof });
-                        }).join(", ")
+                      ? professional.professions
+                          .map((prof: string) => formatProfession(prof))
+                          .filter(Boolean)
+                          .join(", ")
                       : t("cast")}
                   </div>
-                  {description && (
-                    <div className="text-sm sm:text-base leading-relaxed text-neutral-300">
-                      <span className="inline">{displayDescription}</span>
-                      {shouldTruncate && (
-                        <button
-                          onClick={() => setIsExpanded(!isExpanded)}
-                          className="text-theme_13_samecolour hover:underline font-bold ml-1.5 focus:outline-none inline-block text-sm"
-                        >
-                          {isExpanded ? t("view_less") : t("view_more")}
-                        </button>
+
+                  {/* Name */}
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight mb-3 drop-shadow">
+                    {professionalDisplayName}
+                  </h1>
+
+                  {/* Clean Metadata Line (Born, Height, Known For) */}
+                  {(knownForText || professional.dob || professional.height) && (
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 text-xs sm:text-sm text-neutral-400 font-medium mb-4">
+                      {knownForText && (
+                        <span>
+                          <span className="text-neutral-500 font-semibold">{t("known_for")}</span>{" "}
+                          <span className="text-neutral-300">{knownForText}</span>
+                        </span>
+                      )}
+                      {knownForText && (professional.dob || professional.height) && (
+                        <span className="text-neutral-600">•</span>
+                      )}
+                      {professional.dob && (
+                        <span>
+                          <span className="text-neutral-500 font-semibold">{t("dob")}</span>{" "}
+                          <span className="text-neutral-300">{professional.dob}</span>
+                        </span>
+                      )}
+                      {professional.dob && professional.height && (
+                        <span className="text-neutral-600">•</span>
+                      )}
+                      {professional.height && (
+                        <span>
+                          <span className="text-neutral-500 font-semibold">{t("height")}</span>{" "}
+                          <span className="text-neutral-300">{professional.height}</span>
+                        </span>
                       )}
                     </div>
                   )}
 
-                  {/* Additional Metadata */}
-                  <div className="flex flex-col gap-1.5 mt-4 text-xs sm:text-sm text-neutral-400 font-medium">
-                    {knownForText && (
-                      <div>
-                        <span className="text-neutral-500 font-bold">{t("known_for")}</span>{" "}
-                        <span className="text-neutral-300 inline">{displayKnownFor}</span>
-                        {shouldTruncateKnownFor && (
-                          <button
-                            onClick={() => setIsKnownForExpanded(!isKnownForExpanded)}
-                            className="text-theme_13_samecolour hover:underline font-bold ml-1.5 focus:outline-none inline-block text-xs sm:text-sm"
-                          >
-                            {isKnownForExpanded ? t("view_less") : t("view_more")}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {professional.dob && (
-                      <div>
-                        <span className="text-neutral-500 font-bold">{t("dob")}</span>{" "}
-                        <span className="text-neutral-300">{professional.dob}</span>
-                      </div>
-                    )}
-                    {professional.height && (
-                      <div>
-                        <span className="text-neutral-500 font-bold">{t("height")}</span>{" "}
-                        <span className="text-neutral-300">{professional.height}</span>
-                      </div>
-                    )}
-                  </div>
+                  {/* Description / Bio */}
+                  {description && (
+                    <p className="text-sm sm:text-base leading-relaxed text-neutral-300 max-w-4xl font-normal">
+                      {description}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Assets Grid */}
-              <div className="mt-4">
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-5 border-b border-neutral-900 pb-3">
-                  {t("works_features")}
-                </h3>
+              {/* Works & Features Grid */}
+              <div className="flex flex-col gap-6">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white tracking-wide">
+                    {t("works_features")}
+                  </h2>
+                  {assets.length > 0 && (
+                    <span className="text-sm font-semibold text-neutral-400">
+                      ({assets.length})
+                    </span>
+                  )}
+                </div>
+
                 {assets.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-5 sm:gap-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
                     {assets.map((item: any, idx: number) => {
                       const title = resolveTitle(item);
                       const imgUrl = resolveImage(item);
@@ -316,40 +307,45 @@ export function CastDetailsPopup({
                     })}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-neutral-500 text-sm">
+                  <div className="text-center py-16 text-neutral-500 text-sm">
                     {t("no_works_found")}
                   </div>
                 )}
               </div>
             </div>
           )}
-        </motion.div>
+        </div>
       </div>
-    </div>
-  </FocusContext.Provider>
+    </FocusContext.Provider>
   );
 }
 
-function FocusableCastPopupCloseButton({ onClose, hasAssets }: { onClose: () => void; hasAssets?: boolean }) {
+function FocusableCastPopupBackButton({ onClose, hasAssets }: { onClose: () => void; hasAssets?: boolean }) {
   const { ref, focused } = useFocusable({
-    focusKey: "cast-popup-close-btn",
+    focusKey: "cast-popup-back-btn",
     onEnterPress: onClose,
     onArrowPress: (direction) => {
       if (direction === "down" && hasAssets) {
         retrySetFocus("cast-popup-asset-0");
         return false;
       }
-      return false; // Trap focus within close button if no assets or up/left/right pressed
+      return false;
     },
   });
+
   return (
     <button
       ref={ref as any}
       onClick={onClose}
-      className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/60 hover:bg-neutral-800/80 border transition-all flex items-center justify-center cursor-pointer text-neutral-300 hover:text-white outline-none ${focused ? "ring-4 ring-white border-white bg-neutral-800 scale-110 shadow-xl" : "border-white/10"}`}
-      aria-label="Close professional details"
+      className={`flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-150 outline-none cursor-pointer select-none ${
+        focused
+          ? "bg-white text-neutral-950 font-bold ring-4 ring-white/60 shadow-2xl scale-105"
+          : "bg-white/10 text-white/90 border border-white/15 hover:bg-white/20"
+      }`}
+      aria-label="Back to content"
     >
-      <X size={22} />
+      <ChevronLeft size={20} className={focused ? "text-neutral-950" : "text-white"} />
+      <span className="text-sm font-semibold tracking-wide">Back</span>
     </button>
   );
 }
@@ -363,7 +359,7 @@ function FocusableCastPopupAssetItem({ idx, total, title, imgUrl, onSelect }: an
       const col = idx % GRID_COLS;
       if (direction === "up") {
         if (row === 0) {
-          retrySetFocus("cast-popup-close-btn");
+          retrySetFocus("cast-popup-back-btn");
         } else {
           retrySetFocus(`cast-popup-asset-${idx - GRID_COLS}`);
         }
@@ -372,20 +368,22 @@ function FocusableCastPopupAssetItem({ idx, total, title, imgUrl, onSelect }: an
       if (direction === "down") {
         if (idx + GRID_COLS < total) {
           retrySetFocus(`cast-popup-asset-${idx + GRID_COLS}`);
+        } else if (row < Math.floor((total - 1) / GRID_COLS)) {
+          retrySetFocus(`cast-popup-asset-${total - 1}`);
         }
-        return false; // Prevent escaping below bottom row
+        return false;
       }
       if (direction === "left") {
         if (col > 0) {
           retrySetFocus(`cast-popup-asset-${idx - 1}`);
         }
-        return false; // Prevent escaping to the left
+        return false;
       }
       if (direction === "right") {
         if (col < GRID_COLS - 1 && idx + 1 < total) {
           retrySetFocus(`cast-popup-asset-${idx + 1}`);
         }
-        return false; // Prevent escaping to the right
+        return false;
       }
       return false;
     },
@@ -398,28 +396,38 @@ function FocusableCastPopupAssetItem({ idx, total, title, imgUrl, onSelect }: an
     <div
       ref={ref as any}
       onClick={onSelect}
-      className={`group relative aspect-video rounded-2xl overflow-hidden cursor-pointer border bg-neutral-900 shadow-md transition-all duration-300 ${focused ? "border-white ring-4 ring-white scale-[1.04] shadow-2xl z-10" : "border-neutral-800/40 hover:scale-[1.02]"}`}
+      className={`group relative aspect-video rounded-xl overflow-hidden cursor-pointer bg-neutral-900 transition-all duration-200 ${
+        focused
+          ? "border-2 border-white ring-4 ring-white/50 scale-105 shadow-2xl z-10"
+          : "border border-white/10 hover:border-white/20"
+      }`}
     >
       {imgUrl ? (
         <JOJOCommonImage
           src={imgUrl}
           alt={title}
           fill
-          className="object-cover"
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
           wrapperClassName="w-full h-full"
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center p-2 text-center text-sm text-neutral-500 bg-neutral-850">
+        <div className="w-full h-full flex items-center justify-center p-3 text-center text-sm font-semibold text-neutral-400 bg-neutral-850">
           {title}
         </div>
       )}
-      <div className={`absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent transition-opacity duration-300 flex items-end p-3 ${focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-        <span className="text-xs sm:text-sm font-semibold text-white truncate w-full">{title}</span>
+      <div
+        className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent transition-opacity duration-200 flex items-end p-4 ${
+          focused ? "opacity-100" : "opacity-80"
+        }`}
+      >
+        <span className="text-xs sm:text-sm font-bold text-white truncate w-full drop-shadow">
+          {title}
+        </span>
       </div>
       {focused && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-11 h-11 rounded-full bg-theme_13_samecolour/90 text-black flex items-center justify-center">
-            <Play size={18} fill="currentColor" className="ml-0.5" />
+          <div className="w-12 h-12 rounded-full bg-theme_13_samecolour text-black flex items-center justify-center shadow-2xl">
+            <Play size={20} fill="currentColor" className="ml-0.5" />
           </div>
         </div>
       )}
