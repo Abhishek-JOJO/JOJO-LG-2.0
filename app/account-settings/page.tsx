@@ -10,7 +10,7 @@ import { useWatchlistStore } from "@/store/useWatchlistStore";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 import { useLocaleStore } from "@/store/useLocaleStore";
 import { LogoutModal } from "@/components/layout/LogoutModal";
-import { Locale, LOCALE_LABELS, SUPPORTED_LOCALES } from "@/enums/ui.enum";
+import { Locale, LOCALE_LABELS, LoginIdentifierType, SUPPORTED_LOCALES } from "@/enums/ui.enum";
 import { ROUTES } from "@/lib/constants/routes";
 import { mapApiRailItem } from "@/components/content-rail/utils/contentRail.mapper";
 import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
@@ -38,6 +38,30 @@ function retrySetFocus(focusKey: string, attempts = 6, intervalMs = 90) {
   setTimeout(attempt, intervalMs);
 }
 
+function normalizePhoneCode(code: string) {
+  const digits = code.replace(/[^0-9]/g, "");
+  return digits ? `+${digits}` : "";
+}
+
+function formatAccountPhone(phone: string, phoneCode: string) {
+  if (!phone) return "";
+  if (phone.includes("@")) return phone;
+
+  const normalizedCode = normalizePhoneCode(phoneCode || LoginIdentifierType.PHONE_CODE_NUMBER_DEFAULT);
+  if (!normalizedCode) return phone;
+
+  const trimmedPhone = phone.trim();
+  if (trimmedPhone.startsWith("+")) return trimmedPhone;
+
+  const phoneDigits = trimmedPhone.replace(/[^0-9]/g, "");
+  const codeDigits = normalizedCode.replace(/[^0-9]/g, "");
+  if (codeDigits && phoneDigits.startsWith(codeDigits) && phoneDigits.length > codeDigits.length + 7) {
+    return `+${phoneDigits}`;
+  }
+
+  return `${normalizedCode} ${trimmedPhone}`;
+}
+
 export default function AccountSettingsPage() {
   const router = useRouter();
   const t = useTranslations("tSettings");
@@ -51,13 +75,17 @@ export default function AccountSettingsPage() {
   // User account identification (phone or email)
   const rawPhone = (user?.phone || (typeof window !== "undefined" ? localStorage.getItem("user_phone") : "") || "").trim();
   const rawEmail = (user?.email || (typeof window !== "undefined" ? localStorage.getItem("user_email") : "") || "").trim();
-  const rawPhoneCode = ((user as any)?.phone_code || (user as any)?.phoneCode || (typeof window !== "undefined" ? localStorage.getItem("user_phone_code") : "") || "").trim();
+  const rawPhoneCode = (
+    (user as any)?.phone_code ||
+    (user as any)?.phoneCode ||
+    (typeof window !== "undefined" ? localStorage.getItem("user_phone_code") : "") ||
+    ""
+  ).trim();
 
   // If phone field contains '@', it was saved from an email login
   const resolvedEmail = rawEmail || (rawPhone.includes("@") ? rawPhone : "");
   const resolvedPhone = !rawPhone.includes("@") ? rawPhone : "";
-  const formattedPhoneCode = rawPhoneCode ? (rawPhoneCode.startsWith("+") ? rawPhoneCode : `+${rawPhoneCode}`) : "";
-  const formattedPhone = resolvedPhone ? (formattedPhoneCode ? `${formattedPhoneCode} ${resolvedPhone}` : resolvedPhone) : "";
+  const formattedPhone = resolvedPhone ? formatAccountPhone(resolvedPhone, rawPhoneCode) : "";
 
   // Watchlist preview (first page only — this is a compact rail, not the full /watchlist grid)
   const watchlistAssets = useWatchlistStore((s) => s.assets);

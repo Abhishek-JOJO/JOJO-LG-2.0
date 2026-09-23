@@ -20,6 +20,8 @@ export function mapUser(apiUser: any): User {
   return {
     id: apiUser.user_id || apiUser.id || '',
     phone: apiUser.phone || '',
+    phone_code: apiUser.phone_code || apiUser.phoneCode || '',
+    phoneCode: apiUser.phoneCode || apiUser.phone_code || '',
     name: apiUser.name || apiUser.fullName,
     email: apiUser.email,
     avatar: apiUser.avatar || apiUser.profilePicture,

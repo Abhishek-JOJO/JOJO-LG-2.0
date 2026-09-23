@@ -10,6 +10,7 @@ import { useLocaleStore } from "@/store/useLocaleStore";
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { useMemo, useState, useEffect } from "react";
+import QRCode from "qrcode";
 import Loading from "./loading";
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
 import { useRouter } from "next/navigation";
@@ -25,6 +26,15 @@ import { safeNavigate } from "@/lib/webos/safeNavigate";
 import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { useOverseasDetection } from "@/features/geo/hooks/useOverseasDetection";
 import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+
+const SUBSCRIPTION_QR_URL = "https://jojoapp.in/subscription";
+
+function shouldShowSubscriptionQrPage() {
+    if (typeof window === "undefined") return true;
+    const userAgent = window.navigator.userAgent;
+    const isPhoneOrTablet = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent) && !/webOS|SmartTV|TV/i.test(userAgent);
+    return !isPhoneOrTablet;
+}
 
 // This page never set any initial D-pad focus at all — a TV user landing here
 // had nothing focused and no current position for norigin to navigate from, so
@@ -132,6 +142,169 @@ const formatPrice = (val: number | undefined | null): string => {
     return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(2);
 };
 
+function getQrPlanTitle(product: any) {
+    if (!product) return "JOJO Gold";
+    if (product.validityDays === 365 || product.validityCount === 12) return "12 months";
+    if (product.validityDays === 30 || product.validityCount === 1) return "1 Month";
+    return product.label || product.name || "JOJO Gold";
+}
+
+function PlanFeatureIcon({ src, alt, isSelected }: { src?: string; alt?: string; isSelected: boolean }) {
+    if (isSelected && src) {
+        const maskUrl = `url("${String(src).replace(/"/g, '\\"')}")`;
+        return (
+            <div
+                role="img"
+                aria-label={alt || undefined}
+                className="h-9 w-9 bg-black"
+                style={{
+                    WebkitMaskImage: maskUrl,
+                    WebkitMaskRepeat: "no-repeat",
+                    WebkitMaskPosition: "center",
+                    WebkitMaskSize: "contain",
+                    maskImage: maskUrl,
+                    maskRepeat: "no-repeat",
+                    maskPosition: "center",
+                    maskSize: "contain",
+                }}
+            />
+        );
+    }
+
+    return (
+        <div className="relative h-9 w-9">
+            <JOJOCommonImage
+                src={src}
+                alt={alt || ""}
+                fill
+                contentMode="contain"
+                wrapperClassName="w-full h-full"
+            />
+        </div>
+    );
+}
+
+function SubscriptionQrPage({ products, selectedProduct, onSelectProduct }: { products: any[]; selectedProduct: any; onSelectProduct: (productId: string) => void }) {
+    const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+    const selectedSku = selectedProduct?.skus?.[0];
+    const selectedPlanTitle = getQrPlanTitle(selectedProduct);
+
+    useEffect(() => {
+        let cancelled = false;
+        QRCode.toDataURL(SUBSCRIPTION_QR_URL, {
+            width: 460,
+            margin: 1,
+            color: { dark: "#000000", light: "#ffffff" },
+        })
+            .then((dataUrl) => {
+                if (!cancelled) setQrDataUrl(dataUrl);
+            })
+            .catch(() => {
+                if (!cancelled) setQrDataUrl(null);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    return (
+        <div className="relative min-h-screen overflow-hidden flex items-center justify-center px-10 pt-2 pb-16">
+            <div className="fixed inset-0 z-0 pointer-events-none bg-[radial-gradient(circle_at_25%_25%,_#3d1a08_0%,_#140a04_50%,_#050201_100%)]" />
+            <div className="fixed inset-0 z-0 pointer-events-none bg-black/25" />
+            <div className="fixed top-[18%] right-0 z-0 h-[560px] w-[760px] rounded-full bg-[var(--theme_13)] opacity-[0.14] blur-[130px] pointer-events-none translate-x-1/3" />
+            <div className="fixed bottom-[5%] left-0 z-0 h-[520px] w-[720px] rounded-full bg-[var(--theme_13)] opacity-[0.12] blur-[130px] pointer-events-none -translate-x-1/3" />
+
+            <div className="relative z-10 grid w-full max-w-7xl grid-cols-[0.9fr_1.15fr] items-center gap-10 xl:gap-14">
+                <div className="flex flex-col items-center">
+                    <div className="relative mb-4 h-14 w-52">
+                        <JOJOCommonImage
+                            src={LOGOS.JOJO_GOLD}
+                            alt="JOJO Gold"
+                            fill
+                            contentMode="contain"
+                            priority
+                            preset={JOJOImagePreset.Logo}
+                            wrapperClassName="w-full h-full"
+                        />
+                    </div>
+                    <p className="mb-6 text-center text-2xl font-bold text-white">Premium Deals, Unlimited Entertainment!</p>
+
+                    <div className="flex w-full max-w-[560px] flex-col gap-5">
+                        {products.map((product) => {
+                            const sku = product?.skus?.[0];
+                            if (!sku) return null;
+                            const isSelected = product.productId === selectedProduct?.productId;
+                            const title = getQrPlanTitle(product);
+                            const featureLimit = product.validityCount === 1 ? 3 : 4;
+
+                            return (
+                                <button
+                                    key={product.productId}
+                                    onClick={() => onSelectProduct(product.productId)}
+                                    className={`w-full rounded-2xl border px-7 py-6 text-left transition-all ${
+                                        isSelected
+                                            ? "border-[#FAAF3F] bg-gradient-to-r from-[#FAAF3F] via-[#FFD691] to-[#FAAF3F] text-black [&_*]:text-black"
+                                            : "border-white/25 bg-black/28 text-white backdrop-blur-md"
+                                    }`}
+                                >
+                                    <div className="mb-7 flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-3">
+                                            {isSelected && <span className="h-3 w-3 rounded-full bg-black" />}
+                                            <span className="text-2xl font-extrabold">{title}</span>
+                                        </div>
+                                        <span className="text-2xl font-extrabold">
+                                            {sku.currencySymbol}{formatPrice(sku.price)} / month
+                                        </span>
+                                    </div>
+
+                                    <div className={`grid gap-4 ${featureLimit >= 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+                                        {product.features?.slice(0, featureLimit).map((feature: any, idx: number) => (
+                                            <div key={feature.featureId || idx} className="flex min-w-0 flex-col items-center gap-2 text-center">
+                                                <PlanFeatureIcon src={feature.featureImageUrl} alt={feature.featureName} isSelected={isSelected} />
+                                                <span className="text-sm font-bold leading-tight">{String(feature.featureName || "").replace("Upto", "Upto ")}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="flex flex-col items-center rounded-3xl border border-white/22 bg-white/[0.08] p-9 text-center backdrop-blur-2xl">
+                    <h1 className="mb-6 text-center text-4xl font-extrabold leading-tight text-white">Continue Watching on JOJO</h1>
+
+                    <div className="mb-8 flex w-full justify-center">
+                        <div className="flex h-[344px] w-[344px] items-center justify-center rounded-2xl bg-white/10 p-3 backdrop-blur-xl">
+                            <div className="flex h-full w-full items-center justify-center rounded-xl bg-white p-3">
+                                {qrDataUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={qrDataUrl} alt="JOJO Gold subscription QR code" className="h-full w-full object-contain" />
+                                ) : (
+                                    <span className="text-base font-semibold text-black/60">Generating QR...</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <p className="max-w-[620px] text-center text-3xl font-extrabold leading-tight text-white">
+                        Scan the QR code to continue with the {selectedPlanTitle} plan.
+                    </p>
+                    <p className="mt-5 max-w-[650px] text-center text-base font-semibold leading-snug text-white/82">
+                        Use the QR code to open the JOJO app and finish your purchase with the same account as your TV. Restart the app to start watching.
+                    </p>
+                    {selectedSku && (
+                        <p className="mt-4 text-base font-bold text-theme_13_samecolour">
+                            {selectedSku.currencySymbol}{formatPrice(selectedSku.price)} / month
+                        </p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function SubscriptionPage() {
     const t = useTranslations("subscription");
     const locale = useLocaleStore((s) => s.locale);
@@ -174,6 +347,7 @@ export default function SubscriptionPage() {
     }, [isOverseas, plansData, t]);
 
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+    const [showQrPage] = useState(shouldShowSubscriptionQrPage);
 
     // Extract products under the group (e.g. jojo_gold)
     const activeGroup = plansData?.groups?.[0];
@@ -259,7 +433,21 @@ export default function SubscriptionPage() {
         );
     }
 
-    if (isLoading || isSubLoading) {
+    if (isSubLoading) {
+        return <Loading />;
+    }
+
+    if (showQrPage) {
+        return (
+            <SubscriptionQrPage
+                products={products}
+                selectedProduct={selectedProduct}
+                onSelectProduct={setSelectedProductId}
+            />
+        );
+    }
+
+    if (isLoading) {
         return <Loading />;
     }
 

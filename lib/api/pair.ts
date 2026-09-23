@@ -46,6 +46,7 @@ export interface VerifyQrResult {
   userId?: string;
   token?: string;
   phone?: string;
+  phoneCode?: string;
 }
 
 /**
@@ -84,6 +85,7 @@ export async function verifyQrCode(code: string, sessionId?: string, signal?: Ab
       userId,
       token: payload?.token,
       phone: payload?.phone,
+      phoneCode: payload?.phone_code ?? payload?.phoneCode,
     };
   } catch {
     return { verified: false };

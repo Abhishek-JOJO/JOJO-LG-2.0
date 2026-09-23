@@ -119,15 +119,18 @@ export function useVerifyOtp() {
       // Pass session to service with isRegister flag
       return completeOtpVerification(phone, phoneCode, otp, isRegister, sessionId);
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       // Update auth store with session_id as token
       const id = data.user_id ?? (data.user && data.user.id) ?? '';
       const phone = data.phone ?? (data.user && data.user.phone) ?? '';
       const email = data.email ?? (data.user && data.user.email) ?? '';
+      const phoneCode = data.phone_code || data.user?.phone_code || data.user?.phoneCode || variables.phoneCode || '';
       setAuth(
         {
           id,
           phone,
+          phone_code: phone.includes('@') ? '' : phoneCode,
+          phoneCode: phone.includes('@') ? '' : phoneCode,
           email,
           isGuest: false,
           createdAt: new Date().toISOString(),
@@ -187,11 +190,15 @@ export function useVerifySpecialUser() {
       const sessionId = useAuthStore.getState().token ?? undefined;
       return completeSpecialUserVerification(phone, phoneCode, isRegister, sessionId);
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
+      const phone = data.phone || variables.phone || "";
+      const phoneCode = data.phone_code || (data as any).phoneCode || variables.phoneCode || "";
       setAuth(
         {
           id: data.user_id,
-          phone: data.phone || "",
+          phone,
+          phone_code: phone.includes('@') ? '' : phoneCode,
+          phoneCode: phone.includes('@') ? '' : phoneCode,
           email: data.email,
           isGuest: false,
           isSpecialUser: true,

@@ -108,6 +108,8 @@ export function QrPairingPanel() {
           {
             id: result.userId,
             phone: result.phone || "",
+            phone_code: result.phoneCode || "",
+            phoneCode: result.phoneCode || "",
             isGuest: false,
             createdAt: new Date().toISOString(),
           },

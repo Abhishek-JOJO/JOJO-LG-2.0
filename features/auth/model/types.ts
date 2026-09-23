@@ -84,6 +84,10 @@ export interface VerifyOtpResponse {
 export interface VerifySpecialUserResponse {
   session_id: string;
   user_id: string;
+  phone?: string;
+  phone_code?: string;
+  phoneCode?: string;
+  email?: string;
   is_special_user: boolean;
   operator_name: string;
 }
@@ -95,6 +99,8 @@ export interface GuestLoginResponse {
 export interface User {
   id: string;
   phone: string;
+  phone_code?: string;
+  phoneCode?: string;
   name?: string;
   email?: string;
   avatar?: string;
