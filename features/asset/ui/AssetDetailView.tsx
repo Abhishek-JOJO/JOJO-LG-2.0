@@ -16,8 +16,6 @@ import { useContinueWatchingStore } from "@/store/useContinueWatchingStore";
 import {
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Play,
   Plus,
   X,
@@ -210,8 +208,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const { isAppReady } = useBootstrap();
   const sessionId = useAuthStore((state) => state.token);
   const storeUser = useAuthStore((state) => state.user);
-  const castListRef = useRef<HTMLDivElement>(null);
-  const { isDragging: isCastDragging } = useDragScroll(castListRef);
 
   const [activeTab, setActiveTab] = useState<"episodes" | "trailers" | "cast" | "more_like_this">("episodes");
 
@@ -245,9 +241,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     initialFocusDoneRef.current = false;
     contentOverlayOpenRef.current = false;
   }, [assetId]);
-  const [canCastScrollLeft, setCanCastScrollLeft] = useState(false);
-  const [canCastScrollRight, setCanCastScrollRight] = useState(false);
-
   const [isSocketConnected, setIsSocketConnected] = useState(socketClient.isConnected);
 
   useEffect(() => {
@@ -554,12 +547,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // Track whether slide was changed manually by the user (shorter autoplay delay)
   const isUserSlideChangeRef = useRef(false);
 
-  const handleNextSlide = useCallback(() => {
-    if (previewsList.length <= 1) return;
-    isUserSlideChangeRef.current = true;
-    setCurrentSlideIndex((prev) => (prev + 1) % previewsList.length);
-  }, [previewsList]);
-
   const handlePrevSlide = useCallback(() => {
     if (previewsList.length <= 1) return;
     isUserSlideChangeRef.current = true;
@@ -708,49 +695,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       return () => clearTimeout(timer);
     }
   }, [railsLoading, checkScroll]);
-
-
-
-  const checkCastScroll = useCallback(() => {
-    const el = castListRef.current;
-    if (el) {
-      const { scrollLeft, scrollWidth, clientWidth } = el;
-      setCanCastScrollLeft(scrollLeft > 5);
-      setCanCastScrollRight(scrollLeft + clientWidth < scrollWidth - 5);
-    }
-  }, []);
-
-  useEffect(() => {
-    // castListRef.current is only non-null once the Cast tab panel is actually
-    // mounted (it's now lazily mounted per active tab — see the tab panels'
-    // render guards below), so this must also re-run when the tab becomes
-    // active, not just when castList's data changes, or the ResizeObserver
-    // never attaches and the scroll arrows never initialize.
-    checkCastScroll();
-    window.addEventListener("resize", checkCastScroll);
-
-    let observer: ResizeObserver | null = null;
-    if (typeof window !== "undefined" && castListRef.current) {
-      observer = new ResizeObserver(() => {
-        checkCastScroll();
-      });
-      observer.observe(castListRef.current);
-    }
-
-    return () => {
-      window.removeEventListener("resize", checkCastScroll);
-      if (observer) {
-        observer.disconnect();
-      }
-    };
-  }, [castList, checkCastScroll, activeTab]);
-
-  useEffect(() => {
-    if (!showSkeleton) {
-      const timer = setTimeout(checkCastScroll, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [showSkeleton, checkCastScroll]);
 
   // Interactive Action States
   // Watchlist — powered by socket store
@@ -1764,8 +1708,8 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 : "absolute bottom-6 right-6 z-30 flex items-center gap-2"
             }
           >
-            {/* Bar indicators — only width animates, height is always h-1 */}
-            <div className="flex items-center gap-1.5">
+            {/* Rounded pill container — bar indicators only; width animates, height stays h-1 */}
+            <div className="flex items-center gap-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 px-4 py-2.5 shadow-lg">
               {previewsList.map((_, idx) => (
                 <FocusablePreviewDot
                   key={idx}
@@ -1811,8 +1755,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 </FocusablePreviewDot>
               ))}
             </div>
-            {/* Next arrow */}
-            <FocusablePreviewNextButton onClick={handleNextSlide} />
           </div>
         )}
 
@@ -2272,61 +2214,26 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   </div>
               )}
 
-              {/* Cast & Crew Tab Panel — only mounted while active, see Episodes panel above. */}
+              {/* Cast & Crew Tab Panel — grid of all cast & crew, only mounted while active. */}
               {hasCastTab && effectiveTab === "cast" && (
-                <div className="pb-8">
-                    <div className="relative group/cast-rail w-full">
-                      {canCastScrollLeft && (
-                        <button
-                          tabIndex={-1}
-                          onClick={() => {
-                            if (castListRef.current) {
-                              castListRef.current.scrollBy({ left: -400, behavior: "smooth" });
-                            }
-                          }}
-                          className="absolute left-2 top-[75px] sm:top-[90px] -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/cast-rail:opacity-100 shadow-xl cursor-pointer"
-                          aria-label="Scroll left"
-                        >
-                          <ChevronLeft size={24} />
-                        </button>
-                      )}
-
-                      {canCastScrollRight && (
-                        <button
-                          tabIndex={-1}
-                          onClick={() => {
-                            if (castListRef.current) {
-                              castListRef.current.scrollBy({ left: 400, behavior: "smooth" });
-                            }
-                          }}
-                          className="absolute right-2 top-[75px] sm:top-[90px] -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/cast-rail:opacity-100 shadow-xl cursor-pointer"
-                          aria-label="Scroll right"
-                        >
-                          <ChevronRight size={24} />
-                        </button>
-                      )}
-
-                      <div
-                        ref={castListRef}
-                        onScroll={checkCastScroll}
-                        className={`flex gap-6 sm:gap-8 overflow-x-auto pt-4 pb-12 px-0 scrollbar-none ${
-                          isCastDragging ? "scroll-auto cursor-grabbing select-none" : "scroll-smooth cursor-grab"
-                        }`}
-                      >
-                        {castList.map((castItem, idx) => (
-                          <FocusableCastItem
-                            key={idx}
-                            castItem={castItem}
-                            idx={idx}
-                            total={castList.length}
-                            castList={castList}
-                            asset={asset}
-                            assetId={assetId}
-                            setSelectedProfessionalId={setSelectedProfessionalId}
-                            onFocused={handleCastFocused}
-                          />
-                        ))}
-                      </div>
+                <div className="pb-16">
+                    <div
+                      data-cast-grid
+                      className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-x-4 gap-y-8 sm:gap-y-10 w-full pt-4"
+                    >
+                      {castList.map((castItem, idx) => (
+                        <FocusableCastItem
+                          key={idx}
+                          castItem={castItem}
+                          idx={idx}
+                          total={castList.length}
+                          castList={castList}
+                          asset={asset}
+                          assetId={assetId}
+                          setSelectedProfessionalId={setSelectedProfessionalId}
+                          onFocused={handleCastFocused}
+                        />
+                      ))}
                     </div>
                   </div>
               )}
@@ -2605,8 +2512,31 @@ function FocusableCastItem({
     focusKey: castFocusKey,
     onEnterPress: handleCastClick,
     onArrowPress: (direction) => {
+      // Cast & Crew is an auto-fill GRID — compute the real column count by
+      // counting how many cells sit on the same row as the first cell, so
+      // Up/Down land row-accurately at every breakpoint.
+      const gridEl = ref.current?.parentElement;
+      let cols = 1;
+      if (gridEl && gridEl.children.length > 0) {
+        const firstTop = (gridEl.children[0] as HTMLElement).offsetTop;
+        let sameRow = 0;
+        for (let i = 0; i < gridEl.children.length; i++) {
+          if ((gridEl.children[i] as HTMLElement).offsetTop === firstTop) sameRow++;
+          else break;
+        }
+        cols = Math.max(1, sameRow);
+      }
+      const castKeyAt = (i: number) => {
+        const it = castList?.[i];
+        const id = (it?.id || it?.professional_id || it?.professionalId) ?? i;
+        return `cast-${id}`;
+      };
       if (direction === "up") {
-        setFocus("tab-cast");
+        if (idx >= cols && castList?.[idx - cols]) {
+          setFocus(castKeyAt(idx - cols));
+        } else {
+          setFocus("tab-cast");
+        }
         return false;
       }
       if (direction === "left") {
@@ -2626,7 +2556,10 @@ function FocusableCastItem({
         return false; // Boundary: do not escape right
       }
       if (direction === "down") {
-        return false; // Boundary: do not escape down
+        if (castList?.[idx + cols]) {
+          setFocus(castKeyAt(idx + cols));
+        }
+        return false; // Boundary: nothing below the cast grid
       }
       return true;
     },
@@ -2640,7 +2573,7 @@ function FocusableCastItem({
     <div
       ref={ref as any}
       onClick={handleCastClick}
-      className={`flex flex-col items-center shrink-0 w-[130px] sm:w-[155px] text-center cursor-pointer group transition-all duration-300 ${
+      className={`flex flex-col items-center w-full text-center cursor-pointer group transition-all duration-300 ${
         focused ? "scale-105 z-20" : "hover:scale-105"
       }`}
     >
@@ -2780,23 +2713,6 @@ function FocusablePreviewDot({ idx, onClick, assetId, children }: any) {
       style={{ background: "none", border: "none", padding: 0 }}
     >
       {children}
-    </button>
-  );
-}
-
-function FocusablePreviewNextButton({ onClick }: { onClick: () => void }) {
-  const { ref, focused } = useFocusable({
-    focusKey: 'preview-next-btn',
-    onEnterPress: onClick,
-  });
-  return (
-    <button
-      ref={ref as any}
-      onClick={onClick}
-      className={`text-theme_1/80 hover:text-theme_1 transition-colors flex items-center justify-center cursor-pointer active:scale-90 outline-none ${focused ? "ring-2 ring-white rounded-full scale-110" : ""}`}
-      aria-label="Next slide"
-    >
-      <ChevronRight size={30} />
     </button>
   );
 }

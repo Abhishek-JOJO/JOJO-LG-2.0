@@ -3,7 +3,7 @@
 import { ContentRailsView } from "@/features/content-rail/ui/ContentRailsView";
 import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { ROUTES } from "@/lib/constants/routes";
 import SubscriptionSuccessPopup from "@/components/payment/SubscriptionSuccessPopup";
 import TVODSuccessPopup from "@/components/payment/TVODSuccessPopup";
@@ -12,8 +12,9 @@ import { localStorageManager } from "@/lib/localStorage/localStorage.manager";
 import { StorageKey } from "@/enums/storage.enum";
 import { appConfig } from "@/lib/config/app.config";
 import { analyticsService, EVENT_NAMES, buildUserSpecificPropertiesPayload } from "@/shared/analytics";
-import { useActivePathname } from "@/hooks/useActivePathname";
+import { useActivePathname, BROWSE_ROUTES } from "@/hooks/useActivePathname";
 import { useNavStore } from "@/store/useNavStore";
+import { normalizePathname } from "@/lib/utils/pathname";
 import { getQueryClient } from "@/lib/react-query/queryClient";
 import { getContentRails } from "@/features/content-rail/api/getContentRails";
 import { useLocaleStore } from "@/store/useLocaleStore";
@@ -48,6 +49,61 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
     const { isAppReady } = useBootstrap();
     const sessionId = useAuthStore(state => state.token);
     const persistedNavItems = useNavStore((state) => state.persistedNavItems);
+
+    // ── Navbar tab slide transition (Home / Movies / Shows / Natak …) ──
+    // Tab switches don't route-change on TV; they flip activeBrowseTab and the
+    // content hard-swaps in one frame. Animate the incoming page sliding in
+    // over the old one, like OTT apps.
+    //
+    // NOTE — enter-only, no mounted exit page: norigin-spatial-navigation
+    // stores focusables in ONE global map keyed by focusKey. Mounting a second
+    // tree alongside (hero-carousel, spotlight-lead-fixed, rail cards share
+    // keys across tabs) overwrites the live page's registrations, and its
+    // unmount then deletes them — killing focus on the live page. Production
+    // TV apps (Netflix/Hotstar) do the same: only the new screen animates.
+    const [prevShownTab, setPrevShownTab] = useState(pathname);
+    const [tabDirection, setTabDirection] = useState<1 | -1 | null>(null);
+
+    // Left↔right order of the navbar pills, so the slide direction always
+    // matches the remote direction ("/" and "/home" are the same tab).
+    const navTabOrder = useMemo(() => {
+        const urls = (persistedNavItems || [])
+            .map((n) => (n?.url === ROUTES.HOMEPAGE ? ROUTES.HOME : n?.url))
+            .filter((u): u is string => typeof u === "string")
+            .map((u) => {
+                const norm = normalizePathname(u);
+                return norm === ROUTES.HOME ? ROUTES.HOMEPAGE : norm;
+            })
+            .filter((u) => BROWSE_ROUTES.includes(u));
+        const unique = Array.from(new Set(urls));
+        return unique.length > 1
+            ? unique
+            : BROWSE_ROUTES.map((u) => (u === ROUTES.HOME ? ROUTES.HOMEPAGE : u));
+    }, [persistedNavItems]);
+
+    // Adjust-state-during-render: the very first paint of the new tab must
+    // already carry its enter animation — setting this in an effect instead
+    // would flash the swapped content for one frame before animating.
+    if (prevShownTab !== pathname) {
+        setPrevShownTab(pathname);
+        const canonical = (p: string) => (p === ROUTES.HOME ? ROUTES.HOMEPAGE : p);
+        const fromIdx = navTabOrder.indexOf(canonical(prevShownTab));
+        const toIdx = navTabOrder.indexOf(canonical(pathname));
+        setTabDirection(
+            fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx
+                ? (toIdx > fromIdx ? 1 : -1)
+                : null
+        );
+    }
+
+    // Strip the animation class once the slide finishes so the wrapper doesn't
+    // keep a transform around (transformed ancestors re-anchor `position:
+    // fixed` children like the spotlight lead card away from the viewport).
+    useEffect(() => {
+        if (tabDirection === null) return;
+        const done = setTimeout(() => setTabDirection(null), 420);
+        return () => clearTimeout(done);
+    }, [tabDirection]);
     const locale = useLocaleStore((state) => state.locale) || "en";
     const [countryCode, setCountryCode] = useState(appConfig.GEO_DEFAULT_COUNTRY_CODE);
 
@@ -144,8 +200,20 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
     };
 
     return (
-        <div className="min-h-screen" style={{ background: "transparent" }}>
-            {renderContent()}
+        <div
+            className={`min-h-screen relative${tabDirection !== null ? " browse-tab-sliding" : ""}`}
+            style={{ background: "transparent" }}
+        >
+            {/* Incoming tab — slides in over the previous page */}
+            <div
+                className={
+                    tabDirection !== null
+                        ? `browse-page-enter-layer ${tabDirection === 1 ? "browse-page-enter-right" : "browse-page-enter-left"}`
+                        : undefined
+                }
+            >
+                {renderContent()}
+            </div>
             {successData && (
                 successData.matchedType === "TVOD" || successData.paymentType === "TVOD" ? (
                     <TVODSuccessPopup

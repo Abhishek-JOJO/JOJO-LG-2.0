@@ -1148,9 +1148,66 @@ input.bg-transparent-forced {
 
 
 
-/* Browse tab transitions intentionally removed.
-   webOS Chromium 53-72 does not reliably fire multi-keyframe CSS animations
-   with delays — the second phase often drops entirely, leaving a black overlay
-   on screen. The hero carousel already cross-fades its own images (900ms
-   opacity transition in ContentRailList) which gives a natural OTT feel
-   without any extra animation layer. */
+/* ============================================================
+   BROWSE TAB PAGE TRANSITIONS (TV navbar: Home/Movies/Shows/Natak)
+   Whole-page slide like OTT apps (Netflix/Hotstar): the new page
+   slides in over the previous one. Design constraints learned the
+   hard way:
+   - ENTER-ONLY: never mount an "exiting page" copy alongside —
+     norigin-spatial-navigation keys focusables in one global map, so
+     duplicate trees clobber then delete each other's registrations
+     and the user loses remote focus.
+   - NO animation-delay / multi-phase keyframes (unreliable on old
+     webOS Chromium) — simple from→to keyframes only.
+   - Only transform + opacity animate, so the webOS compositor runs
+     it on the GPU without relayout/repaint.
+============================================================ */
+
+/* Clip the page sliding in from off-screen while a switch is active */
+.browse-tab-sliding {
+  overflow-x: hidden;
+}
+
+.browse-page-enter-layer {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  animation-duration: 0.34s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
+}
+
+@keyframes browsePageEnterFromRight {
+  from {
+    opacity: 0;
+    transform: translate3d(24%, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes browsePageEnterFromLeft {
+  from {
+    opacity: 0;
+    transform: translate3d(-24%, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.browse-page-enter-right {
+  animation-name: browsePageEnterFromRight;
+}
+
+.browse-page-enter-left {
+  animation-name: browsePageEnterFromLeft;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .browse-page-enter-layer {
+    animation-duration: 0.12s;
+  }
+}
