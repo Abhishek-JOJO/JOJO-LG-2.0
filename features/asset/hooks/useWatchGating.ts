@@ -188,7 +188,12 @@ export function useWatchGating({
       // Priority 2: Overseas gating — non-IN users must be subscribed (except for TVOD assets)
       if (isOverseas && !isSubscribed && !isTvodAsset) {
         useAssetDetailStore.getState().resetAssetDetailModal();
-        safeNavigate(router, ROUTES.SUBSCRIPTION);
+        if (typeof window !== "undefined") {
+          const { useTvOverlayStore } = require("@/store/useTvOverlayStore");
+          useTvOverlayStore.getState().open("subscription");
+        } else {
+          safeNavigate(router, ROUTES.SUBSCRIPTION);
+        }
         return;
       }
 
@@ -198,7 +203,12 @@ export function useWatchGating({
         !isSubscribed
       ) {
         useAssetDetailStore.getState().resetAssetDetailModal();
-        safeNavigate(router, ROUTES.SUBSCRIPTION);
+        if (typeof window !== "undefined") {
+          const { useTvOverlayStore } = require("@/store/useTvOverlayStore");
+          useTvOverlayStore.getState().open("subscription");
+        } else {
+          safeNavigate(router, ROUTES.SUBSCRIPTION);
+        }
         return;
       }
 
@@ -333,7 +343,12 @@ export function useWatchGating({
           const status = (error as { status?: number })?.status;
           if (status === 403 || message.toLowerCase().includes("subscription")) {
             useAssetDetailStore.getState().resetAssetDetailModal();
-            safeNavigate(router, ROUTES.SUBSCRIPTION);
+            if (typeof window !== "undefined") {
+              const { useTvOverlayStore } = require("@/store/useTvOverlayStore");
+              useTvOverlayStore.getState().open("subscription");
+            } else {
+              safeNavigate(router, ROUTES.SUBSCRIPTION);
+            }
           }
           return;
         } finally {

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
 import { cn } from "@/lib/utils";
+import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 
 function FocusableUpgradeButton({ onClick, tSettings }: any) {
     const { ref, focused } = useFocusable({
@@ -120,7 +121,13 @@ export default function JOJOGoldRowSection() {
                 </div>
             </Link>
             <FocusableUpgradeButton 
-                onClick={() => route.push("/subscription")} 
+                onClick={() => {
+                    if (typeof window !== "undefined") {
+                        useTvOverlayStore.getState().open("subscription");
+                    } else {
+                        route.push("/subscription");
+                    }
+                }} 
                 tSettings={tSettings} 
             />
         </div>

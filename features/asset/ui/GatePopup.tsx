@@ -82,7 +82,12 @@ export function GatePopup({ gate, message, onClose, pricingLabel, onAction }: Ga
     if (onAction) {
       onAction();
     } else if (config.actionRoute) {
-      safeNavigate(router, config.actionRoute);
+      if (config.actionRoute === ROUTES.SUBSCRIPTION && typeof window !== "undefined") {
+        const { useTvOverlayStore } = require("@/store/useTvOverlayStore");
+        useTvOverlayStore.getState().open("subscription");
+      } else {
+        safeNavigate(router, config.actionRoute);
+      }
     }
     onClose();
   };

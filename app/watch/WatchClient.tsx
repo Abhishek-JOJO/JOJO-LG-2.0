@@ -22,6 +22,7 @@ import { logger } from "@/lib/logger/logger";
 import { useWatchPageGating } from "@/features/asset/hooks/useWatchPageGating";
 import { safeNavigate } from "@/lib/webos/safeNavigate";
 import { mapContentAsset } from "@/features/content/model/mapper";
+import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 
 function WatchContent() {
   const searchParams = useSearchParams();
@@ -160,7 +161,7 @@ function WatchContent() {
 
       const timer = setTimeout(() => {
         if (status === 403 || errMsg.toLowerCase().includes("subscription")) {
-          safeNavigate(router, ROUTES.SUBSCRIPTION);
+          useTvOverlayStore.getState().open("subscription");
         } else {
           safeNavigate(router, ROUTES.HOME);
         }
@@ -207,7 +208,7 @@ function WatchContent() {
     // Hide the player IMMEDIATELY before leaving, so that if the user clicks the browser Back button,
     // the restored route cache (bfcache) has the player already hidden!
     setRedirectingToAsset(true);
-    safeNavigate(router, ROUTES.SUBSCRIPTION);
+    useTvOverlayStore.getState().open("subscription");
   }, [video, rawAsset, router]);
 
   // ═══════════════════════════════════════════════════════════════════════════

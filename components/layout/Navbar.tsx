@@ -41,11 +41,7 @@ function FocusableGetGold({ totalNavItems }: { totalNavItems: number }) {
   const openTvOverlay = useTvOverlayStore((state) => state.open);
 
   const handleOpen = () => {
-    if (typeof window !== "undefined" && window.location.protocol === "file:") {
-      openTvOverlay("subscription");
-      return;
-    }
-    safeNavigate(router, ROUTES.SUBSCRIPTION);
+    openTvOverlay("subscription");
   };
 
   const handleArrowPress = (direction: string) => {

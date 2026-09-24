@@ -201,7 +201,13 @@ function FocusableQrPlanCard({
         <button
             ref={ref as any}
             onClick={onSelect}
-            className={`w-full rounded-2xl border border-white/25 px-7 py-6 text-left transition-all outline-none bg-black/28 text-white backdrop-blur-md ${focused ? "scale-[1.02]" : ""}`}
+            className={`w-full rounded-2xl border px-7 py-6 text-left transition-all outline-none bg-black/28 text-white backdrop-blur-md ${
+                focused
+                    ? "border-amber-400 ring-4 ring-amber-400/50 scale-[1.03] shadow-xl shadow-amber-500/20"
+                    : isSelected
+                    ? "border-white/70 bg-white/10"
+                    : "border-white/25"
+            }`}
         >
             <div className="mb-7 flex items-center justify-between gap-4">
                 <span className="text-2xl font-extrabold">{title}</span>
@@ -308,11 +314,6 @@ function SubscriptionQrPage({ products, selectedProduct, onSelectProduct }: { pr
                     <p className="mt-5 max-w-[650px] text-center text-base font-semibold leading-snug text-white/82">
                         Use the QR code to open the JOJO app and finish your purchase with the same account as your TV. Restart the app to start watching.
                     </p>
-                    {selectedSku && (
-                        <p className="mt-4 text-base font-bold text-theme_13_samecolour">
-                            {selectedSku.currencySymbol}{formatPrice(selectedSku.price)} / month
-                        </p>
-                    )}
                 </div>
             </div>
         </div>

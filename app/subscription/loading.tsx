@@ -1,74 +1,71 @@
-import { PageBackground } from "@/components/common/PageBackground";
 import { JOJOSkeleton } from "@/components/ui/JOJOSkeleton";
 
 export default function Loading() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-theme_12">
-      <PageBackground />
+    <div className="relative min-h-screen overflow-hidden flex items-center justify-center px-10 pt-2 pb-16">
+      {/* Background radial gradient & ambient glow matching SubscriptionQrPage */}
+      <div className="fixed inset-0 z-0 pointer-events-none bg-[radial-gradient(circle_at_25%_25%,_#3d1a08_0%,_#140a04_50%,_#050201_100%)]" />
+      <div className="fixed inset-0 z-0 pointer-events-none bg-black/25" />
+      <div className="fixed top-[18%] right-0 z-0 h-[560px] w-[760px] rounded-full bg-[var(--theme_13)] opacity-[0.14] blur-[130px] pointer-events-none translate-x-1/3" />
+      <div className="fixed bottom-[5%] left-0 z-0 h-[520px] w-[720px] rounded-full bg-[var(--theme_13)] opacity-[0.12] blur-[130px] pointer-events-none -translate-x-1/3" />
 
-      {/* Content wrapper — matches page layout */}
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8 lg:flex-row lg:items-center lg:justify-center lg:gap-12 xl:gap-20">
-        {/* ── Left: Video Preview Skeleton ────────────────────── */}
-        <div className="hidden lg:flex w-full max-w-[480px] xl:max-w-[540px] aspect-[4/3] flex-shrink-0">
-          <JOJOSkeleton className="w-full h-full rounded-2xl" />
+      {/* Main 2-column TV Layout */}
+      <div className="relative z-10 grid w-full max-w-7xl grid-cols-[0.9fr_1.15fr] items-center gap-10 xl:gap-14">
+        {/* Left Column: Plans Skeleton */}
+        <div className="flex flex-col items-center">
+          <JOJOSkeleton className="mb-4 h-14 w-52 rounded-xl" />
+          <JOJOSkeleton className="mb-6 h-7 w-80 rounded-lg" />
+
+          <div className="flex w-full max-w-[560px] flex-col gap-5">
+            {/* Card Skeleton 1 */}
+            <div className="w-full rounded-2xl border border-white/20 bg-black/28 p-7 backdrop-blur-md flex flex-col gap-6">
+              <div className="flex items-center justify-between">
+                <JOJOSkeleton className="h-7 w-36 rounded-md" />
+                <JOJOSkeleton className="h-7 w-32 rounded-md" />
+              </div>
+              <div className="grid grid-cols-4 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex flex-col items-center gap-2">
+                    <JOJOSkeleton className="h-10 w-10 rounded-full" />
+                    <JOJOSkeleton className="h-3 w-16 rounded-md" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Card Skeleton 2 */}
+            <div className="w-full rounded-2xl border border-white/20 bg-black/28 p-7 backdrop-blur-md flex flex-col gap-6">
+              <div className="flex items-center justify-between">
+                <JOJOSkeleton className="h-7 w-36 rounded-md" />
+                <JOJOSkeleton className="h-7 w-32 rounded-md" />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex flex-col items-center gap-2">
+                    <JOJOSkeleton className="h-10 w-10 rounded-full" />
+                    <JOJOSkeleton className="h-3 w-16 rounded-md" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* ── Right: Plan Details Skeleton ─────────────────────── */}
-        <div className="flex flex-col items-center w-full max-w-[520px] gap-6 sm:gap-8">
-          {/* Logo Skeleton */}
-          <JOJOSkeleton className="h-14 w-64 sm:h-16 sm:w-72 rounded-lg" />
+        {/* Right Column: QR Container Skeleton */}
+        <div className="flex flex-col items-center rounded-3xl border border-white/22 bg-white/[0.08] p-9 text-center backdrop-blur-2xl">
+          <JOJOSkeleton className="mb-6 h-10 w-80 rounded-xl" />
 
-          {/* Limited Offer Divider Skeleton */}
-          <div className="flex items-center gap-3 w-full">
-            <JOJOSkeleton className="flex-1 h-px rounded-full" />
-            <JOJOSkeleton className="h-4 w-28 rounded-md" />
-            <JOJOSkeleton className="flex-1 h-px rounded-full" />
-          </div>
-
-          {/* Feature Icons Row Skeleton */}
-          <div className="w-full flex justify-between sm:justify-evenly px-2">
-            {Array.from({ length: 4 }).map((_, idx) => (
-              <div key={idx} className="flex flex-col items-center gap-2">
-                <JOJOSkeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl" />
-                <JOJOSkeleton className="h-3 w-14 sm:w-16 rounded-md" />
-                <JOJOSkeleton className="h-3 w-10 sm:w-12 rounded-md" />
+          <div className="mb-8 flex w-full justify-center">
+            <div className="flex h-[344px] w-[344px] items-center justify-center rounded-2xl bg-white/10 p-3 backdrop-blur-xl">
+              <div className="flex h-full w-full items-center justify-center rounded-xl bg-white/20">
+                <JOJOSkeleton className="h-full w-full rounded-xl" />
               </div>
-            ))}
+            </div>
           </div>
 
-          {/* Plan Cards Skeleton */}
-          <div className="flex gap-3 sm:gap-4 w-full">
-            {Array.from({ length: 2 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="
-                  relative flex-1 flex flex-col gap-3
-                  rounded-xl sm:rounded-2xl p-4 sm:p-5
-                  border border-theme_1/5
-                "
-              >
-                {/* Badge skeleton (only first card) */}
-                {idx === 0 && (
-                  <JOJOSkeleton className="absolute -top-3 left-4 h-5 w-28 rounded-md" />
-                )}
-
-                {/* Plan name */}
-                <JOJOSkeleton className="h-5 w-24 sm:w-28 rounded-md" />
-
-                {/* Price row */}
-                <div className="flex items-baseline gap-2">
-                  <JOJOSkeleton className="h-4 w-8 rounded-md" />
-                  <JOJOSkeleton className="h-7 w-14 sm:w-16 rounded-md" />
-                </div>
-
-                {/* Savings text */}
-                <JOJOSkeleton className="h-3 w-20 sm:w-24 rounded-md" />
-              </div>
-            ))}
-          </div>
-
-          {/* CTA Button Skeleton */}
-          <JOJOSkeleton className="h-12 sm:h-13 w-full max-w-xs sm:max-w-sm rounded-full" />
+          <JOJOSkeleton className="mb-4 h-8 w-72 rounded-lg" />
+          <JOJOSkeleton className="h-4 w-96 rounded-md mb-2" />
+          <JOJOSkeleton className="h-4 w-80 rounded-md" />
         </div>
       </div>
     </div>

@@ -1984,6 +1984,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 {asset.certification}
               </span>
             )}
+            {(asset.releaseDate || asset.release_date || asset.asset_release_date) && (
+              <span className="px-3 py-1 rounded-md bg-theme_9 text-theme_5 text-xs font-medium uppercase">
+                {(asset.releaseDate || asset.release_date || asset.asset_release_date).split('-')[0]}
+              </span>
+            )}
             {(isShow ? (asset.seasons?.length || 0) > 0 : !!asset.durationSeconds) && (
               <span className="px-3 py-1 rounded-md bg-theme_9 text-theme_5 text-xs font-medium uppercase">
                 {isShow

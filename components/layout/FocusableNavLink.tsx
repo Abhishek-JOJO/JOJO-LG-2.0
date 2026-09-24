@@ -42,7 +42,7 @@ export const FocusableNavLink = React.memo(({
     const isTargetBrowse = BROWSE_ROUTES.includes(normTarget);
     const isCurrentBrowse = BROWSE_ROUTES.includes(normCurrent);
     const tvOverlay = useTvOverlayStore.getState();
-    const isTvOverlayOpen = typeof window !== "undefined" && window.location.protocol === "file:" && !!tvOverlay.screen;
+    const isTvOverlayOpen = typeof window !== "undefined" && !!tvOverlay.screen;
 
     if (isTargetBrowse && (isCurrentBrowse || isTvOverlayOpen)) {
       const navStore = useNavStore.getState();

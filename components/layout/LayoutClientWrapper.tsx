@@ -33,7 +33,6 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   const setActiveBrowseTab = useNavStore((s) => s.setActiveBrowseTab);
   const isTvOverlayOpen =
     typeof window !== "undefined" &&
-    window.location.protocol === "file:" &&
     tvOverlayScreen !== null;
 
   const prevTvOverlayOpenRef = useRef(isTvOverlayOpen);

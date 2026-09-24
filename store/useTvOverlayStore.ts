@@ -15,7 +15,7 @@ export const useTvOverlayStore = create<TvOverlayState>((set, get) => ({
   screen: null,
 
   open: (screen) => {
-    if (typeof window === "undefined" || window.location.protocol !== "file:") return;
+    if (typeof window === "undefined") return;
 
     // Add one history entry when entering the in-app screen. Moving between
     // Account Settings and Switch Profile reuses that entry, so one Back press
