@@ -243,6 +243,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
   useEffect(() => {
     initialFocusDoneRef.current = false;
+    contentOverlayOpenRef.current = false;
   }, [assetId]);
   const [canCastScrollLeft, setCanCastScrollLeft] = useState(false);
   const [canCastScrollRight, setCanCastScrollRight] = useState(false);
@@ -1601,8 +1602,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       ? `episode-${displayedEpisodes[0].assetId}`
       : null;
   const firstTrailerFocusKey = asset.trailers?.[0]?.assetId || asset.trailers?.[0]?.id ? `trailer-${asset.trailers[0].assetId || asset.trailers[0].id}` : null;
-  const firstCastFocusKey = castList?.[0]?.id ? `cast-${castList[0].id}` : null;
-  const firstRelatedId = displayRelated?.[0] ? resolveId(displayRelated[0]) : null;
+  const firstCastId = castList?.[0]?.id || (castList?.[0] as any)?.professional_id || (castList?.[0] as any)?.professionalId;
+  const firstCastFocusKey = firstCastId ? `cast-${firstCastId}` : null;
+  const firstRelatedId = displayRelated?.[0] ? ((displayRelated[0] as any)?.assetId || resolveId(displayRelated[0]) || (displayRelated[0] as any)?.id) : null;
   const firstRelatedFocusKey = firstRelatedId ? `related-item-${firstRelatedId}` : null;
 
   // ── Coming Soon logic ──────────────────────────────────────────────────────
@@ -2341,8 +2343,8 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                           const mapped = !isFallback ? mapApiRailItem(item, idx) : null;
                           const title = isFallback ? item.title : (mapped?.title || resolveTitle(item));
                           const img = isFallback ? item.image : (mapped?.posterImageRatio4 || mapped?.portraitImage || resolvePortraitImage(item));
-                          const id = isFallback ? "" : (mapped?.id || resolveId(item));
-                          const assetType = isFallback ? "" : (mapped?.assetType || item?.asset?.asset_type || item?.details?.asset_type || item?.asset_type || item?.assetTypeCode);
+                          const id = isFallback ? "" : (mapped?.assetId || resolveId(item) || mapped?.id);
+                          const assetType = isFallback ? "" : (mapped?.assetType || item?.asset?.asset_type || item?.details?.asset_type || item?.asset_type || item?.assetTypeCode || "movies");
 
                           return (
                             <FocusableRelatedItem
@@ -2413,6 +2415,8 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
               const restoreKey = lastFocusedCastKeyRef.current || firstCastFocusKey;
               if (restoreKey) {
                 retrySetFocus(restoreKey, 8, 80);
+              } else {
+                retrySetFocus("tab-cast", 8, 80);
               }
             }}
             openAssetDetail={openAssetDetail}
@@ -2576,11 +2580,13 @@ function FocusableCastItem({
   const cast = castItem as any;
   const avatarUrl = cast.image || cast.avatar || "";
 
+  const profId = cast.id || cast.professional_id || cast.professionalId;
+
   const handleCastClick = () => {
-    if (cast.id) {
-      setSelectedProfessionalId(String(cast.id));
+    if (profId) {
+      setSelectedProfessionalId(String(profId));
       analyticsService.track(EVENT_NAMES.ARTIST_CLICKED, {
-        artist_id: String(cast.id),
+        artist_id: String(profId),
         artist_name: cast.name ?? '',
         artist_role: cast.role ?? '',
         asset_id: String(asset?.assetId ?? assetId),
@@ -2589,7 +2595,7 @@ function FocusableCastItem({
     }
   };
 
-  const castFocusKey = `cast-${cast.id ?? idx}`;
+  const castFocusKey = `cast-${profId ?? idx}`;
   const { ref, focused } = useFocusable({
     focusKey: castFocusKey,
     onEnterPress: handleCastClick,
@@ -2601,14 +2607,16 @@ function FocusableCastItem({
       if (direction === "left") {
         if (idx > 0 && castList?.[idx - 1]) {
           const prev = castList[idx - 1];
-          setFocus(`cast-${prev.id ?? idx - 1}`);
+          const prevId = (prev.id || (prev as any)?.professional_id || (prev as any)?.professionalId) ?? (idx - 1);
+          setFocus(`cast-${prevId}`);
         }
         return false; // Boundary: do not escape left
       }
       if (direction === "right") {
         if (idx < total - 1 && castList?.[idx + 1]) {
           const next = castList[idx + 1];
-          setFocus(`cast-${next.id ?? idx + 1}`);
+          const nextId = (next.id || (next as any)?.professional_id || (next as any)?.professionalId) ?? (idx + 1);
+          setFocus(`cast-${nextId}`);
         }
         return false; // Boundary: do not escape right
       }
@@ -2803,7 +2811,11 @@ function FocusableTabButton({
 }: any) {
   const handleActivate = () => {
     onActivate?.();
-    setFocus(focusKeyPrefix);
+    if (downTargetFocusKey) {
+      retrySetFocus(downTargetFocusKey, 5, 40);
+    } else {
+      setFocus(focusKeyPrefix);
+    }
   };
   const { ref, focused } = useFocusable({
     focusKey: focusKeyPrefix,
@@ -2974,14 +2986,7 @@ function FocusableSeasonListItem({ idx, isSelected, label, subtitle, onClick, se
 function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback, isStandalone, router, openAssetDetail, assetId, upTargetFocusKey }: any) {
   const handleClick = () => {
     if (!id) return;
-    if (isStandalone) {
-      const typeSlug = getAssetTypeSlug(assetType);
-      const titleSlug = slugify(title);
-      const targetUrl = titleSlug ? `/${typeSlug}/${titleSlug}/${id}` : `/${typeSlug}/${id}`;
-      safeNavigate(router, targetUrl);
-    } else {
-      openAssetDetail(id, assetType || "movies", title);
-    }
+    openAssetDetail(id, assetType || "movies", title);
   };
 
   const { ref, focused } = useFocusable({

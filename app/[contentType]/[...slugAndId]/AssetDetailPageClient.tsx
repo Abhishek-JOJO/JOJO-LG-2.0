@@ -58,7 +58,7 @@ export default function AssetDetailPageClient({ initialAsset }: { initialAsset?:
   return (
     <FocusContext.Provider value={focusKey}>
       <div ref={focusRef as any} className="min-h-screen" style={{ background: "var(--theme_12)" }}>
-        <AssetDetailView assetId={assetId} initialAsset={initialAsset} isStandalone={true} />
+        <AssetDetailView key={assetId} assetId={assetId} initialAsset={initialAsset} isStandalone={true} />
       </div>
     </FocusContext.Provider>
   );

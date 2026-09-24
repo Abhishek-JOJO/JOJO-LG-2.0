@@ -175,7 +175,7 @@ function AssetDetailModalBoundary({
             transition={{ duration: 0.2 }}
             className="relative w-full min-h-screen m-0 z-10"
           >
-            <AssetDetailView assetId={activeAssetId} onClose={closeAssetDetail} isStandalone={true} initialAsset={initialAsset} />
+            <AssetDetailView key={activeAssetId} assetId={activeAssetId} onClose={closeAssetDetail} isStandalone={true} initialAsset={initialAsset} />
           </motion.div>
         </div>
       </div>

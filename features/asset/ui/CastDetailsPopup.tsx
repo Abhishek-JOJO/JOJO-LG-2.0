@@ -125,15 +125,7 @@ export function CastDetailsPopup({
     const assetType = item?.asset_type || item?.assetTypeCode || "movies";
 
     onClose(); // Close professional popup first
-
-    if (isStandalone) {
-      const typeSlug = getAssetTypeSlug(assetType);
-      const titleSlug = slugify(title);
-      const targetUrl = titleSlug ? `/${typeSlug}/${titleSlug}/${id}` : `/${typeSlug}/${id}`;
-      safeNavigate(router, targetUrl);
-    } else {
-      openAssetDetail(id, assetType, title);
-    }
+    openAssetDetail(id, assetType, title);
   };
 
   // Safe helper to format professions without ever leaking missing keys like 'hoverCard.host'
@@ -194,12 +186,7 @@ export function CastDetailsPopup({
             <div className="flex min-h-[50vh] flex-col items-center justify-center text-center gap-4">
               <span className="text-4xl">⚠️</span>
               <p className="text-base text-neutral-400">{t("failed_load_details")}</p>
-              <button
-                onClick={onClose}
-                className="px-6 py-2.5 bg-theme_13_samecolour text-white rounded-full text-sm font-bold transition hover:opacity-90 mt-2 cursor-pointer"
-              >
-                {t("go_back")}
-              </button>
+              <FocusableCastPopupErrorButton onClose={onClose} label={t("go_back")} />
             </div>
           ) : (
             <div className="flex flex-col gap-10 max-w-[1700px] mx-auto">
@@ -343,7 +330,7 @@ function FocusableCastPopupBackButton({
     onEnterPress: onClose,
     onArrowPress: (direction) => {
       if (direction === "down" && hasAssets) {
-        setFocus("cast-popup-asset-0");
+        retrySetFocus("cast-popup-asset-0", 5, 40);
         return false;
       }
       return false;
@@ -356,6 +343,7 @@ function FocusableCastPopupBackButton({
   return (
     <button
       ref={ref as any}
+      data-focuskey="cast-popup-back-btn"
       onClick={onClose}
       className={`flex items-center gap-2 px-5 py-2.5 rounded-full transition-transform duration-150 outline-none cursor-pointer select-none ${
         focused
@@ -366,6 +354,28 @@ function FocusableCastPopupBackButton({
     >
       <ChevronLeft size={20} className={focused ? "text-neutral-950" : "text-white"} />
       <span className="text-sm font-semibold tracking-wide">Back</span>
+    </button>
+  );
+}
+
+function FocusableCastPopupErrorButton({ onClose, label }: { onClose: () => void; label: string }) {
+  const { ref, focused } = useFocusable({
+    focusKey: "cast-popup-error-btn",
+    onEnterPress: onClose,
+  });
+
+  return (
+    <button
+      ref={ref as any}
+      data-focuskey="cast-popup-error-btn"
+      onClick={onClose}
+      className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all mt-2 cursor-pointer outline-none ${
+        focused
+          ? "bg-white text-neutral-950 ring-4 ring-white scale-105 shadow-xl"
+          : "bg-theme_13_samecolour text-white hover:opacity-90"
+      }`}
+    >
+      {label}
     </button>
   );
 }
