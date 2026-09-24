@@ -1,11 +1,9 @@
 "use client"
 
-import { ContentRailsSkeleton } from "@/components/content-rail/ContentRailsSkeleton";
 import { ContentRailsView } from "@/features/content-rail/ui/ContentRailsView";
 import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEffect, useState, useRef } from "react";
-import { usePathname } from "next/navigation";
 import { ROUTES } from "@/lib/constants/routes";
 import SubscriptionSuccessPopup from "@/components/payment/SubscriptionSuccessPopup";
 import TVODSuccessPopup from "@/components/payment/TVODSuccessPopup";
@@ -14,14 +12,13 @@ import { localStorageManager } from "@/lib/localStorage/localStorage.manager";
 import { StorageKey } from "@/enums/storage.enum";
 import { appConfig } from "@/lib/config/app.config";
 import { analyticsService, EVENT_NAMES, buildUserSpecificPropertiesPayload } from "@/shared/analytics";
+import { useActivePathname } from "@/hooks/useActivePathname";
+import { useNavStore } from "@/store/useNavStore";
+import { getQueryClient } from "@/lib/react-query/queryClient";
+import { getContentRails } from "@/features/content-rail/api/getContentRails";
+import { useLocaleStore } from "@/store/useLocaleStore";
+import NataksClient from "@/app/nataks/nataks-client";
 
-/**
- * Routes where the home page content rails must NOT render.
- * These are routes that navigate away from home (e.g. OTP success → /watching).
- * During the navigation transition Next.js keeps this component briefly mounted,
- * so we guard against firing content-rail API calls when the user is
- * already leaving (or has left) the home page.
- */
 const SUPPRESS_HOME_ROUTES = [
     ROUTES.WATCHING,
     ROUTES.REGISTER_OTP,
@@ -32,13 +29,6 @@ const SUPPRESS_HOME_ROUTES = [
     ROUTES.DOWNLOAD_APP,
     ROUTES.APP_INSTALL
 ];
-
-import { useActivePathname } from "@/hooks/useActivePathname";
-import { useNavStore } from "@/store/useNavStore";
-import { getQueryClient } from "@/lib/react-query/queryClient";
-import { getContentRails } from "@/features/content-rail/api/getContentRails";
-import { useLocaleStore } from "@/store/useLocaleStore";
-import NataksClient from "@/app/nataks/nataks-client";
 
 interface ParentPageProps {
   initialRoute?: string;
@@ -75,7 +65,6 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         if (!hasTrackedUserSpecificPropsRef.current) {
             const { user, isAuthenticated } = useAuthStore.getState();
             const isGuest = !isAuthenticated || !user || user.isGuest;
-
             if (!isGuest && subData?.data) {
                 hasTrackedUserSpecificPropsRef.current = true;
                 const payload = buildUserSpecificPropertiesPayload(subData.data);
@@ -84,7 +73,6 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         }
     }, [subData]);
 
-    // Check for success checkout data on mount
     useEffect(() => {
         try {
             const saved = sessionStorage.getItem("payment_success_state");
@@ -97,8 +85,6 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         }
     }, []);
 
-    // Do not render content rails when the user is on/navigating to
-    // a non-home route — this prevents spurious API calls during transitions.
     const isSuppressed = SUPPRESS_HOME_ROUTES.some(
         route => pathname === route || pathname.startsWith(`${route}/`)
     );
@@ -112,9 +98,6 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         return () => window.removeEventListener("scroll", onScroll);
     }, [hasScrolled]);
 
-    // Controlled tab pre-warm. On webOS, do NOT fetch every tab together; that
-    // competes with rendering. Instead, wait for Home to settle, then fetch the
-    // next tab pages one by one so Home → Movies is usually already cached.
     useEffect(() => {
         if (!isAppReady || !sessionId) return;
 
@@ -130,8 +113,6 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         const startDelay = 1200;
         const gap = isTvFileRuntime ? 350 : 600;
 
-        // Fixed staggered timers can still overlap on a slow TV connection.
-        // Wait for each request to finish before scheduling the next tab.
         const prefetchNext = async (index: number) => {
             if (cancelled || index >= uniqueSubnavIds.length) return;
             const subnavId = uniqueSubnavIds[index];
@@ -151,22 +132,20 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         };
     }, [isAppReady, sessionId, persistedNavItems, locale]);
 
-    // Completely suppress render when on a non-home route
     if (isSuppressed) {
         return null;
     }
 
-    // We no longer block rendering based on `isAppReady` or `sessionId` here.
-    // If the data was prefetched on the server (HydrationBoundary), ContentRailsView
-    // will instantly render it. If not, it will natively show its own Skeleton.
+    const renderContent = () => {
+        if (pathname === ROUTES.NATAK || pathname === "/nataks") {
+            return <NataksClient />;
+        }
+        return <ContentRailsView />;
+    };
 
     return (
-        <div className="min-h-screen" style={{ background: "var(--theme_12)" }}>
-            {pathname === ROUTES.NATAK || pathname === "/nataks" ? (
-                <NataksClient />
-            ) : (
-                <ContentRailsView />
-            )}
+        <div className="min-h-screen" style={{ background: "transparent" }}>
+            {renderContent()}
             {successData && (
                 successData.matchedType === "TVOD" || successData.paymentType === "TVOD" ? (
                     <TVODSuccessPopup

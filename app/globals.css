@@ -1145,3 +1145,12 @@ input.bg-transparent-forced {
 .animate-ott-slide-left {
   animation: ottSlideInLeft 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
 }
+
+
+
+/* Browse tab transitions intentionally removed.
+   webOS Chromium 53-72 does not reliably fire multi-keyframe CSS animations
+   with delays — the second phase often drops entirely, leaving a black overlay
+   on screen. The hero carousel already cross-fades its own images (900ms
+   opacity transition in ContentRailList) which gives a natural OTT feel
+   without any extra animation layer. */
