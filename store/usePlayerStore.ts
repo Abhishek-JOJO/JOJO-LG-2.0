@@ -152,6 +152,10 @@ const getInitialCaptionBgOpacity = (): number => {
   return localStorageManager.get<number>(StorageKey.PLAYER_CAPTION_BG_OPACITY) ?? 0.8;
 };
 
+const DEFAULT_QUALITIES: QualityOption[] = [
+  { id: -1, label: 'Auto', height: null, bitrate: null, isAuto: true },
+];
+
 export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => ({
   // ── Initial state ──────────────────────────────────────────────────────────
   volume: getInitialVolume(),
@@ -163,7 +167,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => 
   captionBgColor: getInitialCaptionBgColor(),
   captionBgOpacity: getInitialCaptionBgOpacity(),
   status: 'idle',
-  qualities: [],
+  qualities: DEFAULT_QUALITIES,
   activeQualityId: -1,
   audioTracks: [],
   activeAudioTrackId: 0,
@@ -266,7 +270,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>((set, get) => 
   resetRuntimeState: () =>
     set({
       status: 'idle',
-      qualities: [],
+      qualities: DEFAULT_QUALITIES,
       activeQualityId: -1,
       audioTracks: [],
       activeAudioTrackId: 0,

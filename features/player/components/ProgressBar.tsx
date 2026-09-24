@@ -360,8 +360,8 @@ export function ProgressBar({
       </div>
 
       <span
-        className="shrink-0 text-theme_1 tabular-nums select-none"
-        style={{ fontSize: 13, letterSpacing: '0.01em', minWidth: 56, textAlign: 'right' }}
+        className="shrink-0 text-theme_1 font-semibold tabular-nums select-none"
+        style={{ fontSize: 16, letterSpacing: '0.02em', minWidth: 64, textAlign: 'right' }}
       >
         -{formatPlayerTime(remainingSeconds)}
       </span>

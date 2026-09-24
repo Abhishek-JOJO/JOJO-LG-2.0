@@ -242,18 +242,16 @@ function SettingsSelector({
 
   return (
     <div className="relative flex items-center gap-2.5 sm:gap-4">
-      {qualities.length > 0 && (
-        <IconBtn
-          focusKey="menu-trigger-quality"
-          onClick={() => openView('quality', 'menu-trigger-quality')}
-          label="Quality"
-          isVisible={isVisible}
-          active={open && view === 'quality'}
-        >
-          <QualityIcon />
-          <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Quality</span>
-        </IconBtn>
-      )}
+      <IconBtn
+        focusKey="menu-trigger-quality"
+        onClick={() => openView('quality', 'menu-trigger-quality')}
+        label="Quality"
+        isVisible={isVisible}
+        active={open && view === 'quality'}
+      >
+        <QualityIcon />
+        <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Quality</span>
+      </IconBtn>
 
       {audioTracks.length > 1 && (
         <IconBtn
@@ -295,7 +293,7 @@ function SettingsSelector({
 
             {view === 'quality' && (
               <div className="py-1 max-h-72 overflow-y-auto">
-                {qualities.map((q) => (
+                {(qualities.length > 0 ? qualities : [{ id: -1, label: 'Auto', height: null, bitrate: null, isAuto: true }]).map((q) => (
                   <SettingsOptionRow
                     key={q.id}
                     focusKey={`opt-quality-${q.id}`}
