@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, memo } from "react";
 import { useLocaleStore } from "@/store/useLocaleStore";
 import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { restorePageFocus } from "@/src/navigation/focusUtils";
@@ -18,6 +18,7 @@ import JOJOCommonImage, { JOJOImageContentMode, JOJOImagePreset } from "@/compon
 import { JOJOCustomInput, JOJOInputSize, JOJOInputState } from "@/components/ui/JOJOInput";
 import { JOJOSkeleton } from "@/components/ui/JOJOSkeleton";
 import { slugify, useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
+import { TvKeyboard } from "@/components/search/TvKeyboard";
 
 import { mapAnalyticsAssetCategory } from "@/shared/analytics/utils/mapAnalyticsAssetCategory";
 import { useContentRails } from "@/features/content-rail/hooks/useContentRails";
@@ -112,10 +113,14 @@ function FocusableSearchInput({
 }) {
   const { ref, focused, focusKey } = useFocusable({
     focusKey: "search-input",
-    onEnterPress: () => {
-      inputRef.current?.focus();
-    },
+    onEnterPress: () => {},
     onArrowPress: (direction) => {
+      if (direction === "left") {
+        if (doesFocusableExist("tv-key-0-5")) {
+          setFocus("tv-key-0-5");
+          return false;
+        }
+      }
       if (direction === "right") {
         if (hasQuery && doesFocusableExist("search-clear-btn")) {
           setFocus("search-clear-btn");
@@ -135,7 +140,7 @@ function FocusableSearchInput({
         }
         return true;
       }
-      if (direction === "up" || direction === "left") {
+      if (direction === "up") {
         return false;
       }
       return true;
@@ -146,8 +151,7 @@ function FocusableSearchInput({
     <div
       ref={ref as any}
       data-focuskey={focusKey}
-      onClick={() => inputRef.current?.focus()}
-      className={`flex-1 flex items-center h-[42px] px-3 rounded-full transition-all duration-200 cursor-text ${
+      className={`flex-1 flex items-center h-[42px] px-3 rounded-full transition-all duration-200 cursor-default ${
         focused
           ? "border-2 border-white ring-2 ring-white/60 bg-white/10 shadow-lg"
           : "border-2 border-transparent hover:border-white/20 bg-transparent"
@@ -162,13 +166,16 @@ function FocusableSearchInput({
         placeholder={placeholder}
         autoComplete="off"
         spellCheck={false}
+        readOnly={true}
+        inputMode="none"
+        tabIndex={-1}
         aria-label={placeholder}
         inputConfig={{
           background: "transparent",
-          caretColor: "var(--theme_13_samecolour)",
+          caretColor: "transparent",
           placeholderColor: "theme_5",
         }}
-        className="!bg-transparent !rounded-none !h-auto !px-0 border-none body-sm-regular w-full"
+        className="!bg-transparent !rounded-none !h-auto !px-0 border-none body-sm-regular w-full cursor-default"
       />
     </div>
   );
@@ -223,9 +230,11 @@ function SearchClearButton({ onClear, label }: { onClear: () => void; label: str
   );
 }
 
+import { tvSoundManager } from "@/lib/webos/tvSoundManager";
+
 // ─── PosterCard ───────────────────────────────────────────────────────────────
 
-function PosterCard({
+const PosterCard = memo(function PosterCard({
   item,
   index,
   totalCols = 5,
@@ -243,10 +252,26 @@ function PosterCard({
   const img = item?.genre ? item.genre.image || "" : resolveImage(asset);
   const customFocusKey = typeof index === "number" ? `search-poster-${index}` : undefined;
 
+  const handleClick = useCallback(() => {
+    try {
+      tvSoundManager.play("select");
+    } catch {}
+    onClick();
+  }, [onClick]);
+
   const { ref, focused, focusKey } = useFocusable({
     focusKey: customFocusKey,
-    onEnterPress: onClick,
+    onEnterPress: handleClick,
     onArrowPress: (direction) => {
+      try {
+        tvSoundManager.play("nav");
+      } catch {}
+      if (direction === "left" && typeof index === "number" && index % totalCols === 0) {
+        if (doesFocusableExist("tv-key-0-5")) {
+          setFocus("tv-key-0-5");
+          return false;
+        }
+      }
       if (direction === "up" && typeof index === "number" && index < totalCols) {
         if (hasRecents && doesFocusableExist("recent-chip-0")) {
           setFocus("recent-chip-0");
@@ -264,46 +289,28 @@ function PosterCard({
     <div
       ref={ref as any}
       data-focuskey={focusKey}
-      onClick={onClick}
-      className={`aspect-[2/3] relative rounded-lg overflow-hidden bg-neutral-900 cursor-pointer group transition-transform duration-200 hover:scale-105 ${focused ? "scale-105 z-10" : ""}`}
+      onClick={handleClick}
+      className={`aspect-[2/3] relative rounded-xl overflow-hidden bg-[#161616] cursor-pointer transition-transform duration-75 ${
+        focused ? "scale-105 z-10 shadow-2xl ring-2 ring-white" : "border border-white/5"
+      }`}
     >
       {img ? (
-        <>
-          <div className="absolute inset-0 w-full h-full scale-110 blur-xl opacity-70">
-            <JOJOCommonImage
-              src={img}
-              alt=""
-              fill
-              contentMode={JOJOImageContentMode.Cover}
-              optimizeRequestURL={false}
-              wrapperClassName="w-full h-full"
-            />
-          </div>
-          <div className="absolute inset-0 w-full h-full">
-            <JOJOCommonImage
-              src={img}
-              alt={title}
-              fill
-              contentMode={JOJOImageContentMode.Contain}
-              optimizeRequestURL={false}
-              wrapperClassName="w-full h-full"
-            />
-          </div>
-        </>
+        <JOJOCommonImage
+          src={img}
+          alt={title}
+          fill
+          contentMode={JOJOImageContentMode.Cover}
+          optimizeRequestURL={true}
+          wrapperClassName="w-full h-full pointer-events-none select-none"
+        />
       ) : (
         <div className="w-full h-full bg-theme_1/8 flex items-center justify-center p-2 text-center caption-xs-regular text-theme_5">
           {title}
         </div>
       )}
-      {focused && (
-        <div
-          className="absolute inset-0 pointer-events-none rounded-lg"
-          style={{ border: "3px solid #ffffff" }}
-        />
-      )}
     </div>
   );
-}
+});
 
 // ─── Recent search chip ────────────────────────────────────────────────────────
 
@@ -324,6 +331,12 @@ function RecentChip({
     focusKey: `recent-chip-${index}`,
     onEnterPress: onSelect,
     onArrowPress: (direction) => {
+      if (direction === "left" && index === 0) {
+        if (doesFocusableExist("tv-key-0-5")) {
+          setFocus("tv-key-0-5");
+          return false;
+        }
+      }
       if (direction === "up") {
         setFocus("search-input");
         return false;
@@ -633,7 +646,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
   const { ref: modalFocusRef, focusKey: modalFocusKey } = useFocusable({
     focusKey: "MODAL_SEARCH",
     isFocusBoundary: true,
-    preferredChildFocusKey: "search-input",
+    preferredChildFocusKey: "tv-key-0-0",
     focusable: isOpen,
   });
 
@@ -644,6 +657,10 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
     }
 
     const tryFocusSearchInput = () => {
+      if (doesFocusableExist("tv-key-0-0")) {
+        setFocus("tv-key-0-0");
+        return true;
+      }
       if (doesFocusableExist("search-input")) {
         setFocus("search-input");
         return true;
@@ -725,8 +742,6 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
           // Silent fail
         }
       }
-      
-      setTimeout(() => inputRef.current?.focus(), 280);
     } else {
       // Track search closed ONCE per modal close
       if (hasTrackedOpenRef.current && !hasTrackedCloseRef.current) {
@@ -1052,252 +1067,252 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
             key="panel"
             ref={modalFocusRef as any}
             data-focuskey={modalFocusKey}
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-x-0 top-0 z-[10001] px-3 sm:px-6 lg:px-10 pt-3 pb-4 flex flex-col gap-3 pt-8"
-            style={{ maxHeight: "92vh" }}
+            className="fixed inset-0 z-[10001] p-6 lg:p-8 flex flex-row gap-6 bg-black/92 text-white overflow-hidden"
           >
-            <div
-              className="flex items-center gap-3 px-5 h-[52px] rounded-full shrink-0 bg-theme_10"
-              style={{
-                WebkitBackdropFilter: "blur(20px)",
-                backdropFilter: "blur(20px)",
-              }}
-            >
-              <motion.div
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.08, duration: 0.2 }}
-                className="shrink-0"
-              >
-                <Search className="w-[18px] h-[18px] text-theme_5" />
-              </motion.div>
+            {/* Ambient backdrop glow */}
+            <div className="absolute top-[10%] left-[5%] z-0 h-[450px] w-[550px] rounded-full bg-[var(--theme_13)] opacity-[0.12] blur-[140px] pointer-events-none" />
 
-              <motion.div
-                className="flex-1 overflow-hidden"
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: "100%", opacity: 1 }}
-                transition={{ delay: 0.1, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <FocusableSearchInput
-                  inputRef={inputRef}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={t("placeholder")}
-                  hasQuery={hasQuery}
-                  hasResults={searchResults.length > 0}
-                  hasRecents={recents?.length > 0}
-                />
-              </motion.div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                {showSpinner && hasQuery && (
-                  <Loader2 className="w-4 h-4 text-theme_13_samecolour animate-spin" />
-                )}
-                {hasQuery && (
-                  <SearchClearButton
-                    onClear={() => {
-                      setInputValue("");
-                      setCurrentPage(1);
-                      setFocus("search-input");
-                    }}
-                    label={t("clear_all")}
-                  />
-                )}
-                <SearchCloseButton onClose={onClose} label={t("close")} hasQuery={hasQuery} />
-              </div>
+            {/* ── LEFT COLUMN: Custom TV Keyboard ────────────────────── */}
+            <div className="w-[350px] lg:w-[380px] shrink-0 flex flex-col justify-start gap-4 z-10">
+              <TvKeyboard
+                onKeyPress={(char) => setInputValue((prev) => prev + char)}
+                onBackspace={() => setInputValue((prev) => prev.slice(0, -1))}
+                onClear={() => {
+                  setInputValue("");
+                  setCurrentPage(1);
+                }}
+                onRightEdge={() => {
+                  if (doesFocusableExist("search-input")) {
+                    setFocus("search-input");
+                  }
+                }}
+              />
             </div>
 
-            {/* ── Scrollable content panel ────────────────────────────────── */}
-            <div
-              ref={scrollContainerRef}
-              className="rounded-xl overflow-y-auto scrollbar-none bg-theme_10"
-              style={{
-                WebkitBackdropFilter: "blur(6px)",
-                backdropFilter: "blur(6px)",
-              }}
-            >
-              {/* ════ IDLE STATE ════ */}
-              {!hasQuery && (
-                <div className="py-5 space-y-2">
-                  {/* Recent search chips */}
-                  {recents?.length > 0 && (
-                    <div className="px-8">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="title-xs-semibold text-theme_1">
-                          {t("recent_searches")}
-                        </h3>
-                        <ClearAllButton onClick={clearAll} label={t("clear_all")} recentsCount={recents.length} />
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {recents.map((term, idx) => (
-                          <RecentChip
-                            key={term}
-                            term={term}
-                            index={idx}
-                            totalCount={recents.length}
-                            onRemove={() => removeRecent(term)}
-                            onSelect={() => {
-                              setInputValue(term);
-                              inputRef.current?.focus();
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
+            {/* ── RIGHT COLUMN: Search Header & Results ─────────────── */}
+            <div className="flex-1 flex flex-col gap-4 min-w-0 h-full overflow-hidden z-10">
+              {/* Search Header Bar */}
+              <div
+                className="flex items-center gap-3 px-5 h-[56px] rounded-2xl shrink-0 bg-white/[0.08] border border-white/15 backdrop-blur-xl"
+              >
+                <motion.div
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.08, duration: 0.2 }}
+                  className="shrink-0"
+                >
+                  <Search className="w-5 h-5 text-white/70" />
+                </motion.div>
+
+                <motion.div
+                  className="flex-1 overflow-hidden"
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: "100%", opacity: 1 }}
+                  transition={{ delay: 0.1, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <FocusableSearchInput
+                    inputRef={inputRef}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    placeholder={t("placeholder")}
+                    hasQuery={hasQuery}
+                    hasResults={searchResults.length > 0}
+                    hasRecents={recents?.length > 0}
+                  />
+                </motion.div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {showSpinner && hasQuery && (
+                    <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
                   )}
-
-                  {/* Skeleton while rails load — mirrors the real rails: several
-                      titled, horizontally-scrolling rows, not a single static grid */}
-                  {railsBusy && (
-                    <div className="py-2">
-                      <RailSkeletonRow />
-                      <RailSkeletonRow />
-                      <RailSkeletonRow />
-                    </div>
+                  {hasQuery && (
+                    <SearchClearButton
+                      onClear={() => {
+                        setInputValue("");
+                        setCurrentPage(1);
+                        setFocus("search-input");
+                      }}
+                      label={t("clear_all")}
+                    />
                   )}
+                  <SearchCloseButton onClose={onClose} label={t("close")} hasQuery={hasQuery} />
+                </div>
+              </div>
 
-                  {/* Rails */}
-                  {!railsBusy &&
-                    recentRails.map((rawRail: any, idx: number) => {
-                      const rail = mapApiRail(rawRail, idx);
-                      if (!rail?.items || rail?.items?.length === 0) return null;
+              {/* ── Scrollable Content Area ─────────────────────────── */}
+              <div
+                ref={scrollContainerRef}
+                className="flex-1 rounded-2xl overflow-y-auto scrollbar-none bg-white/[0.03] border border-white/10 p-5 backdrop-blur-md"
+              >
+                {/* ════ IDLE STATE ════ */}
+                {!hasQuery && (
+                  <div className="py-2 space-y-4">
+                    {/* Recent search chips */}
+                    {recents?.length > 0 && (
+                      <div className="px-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="title-xs-semibold text-white/90">
+                            {t("recent_searches")}
+                          </h3>
+                          <ClearAllButton onClick={clearAll} label={t("clear_all")} recentsCount={recents.length} />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {recents.map((term, idx) => (
+                            <RecentChip
+                              key={term}
+                              term={term}
+                              index={idx}
+                              totalCount={recents.length}
+                              onRemove={() => removeRecent(term)}
+                              onSelect={() => {
+                                setInputValue(term);
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                      // "Recently Added" gets a plain poster grid instead of a
-                      // scrolling rail row — see RecentlyAddedGrid above for why.
-                      if (/recently added/i.test(rail.title || "")) {
+                    {/* Skeleton while rails load */}
+                    {railsBusy && (
+                      <div className="py-2">
+                        <RailSkeletonRow />
+                        <RailSkeletonRow />
+                        <RailSkeletonRow />
+                      </div>
+                    )}
+
+                    {/* Rails */}
+                    {!railsBusy &&
+                      recentRails.map((rawRail: any, idx: number) => {
+                        const rail = mapApiRail(rawRail, idx);
+                        if (!rail?.items || rail?.items?.length === 0) return null;
+
+                        if (/recently added/i.test(rail.title || "")) {
+                          return (
+                            <RecentlyAddedGrid
+                              key={rail.id || idx}
+                              title={rail.title}
+                              items={rail.items}
+                              hasRecents={recents?.length > 0}
+                              onCardClick={handleCardClick}
+                            />
+                          );
+                        }
+
                         return (
-                          <RecentlyAddedGrid
+                          <ContentRailSection
                             key={rail.id || idx}
-                            title={rail.title}
+                            index={idx}
+                            cr_title={rail.title}
+                            type={rail.type}
                             items={rail.items}
-                            hasRecents={recents?.length > 0}
-                            onCardClick={handleCardClick}
+                            onItemClick={handleCardClick}
+                            onArrowUpDown={idx === 0 ? (direction) => {
+                              if (direction === "up") {
+                                if (recents?.length > 0 && doesFocusableExist("recent-chip-0")) {
+                                  setFocus("recent-chip-0");
+                                } else {
+                                  setFocus("search-input");
+                                }
+                                return true;
+                              }
+                            } : undefined}
+                            onGenreClick={() => {}}
+                            railId={rail.id}
+                            totalPages={rail.totalPages}
+                            disableHover={true}
+                            forceFocusable={true}
+                            onViewAllClick={() => {
+                               if (rail.id) {
+                                 const titleSlug = slugify(rail.title);
+                                 useBrowseHiddenStore.getState().setHiddenParams(rail.id, 1);
+                                 const targetUrl = titleSlug ? `/browse?slug=${titleSlug}` : "/browse";
+                                 safeNavigate(router, targetUrl);
+                               }
+                             }}
+                            button_name={rail?.button_name}
+                            more_enabled={rail?.more_enabled}
                           />
                         );
-                      }
+                      })}
 
-                      return (
-                        <ContentRailSection
-                          key={rail.id || idx}
-                          index={idx}
-                          cr_title={rail.title}
-                          type={rail.type}
-                          items={rail.items}
-                          onItemClick={handleCardClick}
-                          onArrowUpDown={idx === 0 ? (direction) => {
-                            if (direction === "up") {
-                              if (recents?.length > 0 && doesFocusableExist("recent-chip-0")) {
-                                setFocus("recent-chip-0");
-                              } else {
-                                setFocus("search-input");
-                              }
-                              return true;
-                            }
-                          } : undefined}
-                          onGenreClick={() => {
-                            // NOTE: Do NOT call onClose() here.
-                            // ContentRailSection internally calls router.push(genre) AFTER this callback.
-                            // Calling onClose() (which triggers router.back()) would race with that push.
-                            // The genre navigation will unmount /search naturally.
-                          }}
-                          railId={rail.id}
-                          totalPages={rail.totalPages}
-                          disableHover={true}
-                          forceFocusable={true}
-                          onViewAllClick={() => {
-                            // NOTE: Do NOT call onClose() here — same race condition as handleCardClick.
-                            // router.push below will navigate away from /search naturally.
-                             if (rail.id) {
-                               const titleSlug = slugify(rail.title);
-                               useBrowseHiddenStore.getState().setHiddenParams(rail.id, 1);
-                               const targetUrl = titleSlug ? `/browse?slug=${titleSlug}` : "/browse";
-                               safeNavigate(router, targetUrl);
-                             }
-                           }}
-                          button_name={rail?.button_name}
-                          more_enabled={rail?.more_enabled}
-                        />
-                      );
-                    })}
+                    {hasNextPage && (
+                      <div ref={observerRef} className="h-16 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
+                      </div>
+                    )}
 
-                  {hasNextPage && (
-                    <div ref={observerRef} className="h-16 flex items-center justify-center">
-                      <Loader2 className="w-6 h-6 text-theme_13_samecolour animate-spin" />
-                    </div>
-                  )}
+                    {/* Empty fallback */}
+                    {!railsBusy &&
+                      recentRails.length === 0 &&
+                      recents.length === 0 && (
+                        <div className="flex flex-col items-center py-16 gap-3 text-center">
+                          <Search className="w-10 h-10 text-white/40 opacity-40" />
+                          <p className="body-sm-regular text-white/60">
+                            {t("start_typing")}
+                          </p>
+                        </div>
+                      )}
+                  </div>
+                )}
 
-                  {/* Empty fallback */}
-                  {!railsBusy &&
-                    recentRails.length === 0 &&
-                    recents.length === 0 && (
+                {/* ════ ACTIVE SEARCH STATE ════ */}
+                {hasQuery && (
+                  <div className="px-3 py-2">
+                    <div ref={resultsTopRef} />
+
+                    {/* Skeleton while fetching */}
+                    {showSpinner && <PosterGridSkeleton count={10} />}
+
+                    {/* Error */}
+                    {!showSpinner && error && (
                       <div className="flex flex-col items-center py-16 gap-3 text-center">
-                        <Search className="w-8 h-8 text-theme_5 opacity-40" />
-                        <p className="body-sm-regular text-theme_5">
-                          {t("start_typing")}
+                        <p className="body-sm-regular text-red-400">
+                          {t("error")}
                         </p>
                       </div>
                     )}
-                </div>
-              )}
 
-              {/* ════ ACTIVE SEARCH STATE ════ */}
-              {hasQuery && (
-                <div className="px-5 py-5">
-                  {/* Anchor used for scroll-to-top on page change */}
-                  <div ref={resultsTopRef} />
+                    {/* No results */}
+                    {!showSpinner && !error && searchResults.length === 0 && (
+                      <NoResults query={debouncedQuery} />
+                    )}
 
-                  {/* Skeleton while fetching */}
-                  {showSpinner && <PosterGridSkeleton count={10} />}
+                    {/* Results grid + pagination */}
+                    {!showSpinner && searchResults.length > 0 && (
+                      <div>
+                        <h3 className="body-sm-semibold text-white/90 mb-4">
+                          {t("results_for")} &ldquo;{debouncedQuery}&rdquo;
+                        </h3>
 
-                  {/* Error */}
-                  {!showSpinner && error && (
-                    <div className="flex flex-col items-center py-16 gap-3 text-center">
-                      <p className="body-sm-regular text-red-400">
-                        {t("error")}
-                      </p>
-                    </div>
-                  )}
+                        <div className={POSTER_GRID}>
+                          {searchResults.map((item: any, idx: number) => (
+                            <PosterCard
+                              key={idx}
+                              item={item}
+                              index={idx}
+                              onClick={() => handleCardClick(item, idx)}
+                            />
+                          ))}
+                        </div>
 
-                  {/* No results */}
-                  {!showSpinner && !error && searchResults.length === 0 && (
-                    <NoResults query={debouncedQuery} />
-                  )}
-
-                  {/* Results grid + pagination */}
-                  {!showSpinner && searchResults.length > 0 && (
-                    <div>
-                      {/* Header */}
-                      <h3 className="body-sm-semibold text-theme_1 mb-3">
-                        {t("results_for")} &ldquo;{debouncedQuery}&rdquo;
-                      </h3>
-
-                      {/* Cards */}
-                      <div className={POSTER_GRID}>
-                        {searchResults.map((item: any, idx: number) => (
-                          <PosterCard
-                            key={idx}
-                            item={item}
-                            index={idx}
-                            onClick={() => handleCardClick(item, idx)}
-                          />
-                        ))}
+                        <SearchPagination
+                          currentPage={currentPage}
+                          totalPages={totalPages}
+                          totalRecords={totalRecords}
+                          onPageChange={handlePageChange}
+                          isLoading={showSpinner}
+                        />
                       </div>
-
-                      {/* ── Pagination ──────────────────────────────────── */}
-                      <SearchPagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalRecords={totalRecords}
-                        onPageChange={handlePageChange}
-                        isLoading={showSpinner}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
           </FocusContext.Provider>
