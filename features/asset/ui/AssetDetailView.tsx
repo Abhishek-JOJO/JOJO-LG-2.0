@@ -233,6 +233,17 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     isFocusBoundary: true,
     focusKey: "asset-detail-content-overlay",
   });
+  const contentOverlayOpenRef = useRef(contentOverlayOpen);
+  useEffect(() => {
+    contentOverlayOpenRef.current = contentOverlayOpen;
+  }, [contentOverlayOpen]);
+
+  const availableTabsRef = useRef<Array<"episodes" | "trailers" | "cast" | "more_like_this">>([]);
+  const initialFocusDoneRef = useRef(false);
+
+  useEffect(() => {
+    initialFocusDoneRef.current = false;
+  }, [assetId]);
   const [canCastScrollLeft, setCanCastScrollLeft] = useState(false);
   const [canCastScrollRight, setCanCastScrollRight] = useState(false);
 
@@ -1095,21 +1106,28 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   }, [isShowAsset, castList, displayRelated]);
 
   const navigateDownFromActions = () => {
-    const state = listsRef.current;
-    if (state.isShowAsset) {
-      setActiveTab('episodes');
-      retrySetFocus('tab-episodes');
-    } else if (asset?.trailers && asset.trailers.length > 0) {
-      setActiveTab('trailers');
-      retrySetFocus('tab-trailers');
-    } else if (state.hasCast && state.firstCastId) {
-      setActiveTab('cast');
-      retrySetFocus('tab-cast');
-    } else if (state.hasRelated && state.firstRelatedId) {
-      setActiveTab('more_like_this');
-      retrySetFocus('tab-more_like_this');
+    const tabs = availableTabsRef.current;
+    if (tabs.length > 0) {
+      const targetTab = tabs[0];
+      setActiveTab(targetTab);
+      retrySetFocus(`tab-${targetTab}`);
     } else {
-      retrySetFocus(`asset-watch-now-${assetId}`);
+      const state = listsRef.current;
+      if (state.isShowAsset) {
+        setActiveTab('episodes');
+        retrySetFocus('tab-episodes');
+      } else if (asset?.trailers && asset.trailers.length > 0) {
+        setActiveTab('trailers');
+        retrySetFocus('tab-trailers');
+      } else if (state.hasCast && state.firstCastId) {
+        setActiveTab('cast');
+        retrySetFocus('tab-cast');
+      } else if (state.hasRelated && state.firstRelatedId) {
+        setActiveTab('more_like_this');
+        retrySetFocus('tab-more_like_this');
+      } else {
+        retrySetFocus(`asset-watch-now-${assetId}`);
+      }
     }
   };
 
@@ -1179,15 +1197,19 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
   // 1. Initial Focus Trigger: Set focus to primary Watch Now button as soon as skeleton finishes loading
   useEffect(() => {
-    if (!showSkeleton && asset && !isAuthLoading && !isDataLoading) {
+    if (initialFocusDoneRef.current) return;
+    if (!showSkeleton && asset && !isAuthLoading) {
+      initialFocusDoneRef.current = true;
       const timer = setTimeout(() => {
-        setFocus(`asset-watch-now-${assetId}`);
-      }, 100);
+        if (!contentOverlayOpenRef.current) {
+          setFocus(`asset-watch-now-${assetId}`);
+        }
+      }, 80);
       return () => clearTimeout(timer);
     }
-  }, [assetId, showSkeleton, isAuthLoading, isDataLoading, asset]);
+  }, [assetId, showSkeleton, isAuthLoading, asset]);
 
-  // 2. Focus Auto-Recovery Guard: Continuously ensure focus is maintained on AssetDetailView
+  // 2. Focus Auto-Recovery Guard: Ensure focus is acquired on mount if lost
   useEffect(() => {
     if (showSkeleton || !asset) return;
 
@@ -1195,18 +1217,36 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     const checkInterval = setInterval(() => {
       attempts++;
 
-      const isAnyActionFocused =
-        watchNowFocused ||
-        watchlistFocused;
+      // If the content overlay is open or active, do NOT steal focus back to hero!
+      if (contentOverlayOpenRef.current) {
+        clearInterval(checkInterval);
+        return;
+      }
+      const contentSheet = typeof document !== 'undefined' ? document.getElementById("asset-detail-content-sheet") : null;
+      if (contentSheet?.getAttribute("data-overlay-open") === "true") {
+        clearInterval(checkInterval);
+        return;
+      }
 
-      if (!isAnyActionFocused) {
-        const container = document.getElementById("asset-detail-container");
-        if (container) {
+      const container = typeof document !== 'undefined' ? document.getElementById("asset-detail-container") : null;
+      if (container) {
+        // If an element within the container is already focused, do nothing
+        if (typeof document !== 'undefined' && document.activeElement && container.contains(document.activeElement)) {
+          clearInterval(checkInterval);
+          return;
+        }
+
+        const isAnyActionFocused =
+          watchNowFocused ||
+          watchlistFocused;
+
+        if (!isAnyActionFocused) {
           const activeFocusedInDom = container.querySelector(
             '[data-focuskey].ring-4, ' +
             '[data-focuskey].scale-110, ' +
             '[data-focuskey].scale-105, ' +
-            '[data-focuskey].border-white'
+            '[data-focuskey].border-white, ' +
+            '[data-focuskey][data-focused="true"]'
           );
 
           if (!activeFocusedInDom) {
@@ -1235,8 +1275,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     assetId,
     showSkeleton,
     asset,
-    watchNowFocused,
-    watchlistFocused,
     videoStarted,
     videoReady
   ]);
@@ -1263,12 +1301,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     window.scrollTo({ top: 0, behavior: "smooth" });
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [assetId, contentOverlayRef]);
-
-  // Keep a ref of contentOverlayOpen for instant access in keydown handlers
-  const contentOverlayOpenRef = useRef(contentOverlayOpen);
-  useEffect(() => {
-    contentOverlayOpenRef.current = contentOverlayOpen;
-  }, [contentOverlayOpen]);
 
   // Escape (browser testing) & webOS Remote Back button (keyCode 461) handling.
   // Registered in the CAPTURE phase so it runs before any bubble-phase listeners
@@ -1561,6 +1593,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   if (hasTrailersTab) availableTabs.push("trailers");
   if (hasCastTab) availableTabs.push("cast");
   if (hasMoreLikeThisTab) availableTabs.push("more_like_this");
+  availableTabsRef.current = availableTabs;
 
   const firstEpisodeFocusKey = seasonsOption.length > 0
     ? `season-item-${selectedSeasonIndex}`
@@ -1853,7 +1886,15 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           ) : isAuthLoading ? (
             <div className="h-9 sm:h-11 w-32 sm:w-40 bg-neutral-800 rounded-full animate-pulse shrink-0" />
           ) : (
-            <div ref={watchNowRef as any} className={`rounded-full ${watchNowFocused ? 'ring-4 ring-white shadow-xl scale-105 z-50 transition-all' : ''}`}>
+            <div
+              ref={watchNowRef as any}
+              data-focuskey={`asset-watch-now-${assetId}`}
+              className={`rounded-full inline-flex transition-all duration-200 ${
+                watchNowFocused
+                  ? 'border-[3px] border-white ring-4 ring-white/50 shadow-2xl scale-105 z-50'
+                  : 'border-[3px] border-transparent'
+              }`}
+            >
               <JOJOCustomButton
                 state={JOJOButton.State.ACTIVE}
                 size={JOJOButton.Size.M}
@@ -1891,6 +1932,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 {/* Add to list */}
                 <button
                   ref={watchlistRef as any}
+                  data-focuskey={`asset-watchlist-${assetId}`}
                   onClick={() => {
                 if (isGuest) {
                   useGuestPopupStore.getState().openGuestPopup();
@@ -2824,6 +2866,8 @@ function FocusableTabButton({
   return (
     <button
       ref={ref as any}
+      data-focuskey={focusKeyPrefix}
+      data-focused={focused ? "true" : "false"}
       onClick={handleActivate}
       className={`relative pt-1 pb-3 text-base sm:text-lg lg:text-xl font-semibold transition-colors outline-none shrink-0 cursor-pointer ${
         isActive
@@ -2833,7 +2877,9 @@ function FocusableTabButton({
             : "text-neutral-400 hover:text-white"
       }`}
     >
-      <span className="inline-block px-1 py-1">
+      <span className={`inline-block px-2.5 py-1 rounded transition-all ${
+        focused ? "bg-white/15 ring-2 ring-white text-white" : ""
+      }`}>
         {label}
       </span>
       {isActive && (
