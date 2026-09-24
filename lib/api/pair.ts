@@ -47,6 +47,7 @@ export interface VerifyQrResult {
   token?: string;
   phone?: string;
   phoneCode?: string;
+  email?: string;
 }
 
 /**
@@ -79,13 +80,23 @@ export async function verifyQrCode(code: string, sessionId?: string, signal?: Ab
     const tvHasLoginPayload = Boolean(resultSessionId && userId);
     const phoneClaimSucceeded = Boolean(sessionId && metaStatus >= 200 && metaStatus < 300);
 
+    // Email-based accounts return `email` (flat, like VerifyOtpResponse /
+    // SocialLoginResponse) — or nested under `user`; some backends put the
+    // email IN the phone field, which the account screen treats as an email
+    // when it contains '@'. Map all three so email logins show correctly.
+    const phone = payload?.phone;
+    const email =
+      payload?.email ?? payload?.user?.email ??
+      (typeof phone === "string" && phone.includes("@") ? phone : undefined);
+
     return {
       verified: tvHasLoginPayload || phoneClaimSucceeded,
       sessionId: resultSessionId,
       userId,
       token: payload?.token,
-      phone: payload?.phone,
+      phone,
       phoneCode: payload?.phone_code ?? payload?.phoneCode,
+      email,
     };
   } catch {
     return { verified: false };

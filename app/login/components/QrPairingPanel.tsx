@@ -104,12 +104,18 @@ export function QrPairingPanel() {
 
       if (result.verified && result.sessionId && result.userId) {
         clearSelectedProfile();
+        // Mirror useOtpLogin: pass email through, and when the identifier is
+        // an email parked in the phone field, blank the phone code — account
+        // settings resolves either shape into the email display.
+        const phone = result.phone || "";
+        const isEmailIdentifier = phone.includes("@");
         setAuth(
           {
             id: result.userId,
-            phone: result.phone || "",
-            phone_code: result.phoneCode || "",
-            phoneCode: result.phoneCode || "",
+            phone,
+            phone_code: isEmailIdentifier ? "" : (result.phoneCode || ""),
+            phoneCode: isEmailIdentifier ? "" : (result.phoneCode || ""),
+            email: result.email || (isEmailIdentifier ? phone : undefined),
             isGuest: false,
             createdAt: new Date().toISOString(),
           },
