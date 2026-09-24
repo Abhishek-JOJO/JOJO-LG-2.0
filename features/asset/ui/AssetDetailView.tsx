@@ -292,14 +292,22 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // Normalize initialAsset if passed in raw API format
   const normalizedInitialAsset = useMemo(() => {
     if (!initialAsset) return null;
+    let base = initialAsset;
     if (!initialAsset.title && initialAsset.asset_title) {
       try {
-        return mapContentAsset({ data: initialAsset } as any);
+        base = mapContentAsset({ data: initialAsset } as any);
       } catch {
-        return initialAsset;
+        base = initialAsset;
       }
     }
-    return initialAsset;
+    const resolvedTitleImage =
+      base.titleImage ||
+      (typeof base.title_image === "string" ? base.title_image : base.title_image?.url) ||
+      null;
+    return {
+      ...base,
+      titleImage: resolvedTitleImage,
+    };
   }, [initialAsset]);
 
   // Direct sessionStorage cache fallback for instant zero-skeleton paint on Back navigation
@@ -310,14 +318,22 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed) {
+          let res = parsed;
           if (!parsed.title && parsed.asset_title) {
             try {
-              return mapContentAsset({ data: parsed } as any);
+              res = mapContentAsset({ data: parsed } as any);
             } catch {
-              return parsed;
+              res = parsed;
             }
           }
-          return parsed;
+          const resolvedTitleImage =
+            res.titleImage ||
+            (typeof res.title_image === "string" ? res.title_image : res.title_image?.url) ||
+            null;
+          return {
+            ...res,
+            titleImage: resolvedTitleImage,
+          };
         }
       }
     } catch {}
@@ -1356,6 +1372,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       (typeof initialAsset?.landscape === "string" ? initialAsset.landscape : "") ||
       "";
     const previewTitle = initialAsset?.title || initialAsset?.asset_title || "";
+    const previewTitleImage =
+      initialAsset?.titleImage ||
+      (typeof initialAsset?.title_image === "string"
+        ? initialAsset.title_image
+        : initialAsset?.title_image?.url) ||
+      "";
 
     return (
       <div
@@ -1388,8 +1410,21 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             />
           )}
 
-          {/* Logo/Title block — real title if already known, otherwise shimmer */}
-          {previewTitle ? (
+          {/* Logo/Title block — real title image if already known, otherwise title text or shimmer */}
+          {previewTitleImage ? (
+            <div className={
+              isStandalone
+                ? "relative w-[280px] h-[94px] sm:w-[420px] sm:h-[140px] lg:w-[600px] lg:h-[200px] z-20"
+                : "relative w-[150px] h-[50px] sm:w-[260px] sm:h-[90px] z-20"
+            }>
+              <img
+                src={previewTitleImage}
+                alt={previewTitle}
+                className="w-full h-full object-contain object-left-bottom drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+                loading="eager"
+              />
+            </div>
+          ) : previewTitle ? (
             <h1 className="relative z-20 line-clamp-1 text-2xl sm:text-4xl font-bold drop-shadow-lg">
               {previewTitle}
             </h1>
@@ -1561,6 +1596,13 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     (asset.landscape as any)?.path ||
     "";
 
+  const effectiveTitleImage =
+    asset.titleImage ||
+    (typeof (asset as any).title_image === "string"
+      ? (asset as any).title_image
+      : (asset as any).title_image?.url) ||
+    "";
+
   const titleBlock = (
     <div
       className="pointer-events-none transition-transform duration-700 ease-out origin-bottom-left"
@@ -1569,7 +1611,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       }}
     >
       {/* Logo image or Title text */}
-      {asset.titleImage ? (
+      {effectiveTitleImage ? (
         <>
           <h1 className="sr-only">{asset.title}</h1>
           <div className={
@@ -1578,7 +1620,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
               : "relative w-[150px] h-[50px] sm:w-[260px] sm:h-[90px]"
           }>
             <JOJOCommonImage
-              src={asset.titleImage}
+              src={effectiveTitleImage}
               alt={asset.title}
               fill
               contentMode="contain"

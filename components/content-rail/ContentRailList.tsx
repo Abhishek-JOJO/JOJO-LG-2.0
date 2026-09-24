@@ -333,15 +333,32 @@ export function ContentRailList({
     preloadRailItems(items, 12);
   }, [isSpotlightRail, items, isTvFileRuntime]);
 
-  // When cycling cards in spotlight rail, ensure adjacent items are preloaded immediately
+  // Eagerly preload title images for active spotlight rail so fast remote navigation has 0ms image delay
+  useEffect(() => {
+    if (!isSpotlightRail || !railActive || !items?.length) return;
+    const count = Math.min(items.length, 16);
+    for (let i = 0; i < count; i++) {
+      if (items[i]?.title_image) {
+        preloadImageUrl(items[i].title_image, { width: 560, height: 160 });
+      }
+    }
+  }, [isSpotlightRail, railActive, items]);
+
+  // When cycling cards in spotlight rail, ensure adjacent items (next 4, prev 2) are preloaded immediately
   useEffect(() => {
     if (!isSpotlightRail || !items?.length) return;
     if (isTvFileRuntime && !railActive) return;
     const si = spotlightIndex;
-    const nextIdx = (si + 1) % items.length;
-    const nextIdx2 = (si + 2) % items.length;
-    const prevIdx = (si - 1 + items.length) % items.length;
-    [nextIdx, nextIdx2, prevIdx].forEach((idx) => {
+    const len = items.length;
+    const lookaheadIndices = [
+      (si + 1) % len,
+      (si + 2) % len,
+      (si + 3) % len,
+      (si + 4) % len,
+      (si - 1 + len) % len,
+      (si - 2 + len) % len,
+    ];
+    lookaheadIndices.forEach((idx) => {
       const it = items[idx];
       if (it) {
         preloadImageUrl(it.posterImage || it.heroImage || it.landscapeImage || it.image || it.portraitImage, { width: 871, height: 490 });

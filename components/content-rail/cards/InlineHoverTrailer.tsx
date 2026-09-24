@@ -18,10 +18,10 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [videoError, setVideoError] = useState(false);
-  const [titleImageLoaded, setTitleImageLoaded] = useState(false);
+  const [titleImageError, setTitleImageError] = useState(false);
 
   useEffect(() => {
-    setTitleImageLoaded(false);
+    setTitleImageError(false);
   }, [item?.title_image, item?.id]);
   
   const isMuted = usePlayerStore((s) => s.isMuted);
@@ -149,33 +149,31 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
       
       {/* Meta details at bottom left with seamless transition */}
       <div
-        key={`meta-${item?.id || item?.title}`}
         className={`absolute flex flex-col justify-end items-start text-left z-20 pointer-events-none transition-all duration-200 ${
         isLandscape
           ? "bottom-8 left-8 right-8"
           : "bottom-6 left-6 right-6 sm:bottom-8 sm:left-8 sm:right-8"
       }`}>
-        {item?.title_image ? (
+        {item?.title_image && !titleImageError ? (
           <div className={`relative mb-3 flex justify-start items-end ${
             isLandscape
               ? "w-[280px] h-[90px]"
               : "w-[160px] sm:w-[220px] lg:w-[280px] h-[50px] sm:h-[65px] lg:h-[80px]"
           }`}>
             <img
-              key={item.title_image}
               src={jojoResizedImageURL(item.title_image, { targetSize: { width: 560, height: 160 } })}
               alt={item?.title || ""}
               className="w-full h-full object-contain object-left-bottom drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]"
               loading="eager"
-              decoding="async"
-              onLoad={() => setTitleImageLoaded(true)}
+              // @ts-ignore
+              fetchPriority="high"
+              onError={() => setTitleImageError(true)}
             />
           </div>
-        ) : null}
-        {(!item?.title_image || !titleImageLoaded) && item?.title ? (
+        ) : item?.title ? (
           <h3 className={`text-white font-extrabold line-clamp-1 drop-shadow-lg mb-2 text-left ${
             isLandscape ? "text-3xl" : "text-xl sm:text-2xl"
-          } ${item?.title_image && titleImageLoaded ? "hidden" : ""}`}>
+          }`}>
             {item.title}
           </h3>
         ) : null}
