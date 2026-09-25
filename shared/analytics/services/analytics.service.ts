@@ -94,6 +94,7 @@ class AnalyticsService {
 
       const defaultProperties = {
         custom_platform: appConfig.CUSTOME_PLATFORM_EVENT_NAME,
+        platform: "LGTV",
         version: process.env.NEXT_PUBLIC_APP_VERSION,
         profile_id: profileState.selectedProfile?.profile_id || "",
         user_id: authState.user?.id ? String(authState.user.id) : "",
@@ -102,12 +103,11 @@ class AnalyticsService {
         timestamp: new Date().toISOString(),
       };
 
-      const rawEventName = typeof event === 'string' ? event : event.name;
-      const formattedEventName = rawEventName.startsWith('lg_tv_') ? rawEventName : `lg_tv_${rawEventName}`;
+      const eventName = typeof event === 'string' ? event : event.name;
 
       if (typeof event === 'string') {
         enrichedEvent = {
-          name: formattedEventName,
+          name: eventName,
           properties: cleanProperties({
             ...defaultProperties,
             ...urlAttribution,
@@ -118,7 +118,7 @@ class AnalyticsService {
       } else {
         enrichedEvent = {
           ...event,
-          name: formattedEventName,
+          name: eventName,
           properties: cleanProperties({
             ...defaultProperties,
             ...urlAttribution,

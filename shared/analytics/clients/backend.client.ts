@@ -153,6 +153,7 @@ class BackendClient {
 
         const payload: Record<string, any> = {
           custom_platform: appConfig.CUSTOME_PLATFORM_EVENT_NAME,
+          platform: "LGTV",
           version: properties.version || appVersion,
           asset_id: parsedAssetId,
           asset_name: properties.asset_name || properties.asset_title || properties.title || "",
