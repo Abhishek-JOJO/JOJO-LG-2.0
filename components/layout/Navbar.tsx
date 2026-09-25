@@ -179,9 +179,9 @@ function FocusableSearch({
       onClick={() => setSearchOpen(true)}
       className={`p-2.5 rounded-full cursor-pointer flex items-center justify-center transition-all duration-200 shrink-0 ${
         focused
-          ? "bg-white text-black scale-110 ring-2 ring-white font-bold"
+          ? "bg-white text-black scale-110 ring-4 ring-white ring-offset-2 ring-offset-black font-bold shadow-2xl"
           : isSearchActive
-          ? "bg-white/20 text-white ring-2 ring-white/50"
+          ? "bg-white/15 text-white"
           : "text-white/90 hover:text-white hover:bg-white/10"
       }`}
       aria-label="Search"
@@ -290,12 +290,12 @@ export function Navbar() {
   return (
     <header
       className={`z-[999] overflow-visible transition-colors duration-300 sticky top-0 left-0 right-0 w-full ${
-        isScrolled || isSearchActive
+        isScrolled && !isSearchActive
           ? "bg-[#050505]/95 backdrop-blur-md"
           : "bg-transparent shadow-none"
       }`}
       style={{
-        background: isScrolled || isSearchActive ? "rgba(5, 5, 5, 0.95)" : "transparent",
+        background: isScrolled && !isSearchActive ? "rgba(5, 5, 5, 0.95)" : "transparent",
         boxShadow: "none",
         borderBottom: "none",
       }}

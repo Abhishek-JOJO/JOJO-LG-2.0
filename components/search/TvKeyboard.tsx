@@ -23,29 +23,93 @@ interface TvKeyboardProps {
   onTopEdge?: () => void;
 }
 
-interface KeyCellProps {
+interface LetterKeyCellProps {
+  char: string;
+  rowIdx: number;
+  colIdx: number;
+  onKeyPress: (char: string) => void;
+  onRightEdge?: () => void;
+  onTopEdge?: () => void;
+}
+
+const LetterKeyCell = memo(function LetterKeyCell({
+  char,
+  rowIdx,
+  colIdx,
+  onKeyPress,
+  onRightEdge,
+  onTopEdge,
+}: LetterKeyCellProps) {
+  const focusKey = `tv-key-${rowIdx}-${colIdx}`;
+
+  const handleClick = useCallback(() => {
+    try {
+      tvSoundManager.play("select");
+    } catch {}
+    onKeyPress(char);
+  }, [onKeyPress, char]);
+
+  const { ref, focused } = useFocusable({
+    focusKey,
+    onEnterPress: handleClick,
+    onArrowPress: (direction) => {
+      try {
+        tvSoundManager.play("nav");
+      } catch {}
+      if (direction === "right" && colIdx === 5 && onRightEdge) {
+        onRightEdge();
+        return false;
+      }
+      if (direction === "left" && colIdx === 0) {
+        return false;
+      }
+      if (direction === "up" && rowIdx === 0 && onTopEdge) {
+        onTopEdge();
+        return false;
+      }
+      return true;
+    },
+  });
+
+  return (
+    <div
+      ref={ref as any}
+      data-focuskey={focusKey}
+      onClick={handleClick}
+      className={`relative select-none flex items-center justify-center h-[50px] rounded-xl font-bold cursor-pointer ${
+        focused
+          ? "bg-white text-black z-30 shadow-2xl ring-4 ring-white ring-offset-2 ring-offset-[#140a04]"
+          : "bg-[#1c1c1c] text-white/90 hover:bg-[#282828] border border-white/10"
+      }`}
+    >
+      <span className="text-xl leading-none font-extrabold">{char}</span>
+      {focused && (
+        <div
+          className="absolute inset-0 z-40 pointer-events-none rounded-xl"
+          style={{ border: "2.5px solid #ffffff" }}
+        />
+      )}
+    </div>
+  );
+});
+
+interface ActionKeyCellProps {
   focusKey: string;
-  label?: string;
-  icon?: React.ReactNode;
-  colSpan?: number;
+  label: string;
+  icon: React.ReactNode;
   onClick: () => void;
   onRightEdge?: () => void;
   onLeftEdge?: () => void;
-  onTopEdge?: () => void;
-  className?: string;
 }
 
-const KeyCell = memo(function KeyCell({
+const ActionKeyCell = memo(function ActionKeyCell({
   focusKey,
   label,
   icon,
-  colSpan = 1,
   onClick,
   onRightEdge,
   onLeftEdge,
-  onTopEdge,
-  className = "",
-}: KeyCellProps) {
+}: ActionKeyCellProps) {
   const handleClick = useCallback(() => {
     try {
       tvSoundManager.play("select");
@@ -68,41 +132,30 @@ const KeyCell = memo(function KeyCell({
         onLeftEdge();
         return false;
       }
-      if (direction === "up" && onTopEdge) {
-        onTopEdge();
-        return false;
-      }
       return true;
     },
   });
-
-  const spanClass =
-    colSpan === 2
-      ? "col-span-2"
-      : colSpan === 3
-      ? "col-span-3"
-      : colSpan === 4
-      ? "col-span-4"
-      : "col-span-1";
 
   return (
     <div
       ref={ref as any}
       data-focuskey={focusKey}
       onClick={handleClick}
-      className={`relative select-none flex items-center justify-center h-[50px] rounded-xl font-bold cursor-pointer transition-transform duration-75 ${spanClass} ${
+      className={`relative col-span-2 select-none flex items-center justify-center h-[50px] rounded-xl font-bold cursor-pointer ${
         focused
-          ? "bg-white text-black scale-105 z-20 shadow-xl ring-2 ring-white"
-          : "bg-[#1c1c1c] text-white/90 hover:bg-[#282828] border border-white/5"
-      } ${className}`}
+          ? "bg-white text-black z-30 shadow-2xl ring-4 ring-white ring-offset-2 ring-offset-[#140a04]"
+          : "bg-[#1c1c1c] text-white/90 hover:bg-[#282828] border border-white/10"
+      }`}
     >
-      {icon ? (
-        <div className="flex items-center justify-center gap-2 text-sm font-semibold uppercase tracking-wider">
-          {icon}
-          {label && <span>{label}</span>}
-        </div>
-      ) : (
-        <span className="text-lg leading-none font-bold">{label}</span>
+      <div className="flex items-center justify-center gap-2 text-sm font-bold uppercase tracking-wider">
+        {icon}
+        <span>{label}</span>
+      </div>
+      {focused && (
+        <div
+          className="absolute inset-0 z-40 pointer-events-none rounded-xl"
+          style={{ border: "2.5px solid #ffffff" }}
+        />
       )}
     </div>
   );
@@ -115,31 +168,9 @@ export const TvKeyboard = memo(function TvKeyboard({
   onRightEdge,
   onTopEdge,
 }: TvKeyboardProps) {
-  const handleRight = useCallback(() => {
-    if (onRightEdge) {
-      onRightEdge();
-    } else if (doesFocusableExist("search-input")) {
-      setFocus("search-input");
-    }
-  }, [onRightEdge]);
-
-  const handleLeft = useCallback(() => {
-    // Stay inside keyboard
-    return;
-  }, []);
-
-  const handleTopEdge = useCallback(() => {
-    if (onTopEdge) {
-      onTopEdge();
-    }
-  }, [onTopEdge]);
-
-  const handleKeyPress = useCallback(
-    (char: string) => {
-      onKeyPress(char);
-    },
-    [onKeyPress]
-  );
+  const handleSpace = useCallback(() => {
+    onKeyPress(" ");
+  }, [onKeyPress]);
 
   return (
     <div className="w-full select-none bg-[#161616] border border-white/10 rounded-xl p-3.5 shadow-lg flex flex-col gap-2.5">
@@ -147,14 +178,14 @@ export const TvKeyboard = memo(function TvKeyboard({
       <div className="grid grid-cols-6 gap-2.5">
         {KEYBOARD_ROWS.map((row, rowIdx) =>
           row.map((char, colIdx) => (
-            <KeyCell
+            <LetterKeyCell
               key={`key-${rowIdx}-${colIdx}`}
-              focusKey={`tv-key-${rowIdx}-${colIdx}`}
-              label={char}
-              onClick={() => handleKeyPress(char)}
-              onRightEdge={colIdx === 5 ? handleRight : undefined}
-              onLeftEdge={colIdx === 0 ? handleLeft : undefined}
-              onTopEdge={rowIdx === 0 ? handleTopEdge : undefined}
+              char={char}
+              rowIdx={rowIdx}
+              colIdx={colIdx}
+              onKeyPress={onKeyPress}
+              onRightEdge={onRightEdge}
+              onTopEdge={onTopEdge}
             />
           ))
         )}
@@ -162,28 +193,25 @@ export const TvKeyboard = memo(function TvKeyboard({
 
       {/* Action Row: SPACE (col-span-2), BACKSPACE (col-span-2), CLEAR (col-span-2) */}
       <div className="grid grid-cols-6 gap-2 pt-1 border-t border-white/10">
-        <KeyCell
+        <ActionKeyCell
           focusKey="tv-key-space"
           label="Space"
           icon={<Space className="w-4 h-4" />}
-          colSpan={2}
-          onClick={() => handleKeyPress(" ")}
-          onLeftEdge={handleLeft}
+          onClick={handleSpace}
+          onLeftEdge={() => {}}
         />
-        <KeyCell
+        <ActionKeyCell
           focusKey="tv-key-backspace"
           label="Delete"
           icon={<Delete className="w-4 h-4" />}
-          colSpan={2}
           onClick={onBackspace}
         />
-        <KeyCell
+        <ActionKeyCell
           focusKey="tv-key-clear"
           label="Clear"
           icon={<RotateCcw className="w-3.5 h-3.5" />}
-          colSpan={2}
           onClick={onClear}
-          onRightEdge={handleRight}
+          onRightEdge={onRightEdge}
         />
       </div>
     </div>

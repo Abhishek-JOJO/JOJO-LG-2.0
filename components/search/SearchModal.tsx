@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useRef, useState, memo } from "react";
+import { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
 import { useLocaleStore } from "@/store/useLocaleStore";
 import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { restorePageFocus } from "@/src/navigation/focusUtils";
@@ -122,16 +122,18 @@ function FocusableSearchInput({
   onChange,
   placeholder,
   hasQuery,
-  hasResults,
-  hasRecents,
+  showSpinner,
+  onClear,
+  clearLabel,
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   placeholder: string;
   hasQuery: boolean;
-  hasResults: boolean;
-  hasRecents: boolean;
+  showSpinner?: boolean;
+  onClear?: () => void;
+  clearLabel?: string;
 }) {
   const { ref, focused, focusKey } = useFocusable({
     focusKey: "search-input",
@@ -177,31 +179,54 @@ function FocusableSearchInput({
     <div
       ref={ref as any}
       data-focuskey={focusKey}
-      className={`flex-1 flex items-center h-[38px] px-2 rounded-xl transition-all duration-150 cursor-default ${focused
-          ? "border-2 border-white ring-2 ring-white/60 bg-white/10 shadow-lg"
-          : "border-2 border-transparent bg-transparent"
-        }`}
+      className={`relative flex items-center gap-3 px-4 h-[52px] rounded-xl shrink-0 shadow-lg cursor-default ${
+        focused
+          ? "bg-[#222222] text-white z-30 shadow-2xl ring-4 ring-white ring-offset-2 ring-offset-[#140a04]"
+          : "bg-[#161616] text-white/80 border border-white/10"
+      }`}
     >
-      <JOJOCustomInput
-        ref={inputRef}
-        size={JOJOInputSize.S}
-        state={JOJOInputState.DEFAULT}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        autoComplete="off"
-        spellCheck={false}
-        readOnly={true}
-        inputMode="none"
-        tabIndex={-1}
-        aria-label={placeholder}
-        inputConfig={{
-          background: "transparent",
-          caretColor: "transparent",
-          placeholderColor: "theme_5",
-        }}
-        className="!bg-transparent !rounded-none !h-auto !px-0 border-none body-sm-regular w-full cursor-default text-white"
-      />
+      <Search className={`w-5 h-5 shrink-0 transition-colors ${focused ? "text-white" : "text-white/60"}`} />
+      <div className="flex-1 min-w-0">
+        <JOJOCustomInput
+          ref={inputRef}
+          size={JOJOInputSize.S}
+          state={JOJOInputState.DEFAULT}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          autoComplete="off"
+          spellCheck={false}
+          readOnly={true}
+          inputMode="none"
+          tabIndex={-1}
+          aria-label={placeholder}
+          inputConfig={{
+            background: "transparent",
+            caretColor: "transparent",
+            placeholderColor: "theme_5",
+          }}
+          className="!bg-transparent !rounded-none !h-auto !px-0 border-none body-sm-regular w-full cursor-default text-white"
+        />
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
+        {showSpinner && hasQuery && (
+          <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+        )}
+        {hasQuery && onClear && (
+          <SearchClearButton
+            onClear={onClear}
+            label={clearLabel || "Clear"}
+          />
+        )}
+      </div>
+
+      {focused && (
+        <div
+          className="absolute inset-0 z-40 pointer-events-none rounded-xl"
+          style={{ border: "2.5px solid #ffffff" }}
+        />
+      )}
     </div>
   );
 }
@@ -253,8 +278,8 @@ function SearchClearButton({ onClear, label }: { onClear: () => void; label: str
       role="button"
       aria-label={label}
       onClick={onClear}
-      className={`p-1.5 rounded-full transition-all cursor-pointer ${focused
-          ? "bg-white text-black scale-110 ring-2 ring-white"
+      className={`p-1.5 rounded-full cursor-pointer ${focused
+          ? "bg-white text-black ring-4 ring-white shadow-lg"
           : "text-white/60 hover:text-white hover:bg-white/10"
         }`}
     >
@@ -318,8 +343,9 @@ const PosterCard = memo(function PosterCard({
       ref={ref as any}
       data-focuskey={focusKey}
       onClick={handleClick}
-      className={`aspect-[2/3] relative rounded-xl overflow-hidden bg-[#161616] cursor-pointer transition-transform duration-75 ${focused ? "scale-105 z-10 shadow-2xl ring-2 ring-white" : "border border-white/5"
-        }`}
+      className={`aspect-[2/3] relative rounded-xl overflow-hidden bg-[#161616] cursor-pointer ${
+        focused ? "z-30 shadow-2xl opacity-100" : "border border-white/5 opacity-90"
+      }`}
     >
       {img ? (
         <JOJOCommonImage
@@ -335,6 +361,12 @@ const PosterCard = memo(function PosterCard({
         <div className="w-full h-full bg-theme_1/8 flex items-center justify-center p-2 text-center caption-xs-regular text-theme_5">
           {title}
         </div>
+      )}
+      {focused && (
+        <div
+          className="absolute inset-0 z-50 pointer-events-none rounded-xl"
+          style={{ border: "3.5px solid #ffffff" }}
+        />
       )}
     </div>
   );
@@ -892,7 +924,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
     error,
   } = useSearch(debouncedQuery, currentPage, limit);
 
-  const searchResults: any[] = (() => {
+  const searchResults: any[] = useMemo(() => {
     const d = (searchData as any)?.data;
     if (!d) return [];
     if (Array.isArray(d)) return d;
@@ -901,7 +933,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
     if (Array.isArray(d?.items)) return d.items;
     if (Array.isArray(d?.data)) return d.data;
     return [];
-  })();
+  }, [searchData]);
 
   const meta =
     (searchData as any)?.metaData ??
@@ -945,7 +977,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
   const showSpinner = searchLoading || isFetching;
   const railsBusy = railsLoading || isFetchingNextPage;
 
-  const rails: any[] = (() => {
+  const rails: any[] = useMemo(() => {
     return (railsData?.pages || []).flatMap((page: any) => {
       const d = page?.data;
       return (
@@ -956,21 +988,42 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
         (Array.isArray(page) ? page : [])
       );
     });
-  })();
+  }, [railsData?.pages]);
 
-  // Show all rails from the search subnav — don't filter by cr_name since
-  // rail names are translated (e.g. Gujarati) and won't match English keywords.
-  // The search subnav only contains relevant rails (recently added, genre, etc.)
-  // so showing all of them is correct regardless of language.
-  const recentRails = rails.filter((rail: any) => {
-    if (!rail) return false;
-    // Always exclude hero/main-carousel display types (type 8 or 14)
-    const displayType = Number(rail?.cr_display_type ?? rail?.display_type ?? 0);
-    if (displayType === 8 || displayType === 14) return false;
-    // Must have items
-    const items = rail?.cr_items || rail?.content_rail_items || rail?.items;
-    return Array.isArray(items) && items.length > 0;
-  });
+  const recentRails = useMemo(() => {
+    return rails.filter((rail: any) => {
+      if (!rail) return false;
+      const displayType = Number(rail?.cr_display_type ?? rail?.display_type ?? 0);
+      if (displayType === 8 || displayType === 14) return false;
+      const items = rail?.cr_items || rail?.content_rail_items || rail?.items;
+      return Array.isArray(items) && items.length > 0;
+    });
+  }, [rails]);
+
+  const handleTvKeyPress = useCallback((char: string) => {
+    setInputValue((prev) => prev + char);
+  }, []);
+
+  const handleTvBackspace = useCallback(() => {
+    setInputValue((prev) => prev.slice(0, -1));
+  }, []);
+
+  const handleTvClear = useCallback(() => {
+    setInputValue("");
+    setCurrentPage(1);
+  }, []);
+
+  const handleTvTopEdge = useCallback(() => {
+    if (doesFocusableExist("search-input")) {
+      setFocus("search-input");
+    }
+  }, []);
+
+  const handleTvRightEdge = useCallback(() => {
+    if (doesFocusableExist("search-poster-0")) {
+      setFocus("search-poster-0");
+    }
+  }, []);
 
   const handleCardClick = useCallback(
     (item: any, index?: number) => {
@@ -1083,80 +1136,45 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.22 }}
+            transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed top-[74px] sm:top-[84px] lg:top-[92px] bottom-0 left-0 right-0 z-[990] bg-black/60"
-            style={{ WebkitBackdropFilter: "blur(6px)", backdropFilter: "blur(6px)" }}
+            className="fixed inset-0 z-[990] bg-black/60"
           />
           <FocusContext.Provider value={modalFocusKey}>
             <motion.div
               key="panel"
               ref={modalFocusRef as any}
               data-focuskey={modalFocusKey}
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed top-[74px] sm:top-[84px] lg:top-[92px] bottom-0 left-0 right-0 z-[995] pt-16 sm:pt-20 lg:pt-24 px-8 sm:px-12 lg:px-16 pb-8 flex flex-row gap-8 xl:gap-10 bg-[radial-gradient(circle_at_25%_25%,_#3d1a08_0%,_#140a04_50%,_#050201_100%)] text-white overflow-hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 z-[995] pt-[100px] sm:pt-[110px] lg:pt-[120px] px-8 sm:px-12 lg:px-16 pb-8 flex flex-row gap-8 xl:gap-10 bg-[radial-gradient(circle_at_25%_25%,_#3d1a08_0%,_#140a04_50%,_#050201_100%)] text-white overflow-hidden"
             >
               {/* Dark overlay for contrast like watching page */}
               <div aria-hidden="true" className="absolute inset-0 z-0 pointer-events-none bg-black/35" />
 
-              {/* Ambient backdrop glow */}
-              <div className="absolute top-[10%] left-[5%] z-0 h-[450px] w-[550px] rounded-full bg-[var(--theme_13)] opacity-[0.12] blur-[140px] pointer-events-none" />
-
               {/* ── LEFT COLUMN: Search Input Bar + TV Keyboard ── */}
               <div className="w-[420px] lg:w-[450px] shrink-0 flex flex-col justify-start gap-3.5 z-10">
                 {/* Search Input Bar */}
-                <div className="flex items-center gap-3 px-4 h-[52px] rounded-xl bg-[#161616] border border-white/10 shrink-0 shadow-lg">
-                  <Search className="w-5 h-5 text-white/60 shrink-0" />
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <FocusableSearchInput
-                      inputRef={inputRef}
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      placeholder={t("placeholder")}
-                      hasQuery={hasQuery}
-                      hasResults={searchResults.length > 0}
-                      hasRecents={false}
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {showSpinner && hasQuery && (
-                      <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
-                    )}
-                    {hasQuery && (
-                      <SearchClearButton
-                        onClear={() => {
-                          setInputValue("");
-                          setCurrentPage(1);
-                          setFocus("search-input");
-                        }}
-                        label={t("clear_all")}
-                      />
-                    )}
-                  </div>
-                </div>
+                <FocusableSearchInput
+                  inputRef={inputRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder={t("placeholder")}
+                  hasQuery={hasQuery}
+                  showSpinner={showSpinner}
+                  onClear={handleTvClear}
+                  clearLabel={t("clear_all")}
+                />
 
                 {/* Custom TV Keyboard */}
                 <TvKeyboard
-                  onKeyPress={(char) => setInputValue((prev) => prev + char)}
-                  onBackspace={() => setInputValue((prev) => prev.slice(0, -1))}
-                  onClear={() => {
-                    setInputValue("");
-                    setCurrentPage(1);
-                  }}
-                  onTopEdge={() => {
-                    if (doesFocusableExist("search-input")) {
-                      setFocus("search-input");
-                    }
-                  }}
-                  onRightEdge={() => {
-                    if (doesFocusableExist("search-poster-0")) {
-                      setFocus("search-poster-0");
-                    }
-                  }}
+                  onKeyPress={handleTvKeyPress}
+                  onBackspace={handleTvBackspace}
+                  onClear={handleTvClear}
+                  onTopEdge={handleTvTopEdge}
+                  onRightEdge={handleTvRightEdge}
                 />
               </div>
 
