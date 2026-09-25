@@ -13,6 +13,8 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useLocaleStore } from "@/store/useLocaleStore";
 import { appConfig } from "@/lib/config/app.config";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
+import { usePlayerStore } from "@/store/usePlayerStore";
+import { ROUTES } from "@/lib/constants/routes";
 
 interface FocusableNavLinkProps {
   item: any;
@@ -43,8 +45,13 @@ export const FocusableNavLink = React.memo(({
     const isCurrentBrowse = BROWSE_ROUTES.includes(normCurrent);
     const tvOverlay = useTvOverlayStore.getState();
     const isTvOverlayOpen = typeof window !== "undefined" && !!tvOverlay.screen;
+    const isSearchOpen = usePlayerStore.getState().isSearchOpen;
 
-    if (isTargetBrowse && (isCurrentBrowse || isTvOverlayOpen)) {
+    if (isSearchOpen) {
+      usePlayerStore.getState().setSearchOpen(false);
+    }
+
+    if (isTargetBrowse && (isCurrentBrowse || isTvOverlayOpen || normCurrent === ROUTES.SEARCH || isSearchOpen)) {
       const navStore = useNavStore.getState();
       if (navStore.activeBrowseTab !== normTarget) {
         navStore.setActiveBrowseTab(normTarget);
@@ -61,6 +68,9 @@ export const FocusableNavLink = React.memo(({
           window.history.replaceState({ browseTab: normTarget }, "", hashTarget);
         }
       } catch (e) {}
+      if (normCurrent === ROUTES.SEARCH || normCurrent.startsWith(ROUTES.SEARCH)) {
+        safeNavigate(router, ROUTES.HOME);
+      }
       return;
     }
 
@@ -143,10 +153,11 @@ export const FocusableNavLink = React.memo(({
         }
       }
 
-      // Only auto-switch tabs on focus if the user is already on a browse route.
+      // Auto-switch tabs on focus
       const normCurrent = typeof window !== "undefined" ? normalizePathname(window.location.pathname) : "";
       const isCurrentBrowse = BROWSE_ROUTES.includes(normCurrent);
-      if (!isItemActive && isCurrentBrowse) {
+      const isSearchOpen = usePlayerStore.getState().isSearchOpen;
+      if (!isItemActive && (isCurrentBrowse || isSearchOpen || normCurrent === ROUTES.SEARCH)) {
         navigateTab();
       }
     }, 220);

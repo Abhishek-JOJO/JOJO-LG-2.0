@@ -1,5 +1,6 @@
 {
   "common": {
+    "get_gold": "ગોલ્ડ મેળવો",
     "logout": "લૉગઆઉટ",
     "cancel": "રદ કરો",
     "exit_app_title": "JOJO બંધ કરવું છે?",

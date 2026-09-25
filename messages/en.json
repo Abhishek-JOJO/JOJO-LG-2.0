@@ -1,5 +1,6 @@
 {
   "common": {
+    "get_gold": "Get Gold",
     "logout": "Logout",
     "cancel": "Cancel",
     "exit_app_title": "Exit JOJO?",

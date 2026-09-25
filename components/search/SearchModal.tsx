@@ -11,7 +11,7 @@ import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 import { ContentRailSection } from "@/components/content-rail/ContentRailSection";
 import { RailCardVariant } from "@/components/content-rail/config/contentRail.types";
-import { getPortraitImage, getPosterImage, mapApiRail } from "@/components/content-rail/utils/contentRail.mapper";
+import { getPortraitImage, getPosterImage, getLandscapeImage, mapApiRail, mapApiRailItem } from "@/components/content-rail/utils/contentRail.mapper";
 import { NoResults } from "@/components/search/NoResults";
 import { SearchPagination } from "@/components/search/SearchPagination";
 import JOJOCommonImage, { JOJOImageContentMode, JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
@@ -47,25 +47,47 @@ const POSTER_GRID =
 // Prefers a genuinely portrait-ratio image (ratio_id aware, same helpers
 // mapApiRailItem uses for every other portrait card in the app) before ever
 // falling back to a landscape thumbnail — picking is_default/[0] without
-// checking ratio_id could grab a landscape-shaped entry and force-crop it
-// into this 2:3 card, cutting off title art and faces.
-function resolveImage(asset: any): string {
-  if (!asset) return "";
+function resolveSearchPosterUrl(item: any): string {
+  if (!item) return "";
+  if (item?.genre) return item.genre.image || "";
+
+  const asset = item?.details || item?.asset || item;
   const portraitArr = Array.isArray(asset?.portrait) ? asset.portrait : undefined;
   const posterArr = Array.isArray(asset?.poster) ? asset.poster : undefined;
   const landscapeArr = Array.isArray(asset?.landscape) ? asset.landscape : undefined;
 
-  return (
-    getPortraitImage(portraitArr) ||
-    posterArr?.find((img: any) => Number(img?.ratio_id) === 4)?.url ||
-    getPosterImage(posterArr) ||
-    portraitArr?.[0]?.url ||
-    posterArr?.[0]?.url ||
-    landscapeArr?.[0]?.url ||
-    (typeof asset?.image === "string" ? asset.image : undefined) ||
-    (typeof asset?.thumbnail === "string" ? asset.thumbnail : undefined) ||
-    ""
-  );
+  // 1. Ratio-4 poster / portrait image (ideal 2:3 vertical poster)
+  const ratio4Poster = posterArr?.find((img: any) => Number(img?.ratio_id) === 4)?.url;
+  const portraitUrl = getPortraitImage(portraitArr) || ratio4Poster;
+  if (portraitUrl) return portraitUrl;
+
+  // 2. Any entry in portrait or poster array
+  const anyPortrait = portraitArr?.find((img: any) => img?.url)?.url;
+  if (anyPortrait) return anyPortrait;
+
+  const posterUrl = getPosterImage(posterArr) || posterArr?.find((img: any) => img?.url)?.url;
+  if (posterUrl) return posterUrl;
+
+  // 3. String fields on asset
+  if (typeof asset?.portrait === "string" && asset.portrait) return asset.portrait;
+  if (typeof asset?.portraitImage === "string" && asset.portraitImage) return asset.portraitImage;
+  if (typeof asset?.portrait_image === "string" && asset.portrait_image) return asset.portrait_image;
+  if (typeof asset?.poster === "string" && asset.poster) return asset.poster;
+  if (typeof asset?.posterImage === "string" && asset.posterImage) return asset.posterImage;
+  if (typeof asset?.poster_image === "string" && asset.poster_image) return asset.poster_image;
+  if (typeof asset?.image === "string" && asset.image) return asset.image;
+  if (typeof asset?.thumbnail === "string" && asset.thumbnail) return asset.thumbnail;
+
+  // 4. Landscape fallbacks if portrait is unavailable
+  const landscapeUrl = getLandscapeImage(landscapeArr) || landscapeArr?.find((img: any) => img?.url)?.url;
+  if (landscapeUrl) return landscapeUrl;
+  if (typeof asset?.landscape === "string" && asset.landscape) return asset.landscape;
+  if (typeof asset?.landscapeImage === "string" && asset.landscapeImage) return asset.landscapeImage;
+  if (typeof asset?.landscape_image === "string" && asset.landscape_image) return asset.landscape_image;
+
+  // 5. Fallback to mapApiRailItem
+  const mapped = mapApiRailItem(item, 0);
+  return mapped.posterImageRatio4 || mapped.portraitImage || mapped.posterImage || mapped.image || mapped.landscapeImage || "";
 }
 
 function resolveTitle(item: any): string {
@@ -113,34 +135,38 @@ function FocusableSearchInput({
 }) {
   const { ref, focused, focusKey } = useFocusable({
     focusKey: "search-input",
-    onEnterPress: () => {},
+    onEnterPress: () => { },
     onArrowPress: (direction) => {
-      if (direction === "left") {
-        if (doesFocusableExist("tv-key-0-5")) {
-          setFocus("tv-key-0-5");
+      if (direction === "down") {
+        if (doesFocusableExist("tv-key-0-0")) {
+          setFocus("tv-key-0-0");
           return false;
         }
+        return false;
+      }
+      if (direction === "up") {
+        if (doesFocusableExist("navbar-search")) {
+          setFocus("navbar-search");
+          return false;
+        }
+        if (doesFocusableExist("search-close-btn")) {
+          setFocus("search-close-btn");
+          return false;
+        }
+        return false;
       }
       if (direction === "right") {
         if (hasQuery && doesFocusableExist("search-clear-btn")) {
           setFocus("search-clear-btn");
-        } else if (doesFocusableExist("search-close-btn")) {
-          setFocus("search-close-btn");
-        }
-        return false;
-      }
-      if (direction === "down") {
-        if (hasQuery && hasResults && doesFocusableExist("search-poster-0")) {
-          setFocus("search-poster-0");
           return false;
         }
-        if (!hasQuery && hasRecents && doesFocusableExist("recent-chip-0")) {
-          setFocus("recent-chip-0");
+        if (doesFocusableExist("search-poster-0")) {
+          setFocus("search-poster-0");
           return false;
         }
         return true;
       }
-      if (direction === "up") {
+      if (direction === "left") {
         return false;
       }
       return true;
@@ -151,11 +177,10 @@ function FocusableSearchInput({
     <div
       ref={ref as any}
       data-focuskey={focusKey}
-      className={`flex-1 flex items-center h-[42px] px-3 rounded-full transition-all duration-200 cursor-default ${
-        focused
+      className={`flex-1 flex items-center h-[38px] px-2 rounded-xl transition-all duration-150 cursor-default ${focused
           ? "border-2 border-white ring-2 ring-white/60 bg-white/10 shadow-lg"
-          : "border-2 border-transparent hover:border-white/20 bg-transparent"
-      }`}
+          : "border-2 border-transparent bg-transparent"
+        }`}
     >
       <JOJOCustomInput
         ref={inputRef}
@@ -175,7 +200,7 @@ function FocusableSearchInput({
           caretColor: "transparent",
           placeholderColor: "theme_5",
         }}
-        className="!bg-transparent !rounded-none !h-auto !px-0 border-none body-sm-regular w-full cursor-default"
+        className="!bg-transparent !rounded-none !h-auto !px-0 border-none body-sm-regular w-full cursor-default text-white"
       />
     </div>
   );
@@ -192,21 +217,30 @@ function SearchClearButton({ onClear, label }: { onClear: () => void; label: str
         setFocus("search-input");
         return false;
       }
-      if (direction === "right") {
-        if (doesFocusableExist("search-close-btn")) {
-          setFocus("search-close-btn");
+      if (direction === "down") {
+        if (doesFocusableExist("tv-key-0-5")) {
+          setFocus("tv-key-0-5");
+          return false;
         }
         return false;
       }
-      if (direction === "down") {
+      if (direction === "up") {
+        if (doesFocusableExist("search-close-btn")) {
+          setFocus("search-close-btn");
+          return false;
+        }
+        return false;
+      }
+      if (direction === "right") {
         if (doesFocusableExist("search-poster-0")) {
           setFocus("search-poster-0");
           return false;
         }
+        if (doesFocusableExist("recent-chip-0")) {
+          setFocus("recent-chip-0");
+          return false;
+        }
         return true;
-      }
-      if (direction === "up") {
-        return false;
       }
       return true;
     },
@@ -219,11 +253,10 @@ function SearchClearButton({ onClear, label }: { onClear: () => void; label: str
       role="button"
       aria-label={label}
       onClick={onClear}
-      className={`p-1.5 rounded-full transition-all cursor-pointer ${
-        focused
+      className={`p-1.5 rounded-full transition-all cursor-pointer ${focused
           ? "bg-white text-black scale-110 ring-2 ring-white"
-          : "text-theme_5 hover:text-theme_1 hover:bg-white/10"
-      }`}
+          : "text-white/60 hover:text-white hover:bg-white/10"
+        }`}
     >
       <X className="w-4 h-4" />
     </div>
@@ -247,15 +280,14 @@ const PosterCard = memo(function PosterCard({
   hasRecents?: boolean;
   onClick: () => void;
 }) {
-  const asset = item?.asset || item;
   const title = resolveTitle(item);
-  const img = item?.genre ? item.genre.image || "" : resolveImage(asset);
+  const img = resolveSearchPosterUrl(item);
   const customFocusKey = typeof index === "number" ? `search-poster-${index}` : undefined;
 
   const handleClick = useCallback(() => {
     try {
       tvSoundManager.play("select");
-    } catch {}
+    } catch { }
     onClick();
   }, [onClick]);
 
@@ -265,7 +297,7 @@ const PosterCard = memo(function PosterCard({
     onArrowPress: (direction) => {
       try {
         tvSoundManager.play("nav");
-      } catch {}
+      } catch { }
       if (direction === "left" && typeof index === "number" && index % totalCols === 0) {
         if (doesFocusableExist("tv-key-0-5")) {
           setFocus("tv-key-0-5");
@@ -273,11 +305,7 @@ const PosterCard = memo(function PosterCard({
         }
       }
       if (direction === "up" && typeof index === "number" && index < totalCols) {
-        if (hasRecents && doesFocusableExist("recent-chip-0")) {
-          setFocus("recent-chip-0");
-        } else {
-          setFocus("search-input");
-        }
+        setFocus("search-input");
         return false;
       }
       return true;
@@ -290,18 +318,18 @@ const PosterCard = memo(function PosterCard({
       ref={ref as any}
       data-focuskey={focusKey}
       onClick={handleClick}
-      className={`aspect-[2/3] relative rounded-xl overflow-hidden bg-[#161616] cursor-pointer transition-transform duration-75 ${
-        focused ? "scale-105 z-10 shadow-2xl ring-2 ring-white" : "border border-white/5"
-      }`}
+      className={`aspect-[2/3] relative rounded-xl overflow-hidden bg-[#161616] cursor-pointer transition-transform duration-75 ${focused ? "scale-105 z-10 shadow-2xl ring-2 ring-white" : "border border-white/5"
+        }`}
     >
       {img ? (
         <JOJOCommonImage
           src={img}
           alt={title}
           fill
-          contentMode={JOJOImageContentMode.Cover}
-          optimizeRequestURL={true}
+          contentMode={JOJOImageContentMode.Fill}
+          className="object-fill pointer-events-none select-none"
           wrapperClassName="w-full h-full pointer-events-none select-none"
+          optimizeRequestURL={false}
         />
       ) : (
         <div className="w-full h-full bg-theme_1/8 flex items-center justify-center p-2 text-center caption-xs-regular text-theme_5">
@@ -381,15 +409,11 @@ function SearchCloseButton({ onClose, label, hasQuery }: { onClose: () => void; 
     focusKey: "search-close-btn",
     onEnterPress: onClose,
     onArrowPress: (direction) => {
-      if (direction === "left") {
-        if (hasQuery && doesFocusableExist("search-clear-btn")) {
-          setFocus("search-clear-btn");
-        } else {
-          setFocus("search-input");
-        }
+      if (direction === "down") {
+        setFocus("search-input");
         return false;
       }
-      if (direction === "up") {
+      if (direction === "left") {
         return false;
       }
       return true;
@@ -403,9 +427,13 @@ function SearchCloseButton({ onClose, label, hasQuery }: { onClose: () => void; 
       role="button"
       aria-label={label}
       onClick={onClose}
-      className={`p-1.5 rounded-full transition-all cursor-pointer ${focused ? "bg-white text-black scale-110 ring-2 ring-white" : "text-theme_5 hover:text-theme_1 hover:bg-white/10"}`}
+      className={`flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer transition-all duration-150 ${focused
+          ? "bg-white text-black scale-105 ring-2 ring-white font-bold shadow-lg"
+          : "bg-white/10 text-white/90 hover:bg-white/20 hover:text-white"
+        }`}
     >
       <X className="w-5 h-5" />
+      <span className="text-sm font-semibold">{label}</span>
     </div>
   );
 }
@@ -463,9 +491,7 @@ function GenreRow({
     >
       {items.map((item, idx) => {
         const title = resolveTitle(item);
-        const img = item?.genre
-          ? item.genre.image || ""
-          : resolveImage(item?.asset || item);
+        const img = resolveSearchPosterUrl(item);
         return (
           <div
             key={idx}
@@ -521,8 +547,8 @@ function RecentlyAddedGrid({
   onCardClick: (item: any, index: number) => void;
 }) {
   return (
-    <div className="px-8 mb-2">
-      <h3 className="title-xs-semibold text-theme_1 mb-3">{title}</h3>
+    <div className="mb-6">
+      <h3 className="title-xs-semibold text-white/90 mb-3">{title}</h3>
       <div className={POSTER_GRID}>
         {items.map((item, idx) => (
           <PosterCard
@@ -645,7 +671,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
   // and lose focus permanently until reload — see the matching fix on MODAL_ASSET_DETAIL.
   const { ref: modalFocusRef, focusKey: modalFocusKey } = useFocusable({
     focusKey: "MODAL_SEARCH",
-    isFocusBoundary: true,
+    isFocusBoundary: false,
     preferredChildFocusKey: "tv-key-0-0",
     focusable: isOpen,
   });
@@ -733,7 +759,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
         searchOpenTimeRef.current = Date.now();
         hasTrackedOpenRef.current = true;
         hasTrackedCloseRef.current = false;
-        
+
         try {
           analyticsService.trackSearchOpened({
             source: 'navbar',
@@ -746,23 +772,23 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
       // Track search closed ONCE per modal close
       if (hasTrackedOpenRef.current && !hasTrackedCloseRef.current) {
         hasTrackedCloseRef.current = true;
-        
+
         try {
-          const durationSeconds = searchOpenTimeRef.current 
+          const durationSeconds = searchOpenTimeRef.current
             ? Math.floor((Date.now() - searchOpenTimeRef.current) / 1000)
             : undefined;
-          
+
           analyticsService.trackSearchClosed({
             duration_seconds: durationSeconds,
           });
         } catch (e) {
           // Silent fail
         }
-        
+
         // Reset for next open
         hasTrackedOpenRef.current = false;
       }
-      
+
       setInputValue("");
       setCurrentPage(1);
     }
@@ -896,7 +922,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
     if (lastTrackedQuery.current === debouncedQuery) return;
 
     lastTrackedQuery.current = debouncedQuery;
-    
+
     try {
       analyticsService.trackSearchPerformed({
         search_query: debouncedQuery,
@@ -1036,7 +1062,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
             is_top_10: Boolean(asset?.isintop10),
             item_position: index,
           });
-        } catch (e) { 
+        } catch (e) {
           console.error("[SearchModal] Failed to track content_clicked:", e);
         }
 
@@ -1059,124 +1085,89 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
             exit={{ opacity: 0 }}
             transition={{ duration: 0.22 }}
             onClick={onClose}
-            className="fixed inset-0 z-[10000] bg-black/60"
+            className="fixed top-[74px] sm:top-[84px] lg:top-[92px] bottom-0 left-0 right-0 z-[990] bg-black/60"
             style={{ WebkitBackdropFilter: "blur(6px)", backdropFilter: "blur(6px)" }}
           />
           <FocusContext.Provider value={modalFocusKey}>
-          <motion.div
-            key="panel"
-            ref={modalFocusRef as any}
-            data-focuskey={modalFocusKey}
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 z-[10001] p-6 lg:p-8 flex flex-row gap-6 bg-black/92 text-white overflow-hidden"
-          >
-            {/* Ambient backdrop glow */}
-            <div className="absolute top-[10%] left-[5%] z-0 h-[450px] w-[550px] rounded-full bg-[var(--theme_13)] opacity-[0.12] blur-[140px] pointer-events-none" />
+            <motion.div
+              key="panel"
+              ref={modalFocusRef as any}
+              data-focuskey={modalFocusKey}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed top-[74px] sm:top-[84px] lg:top-[92px] bottom-0 left-0 right-0 z-[995] pt-16 sm:pt-20 lg:pt-24 px-8 sm:px-12 lg:px-16 pb-8 flex flex-row gap-8 xl:gap-10 bg-[radial-gradient(circle_at_25%_25%,_#3d1a08_0%,_#140a04_50%,_#050201_100%)] text-white overflow-hidden"
+            >
+              {/* Dark overlay for contrast like watching page */}
+              <div aria-hidden="true" className="absolute inset-0 z-0 pointer-events-none bg-black/35" />
 
-            {/* ── LEFT COLUMN: Custom TV Keyboard ────────────────────── */}
-            <div className="w-[350px] lg:w-[380px] shrink-0 flex flex-col justify-start gap-4 z-10">
-              <TvKeyboard
-                onKeyPress={(char) => setInputValue((prev) => prev + char)}
-                onBackspace={() => setInputValue((prev) => prev.slice(0, -1))}
-                onClear={() => {
-                  setInputValue("");
-                  setCurrentPage(1);
-                }}
-                onRightEdge={() => {
-                  if (doesFocusableExist("search-input")) {
-                    setFocus("search-input");
-                  }
-                }}
-              />
-            </div>
+              {/* Ambient backdrop glow */}
+              <div className="absolute top-[10%] left-[5%] z-0 h-[450px] w-[550px] rounded-full bg-[var(--theme_13)] opacity-[0.12] blur-[140px] pointer-events-none" />
 
-            {/* ── RIGHT COLUMN: Search Header & Results ─────────────── */}
-            <div className="flex-1 flex flex-col gap-4 min-w-0 h-full overflow-hidden z-10">
-              {/* Search Header Bar */}
-              <div
-                className="flex items-center gap-3 px-5 h-[56px] rounded-2xl shrink-0 bg-white/[0.08] border border-white/15 backdrop-blur-xl"
-              >
-                <motion.div
-                  initial={{ scale: 0.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.08, duration: 0.2 }}
-                  className="shrink-0"
-                >
-                  <Search className="w-5 h-5 text-white/70" />
-                </motion.div>
-
-                <motion.div
-                  className="flex-1 overflow-hidden"
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: "100%", opacity: 1 }}
-                  transition={{ delay: 0.1, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  <FocusableSearchInput
-                    inputRef={inputRef}
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    placeholder={t("placeholder")}
-                    hasQuery={hasQuery}
-                    hasResults={searchResults.length > 0}
-                    hasRecents={recents?.length > 0}
-                  />
-                </motion.div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {showSpinner && hasQuery && (
-                    <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
-                  )}
-                  {hasQuery && (
-                    <SearchClearButton
-                      onClear={() => {
-                        setInputValue("");
-                        setCurrentPage(1);
-                        setFocus("search-input");
-                      }}
-                      label={t("clear_all")}
+              {/* ── LEFT COLUMN: Search Input Bar + TV Keyboard ── */}
+              <div className="w-[420px] lg:w-[450px] shrink-0 flex flex-col justify-start gap-3.5 z-10">
+                {/* Search Input Bar */}
+                <div className="flex items-center gap-3 px-4 h-[52px] rounded-xl bg-[#161616] border border-white/10 shrink-0 shadow-lg">
+                  <Search className="w-5 h-5 text-white/60 shrink-0" />
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <FocusableSearchInput
+                      inputRef={inputRef}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      placeholder={t("placeholder")}
+                      hasQuery={hasQuery}
+                      hasResults={searchResults.length > 0}
+                      hasRecents={false}
                     />
-                  )}
-                  <SearchCloseButton onClose={onClose} label={t("close")} hasQuery={hasQuery} />
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {showSpinner && hasQuery && (
+                      <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+                    )}
+                    {hasQuery && (
+                      <SearchClearButton
+                        onClear={() => {
+                          setInputValue("");
+                          setCurrentPage(1);
+                          setFocus("search-input");
+                        }}
+                        label={t("clear_all")}
+                      />
+                    )}
+                  </div>
                 </div>
+
+                {/* Custom TV Keyboard */}
+                <TvKeyboard
+                  onKeyPress={(char) => setInputValue((prev) => prev + char)}
+                  onBackspace={() => setInputValue((prev) => prev.slice(0, -1))}
+                  onClear={() => {
+                    setInputValue("");
+                    setCurrentPage(1);
+                  }}
+                  onTopEdge={() => {
+                    if (doesFocusableExist("search-input")) {
+                      setFocus("search-input");
+                    }
+                  }}
+                  onRightEdge={() => {
+                    if (doesFocusableExist("search-poster-0")) {
+                      setFocus("search-poster-0");
+                    }
+                  }}
+                />
               </div>
 
-              {/* ── Scrollable Content Area ─────────────────────────── */}
+              {/* ── RIGHT COLUMN: Content & Results ── */}
               <div
                 ref={scrollContainerRef}
-                className="flex-1 rounded-2xl overflow-y-auto scrollbar-none bg-white/[0.03] border border-white/10 p-5 backdrop-blur-md"
+                className="flex-1 overflow-y-auto scrollbar-none min-h-0 z-10 pr-2"
               >
                 {/* ════ IDLE STATE ════ */}
                 {!hasQuery && (
-                  <div className="py-2 space-y-4">
-                    {/* Recent search chips */}
-                    {recents?.length > 0 && (
-                      <div className="px-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="title-xs-semibold text-white/90">
-                            {t("recent_searches")}
-                          </h3>
-                          <ClearAllButton onClick={clearAll} label={t("clear_all")} recentsCount={recents.length} />
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {recents.map((term, idx) => (
-                            <RecentChip
-                              key={term}
-                              term={term}
-                              index={idx}
-                              totalCount={recents.length}
-                              onRemove={() => removeRecent(term)}
-                              onSelect={() => {
-                                setInputValue(term);
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
+                  <div className="py-1 space-y-4">
                     {/* Skeleton while rails load */}
                     {railsBusy && (
                       <div className="py-2">
@@ -1198,7 +1189,6 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                               key={rail.id || idx}
                               title={rail.title}
                               items={rail.items}
-                              hasRecents={recents?.length > 0}
                               onCardClick={handleCardClick}
                             />
                           );
@@ -1214,27 +1204,23 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                             onItemClick={handleCardClick}
                             onArrowUpDown={idx === 0 ? (direction) => {
                               if (direction === "up") {
-                                if (recents?.length > 0 && doesFocusableExist("recent-chip-0")) {
-                                  setFocus("recent-chip-0");
-                                } else {
-                                  setFocus("search-input");
-                                }
+                                setFocus("search-input");
                                 return true;
                               }
                             } : undefined}
-                            onGenreClick={() => {}}
+                            onGenreClick={() => { }}
                             railId={rail.id}
                             totalPages={rail.totalPages}
                             disableHover={true}
                             forceFocusable={true}
                             onViewAllClick={() => {
-                               if (rail.id) {
-                                 const titleSlug = slugify(rail.title);
-                                 useBrowseHiddenStore.getState().setHiddenParams(rail.id, 1);
-                                 const targetUrl = titleSlug ? `/browse?slug=${titleSlug}` : "/browse";
-                                 safeNavigate(router, targetUrl);
-                               }
-                             }}
+                              if (rail.id) {
+                                const titleSlug = slugify(rail.title);
+                                useBrowseHiddenStore.getState().setHiddenParams(rail.id, 1);
+                                const targetUrl = titleSlug ? `/browse?slug=${titleSlug}` : "/browse";
+                                safeNavigate(router, targetUrl);
+                              }
+                            }}
                             button_name={rail?.button_name}
                             more_enabled={rail?.more_enabled}
                           />
@@ -1249,8 +1235,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
 
                     {/* Empty fallback */}
                     {!railsBusy &&
-                      recentRails.length === 0 &&
-                      recents.length === 0 && (
+                      recentRails.length === 0 && (
                         <div className="flex flex-col items-center py-16 gap-3 text-center">
                           <Search className="w-10 h-10 text-white/40 opacity-40" />
                           <p className="body-sm-regular text-white/60">
@@ -1313,8 +1298,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                   </div>
                 )}
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
           </FocusContext.Provider>
         </>
       )}

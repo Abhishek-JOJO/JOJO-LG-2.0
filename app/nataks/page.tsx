@@ -1,6 +1,6 @@
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { prefetchRouteRails } from "@/lib/ssr/prefetchRails";
-import NataksClient from "./nataks-client";
+import ParentPage from "@/app/parent-page";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -49,7 +49,7 @@ export default async function NataksPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }}
       />
-      <NataksClient />
+      <ParentPage initialRoute="/nataks" />
     </HydrationBoundary>
   );
 }

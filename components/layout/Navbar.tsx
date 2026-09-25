@@ -18,11 +18,12 @@ import { BottomNav } from "./BottomNav";
 import { FocusableNavLink } from "./FocusableNavLink";
 import { MobileSidebar } from "./MobileSidebar";
 import { useNavbar } from "./hooks/useNavbar";
-import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
+import { useLocaleStore } from "@/store/useLocaleStore";
 import { normalizePathname } from "@/lib/utils/pathname";
 
 function LogoSkeleton({ isGoldSlot = false }: { isGoldSlot?: boolean }) {
@@ -36,9 +37,16 @@ function LogoSkeleton({ isGoldSlot = false }: { isGoldSlot?: boolean }) {
   );
 }
 
-function FocusableGetGold({ totalNavItems }: { totalNavItems: number }) {
+function FocusableGetGold({
+  totalNavItems,
+  isSearchActive = false,
+}: {
+  totalNavItems: number;
+  isSearchActive?: boolean;
+}) {
   const router = useRouter();
   const openTvOverlay = useTvOverlayStore((state) => state.open);
+  const locale = useLocaleStore((state) => state.locale);
 
   const handleOpen = () => {
     openTvOverlay("subscription");
@@ -57,6 +65,16 @@ function FocusableGetGold({ totalNavItems }: { totalNavItems: number }) {
       return false;
     }
     if (direction === 'down') {
+      if (isSearchActive) {
+        if (doesFocusableExist('search-input')) {
+          setFocus('search-input');
+          return false;
+        }
+        if (doesFocusableExist('tv-key-0-0')) {
+          setFocus('tv-key-0-0');
+          return false;
+        }
+      }
       if (document.getElementById('hero-carousel-container')) {
         setFocus('hero-carousel');
         return false;
@@ -77,6 +95,8 @@ function FocusableGetGold({ totalNavItems }: { totalNavItems: number }) {
     onEnterPress: handleOpen,
   });
 
+  const getGoldLabel = locale === "gu" ? "ગોલ્ડ મેળવો" : "Get Gold";
+
   return (
     <div
       ref={ref as any}
@@ -88,7 +108,7 @@ function FocusableGetGold({ totalNavItems }: { totalNavItems: number }) {
           : "hover:brightness-105"
         }`}
     >
-      Get Gold
+      {getGoldLabel}
     </div>
   );
 }
@@ -97,10 +117,12 @@ function FocusableSearch({
   totalNavItems,
   isGold,
   isAuthenticated,
+  isSearchActive = false,
 }: {
   totalNavItems: number;
   isGold: boolean;
   isAuthenticated: boolean;
+  isSearchActive?: boolean;
 }) {
   const setSearchOpen = usePlayerStore((s) => s.setSearchOpen);
 
@@ -119,6 +141,16 @@ function FocusableSearch({
       return false;
     }
     if (direction === 'down') {
+      if (isSearchActive) {
+        if (doesFocusableExist('tv-key-0-0')) {
+          setFocus('tv-key-0-0');
+          return false;
+        }
+        if (doesFocusableExist('search-input')) {
+          setFocus('search-input');
+          return false;
+        }
+      }
       if (document.getElementById('hero-carousel-container')) {
         setFocus('hero-carousel');
         return false;
@@ -142,11 +174,16 @@ function FocusableSearch({
   return (
     <div
       ref={ref as any}
+      tabIndex={0}
+      data-focuskey="navbar-search"
       onClick={() => setSearchOpen(true)}
-      className={`p-2.5 rounded-full cursor-pointer flex items-center justify-center transition-all duration-200 shrink-0 ${focused
-          ? "bg-white text-black scale-110 ring-2 ring-white"
+      className={`p-2.5 rounded-full cursor-pointer flex items-center justify-center transition-all duration-200 shrink-0 ${
+        focused
+          ? "bg-white text-black scale-110 ring-2 ring-white font-bold"
+          : isSearchActive
+          ? "bg-white/20 text-white ring-2 ring-white/50"
           : "text-white/90 hover:text-white hover:bg-white/10"
-        }`}
+      }`}
       aria-label="Search"
     >
       <Search className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -246,20 +283,23 @@ export function Navbar() {
   const shouldDelayLogoUntilGoldStatus = isGoldStatusPending;
   const useGoldLogoSlot = isGold || shouldDelayLogoUntilGoldStatus;
 
+  const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
+  const isSearchPage = normalizedPath === ROUTES.SEARCH || normalizedPath.startsWith(ROUTES.SEARCH);
+  const isSearchActive = isSearchOpen || isSearchPage;
+
   return (
     <header
       className={`z-[999] overflow-visible transition-colors duration-300 sticky top-0 left-0 right-0 w-full ${
-        isScrolled
-          ? "bg-[#050505]/95"
+        isScrolled || isSearchActive
+          ? "bg-[#050505]/95 backdrop-blur-md"
           : "bg-transparent shadow-none"
       }`}
       style={{
-        background: isScrolled ? "rgba(5, 5, 5, 0.95)" : "transparent",
+        background: isScrolled || isSearchActive ? "rgba(5, 5, 5, 0.95)" : "transparent",
         boxShadow: "none",
         borderBottom: "none",
       }}
     >
-
       {isBrowsingMode ? (
         <div className="relative py-4 sm:py-5 lg:py-6 px-6 sm:px-12 lg:px-16 w-full flex items-center justify-between z-50">
           {/* 1. Left JOJO Logo */}
@@ -311,12 +351,14 @@ export function Navbar() {
                 {!isGold && !shouldDelayLogoUntilGoldStatus && (
                   <FocusableGetGold
                     totalNavItems={visibleNavItems.length}
+                    isSearchActive={isSearchActive}
                   />
                 )}
                 <FocusableSearch
                   totalNavItems={visibleNavItems.length}
                   isGold={isGold}
                   isAuthenticated={isAuthenticated}
+                  isSearchActive={isSearchActive}
                 />
               </div>
             )}

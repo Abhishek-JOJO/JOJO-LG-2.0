@@ -18,7 +18,6 @@ import { normalizePathname } from "@/lib/utils/pathname";
 import { getQueryClient } from "@/lib/react-query/queryClient";
 import { getContentRails } from "@/features/content-rail/api/getContentRails";
 import { useLocaleStore } from "@/store/useLocaleStore";
-import NataksClient from "@/app/nataks/nataks-client";
 
 const SUPPRESS_HOME_ROUTES = [
     ROUTES.WATCHING,
@@ -193,9 +192,6 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
     }
 
     const renderContent = () => {
-        if (pathname === ROUTES.NATAK || pathname === "/nataks") {
-            return <NataksClient />;
-        }
         return <ContentRailsView />;
     };
 

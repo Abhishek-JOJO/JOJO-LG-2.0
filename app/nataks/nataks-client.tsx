@@ -116,7 +116,7 @@ export default function NataksPage() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen" style={{ background: "var(--theme_12)" }}>
+      <main className="min-h-screen bg-transparent">
         <ContentRailsSkeleton hasHero={true} />
       </main>
     );
@@ -124,7 +124,7 @@ export default function NataksPage() {
 
   if (error) {
     return (
-      <main className="min-h-screen flex items-center justify-center" style={{ background: "var(--theme_12)" }}>
+      <main className="min-h-screen flex items-center justify-center bg-transparent">
         <div className="text-center text-red-500 font-medium select-none">
           {t("error_load")}
         </div>
@@ -139,7 +139,7 @@ export default function NataksPage() {
   });
 
   if (rails.length === 0) {
-    return <main className="min-h-screen" style={{ background: "var(--theme_12)" }} />;
+    return <main className="min-h-screen bg-transparent" />;
   }
 
   // Check if first rail is a Hero Carousel
@@ -182,7 +182,7 @@ export default function NataksPage() {
   const pageTitle = matchedItem?.title || "Nataks";
 
   return (
-    <main className="min-h-screen pb-16" style={{ background: "var(--theme_12)" }}>
+    <main className="min-h-screen pb-16 bg-transparent">
       {/* Render Hero Carousel banner at the top if present */}
       {hasHero && firstRail && (
         <ContentRailSection

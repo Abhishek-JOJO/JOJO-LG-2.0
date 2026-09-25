@@ -90,19 +90,19 @@ const KeyCell = memo(function KeyCell({
       ref={ref as any}
       data-focuskey={focusKey}
       onClick={handleClick}
-      className={`relative select-none flex items-center justify-center h-[46px] rounded-xl font-bold cursor-pointer transition-transform duration-75 ${spanClass} ${
+      className={`relative select-none flex items-center justify-center h-[50px] rounded-xl font-bold cursor-pointer transition-transform duration-75 ${spanClass} ${
         focused
           ? "bg-white text-black scale-105 z-20 shadow-xl ring-2 ring-white"
           : "bg-[#1c1c1c] text-white/90 hover:bg-[#282828] border border-white/5"
       } ${className}`}
     >
       {icon ? (
-        <div className="flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wider">
+        <div className="flex items-center justify-center gap-2 text-sm font-semibold uppercase tracking-wider">
           {icon}
           {label && <span>{label}</span>}
         </div>
       ) : (
-        <span className="text-base leading-none">{label}</span>
+        <span className="text-lg leading-none font-bold">{label}</span>
       )}
     </div>
   );
@@ -142,9 +142,9 @@ export const TvKeyboard = memo(function TvKeyboard({
   );
 
   return (
-    <div className="w-full select-none bg-[#111111]/95 border border-white/10 rounded-2xl p-3.5 shadow-2xl flex flex-col gap-2">
+    <div className="w-full select-none bg-[#161616] border border-white/10 rounded-xl p-3.5 shadow-lg flex flex-col gap-2.5">
       {/* 6x6 Matrix for Letters & Numbers */}
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-6 gap-2.5">
         {KEYBOARD_ROWS.map((row, rowIdx) =>
           row.map((char, colIdx) => (
             <KeyCell
