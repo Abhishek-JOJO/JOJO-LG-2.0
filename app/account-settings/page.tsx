@@ -19,6 +19,7 @@ import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
 import { cn } from "@/lib/utils";
 import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 import { DEFAULT_AMBIENT_RGB } from "@/lib/utils/colorExtractor";
+import { APP_VERSION } from "@/lib/constants/version";
 
 // This page keeps re-rendering in the background is unlikely here (no hero
 // video), but retrySetFocus is used anyway for consistency with the rest of
@@ -251,14 +252,17 @@ export default function AccountSettingsPage() {
           </div>
         </div>
 
-        {/* Logout */}
-        <div>
+        {/* Logout & App Version */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-4 border-t border-white/10 mt-6">
           <FocusableLogoutButton
             focusKey="account-logout-btn"
             label={t("logout")}
             onClick={handleLogoutClick}
             upKey={`account-lang-${firstLocale}`}
           />
+          <div className="text-xs font-mono text-white/40">
+            v{APP_VERSION}
+          </div>
         </div>
       </div>
 

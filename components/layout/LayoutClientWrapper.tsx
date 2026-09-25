@@ -15,6 +15,9 @@ import { StatusLine } from "@/components/common/StatusLine";
 import { AmbientBackground } from "@/components/common/AmbientBackground";
 import { SearchModal } from "@/components/search/SearchModal";
 import { ExitConfirmModal } from "@/components/layout/ExitConfirmModal";
+import { AppUpdateModal } from "@/components/layout/AppUpdateModal";
+import { AppVersionWatermark } from "@/components/common/AppVersionWatermark";
+import { useTVUpdateCheck } from "@/hooks/useTVUpdateCheck";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 import { useNavStore } from "@/store/useNavStore";
@@ -25,6 +28,7 @@ import SubscriptionPage from "@/app/subscription/SubscriptionClient";
 import { normalizePathname } from "@/lib/utils/pathname";
 
 export function LayoutClientWrapper({ children }: { children: React.ReactNode }) {
+  useTVUpdateCheck();
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
   const setSearchOpen = usePlayerStore((s) => s.setSearchOpen);
   const tvOverlayScreen = useTvOverlayStore((s) => s.screen);
@@ -179,6 +183,8 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
       <GuestLoginPopup />
       <SessionExpiredModal />
       <ExitConfirmModal />
+      <AppUpdateModal />
+      <AppVersionWatermark />
       {showFooter && !hideHeaderFooter && !isTvOverlayOpen && <Footer />}
       <StatusLine />
     </>
