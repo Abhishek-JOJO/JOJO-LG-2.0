@@ -8,6 +8,7 @@ import type { AnalyticsEvent } from '../model/common.types';
 import { useProfileStore } from "@/store/useProfileStore";
 import { getSourceLink } from "../utils/getSourceLink";
 import { appConfig, isConfigLoaded, getAppConfig } from "@/lib/config/app.config";
+import { DEFAULT_HEADER_VALUES } from "@/lib/constants/headers";
 
 class BackendClient {
   private isEnabled = true;
@@ -48,7 +49,7 @@ class BackendClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "deviceTypeCode": "3",
+        "deviceTypeCode": DEFAULT_HEADER_VALUES.DEVICE_TYPE_CODE,
         "appversion": appVersion,
         "project": "JOJO",
         "language": locale,
@@ -117,7 +118,7 @@ class BackendClient {
           user_id: userId,
           sessionid: sessionId,
           appVersion: appVersion,
-          deviceTypeCode: "2",
+          deviceTypeCode: "5",
           language: locale,
           event: EVENT_NAMES.CONTENT_CLICKED,
           consumedAt: new Date().toISOString(),
@@ -170,7 +171,7 @@ class BackendClient {
           sessionid: sessionId,
           user_id: userId,
           appVersion: appVersion,
-          deviceTypeCode: "2",
+          deviceTypeCode: "5",
           language: locale,
           event: EVENT_NAMES.PLAYBACK_STARTED,
           consumedAt: new Date().toISOString(),
@@ -202,7 +203,7 @@ class BackendClient {
           sessionid: sessionId,
           user_id: userId,
           appVersion: appVersion,
-          deviceTypeCode: "2",
+          deviceTypeCode: "5",
           language: locale,
           event: EVENT_NAMES.PLAYBACK_END,
           consumedAt: new Date().toISOString(),

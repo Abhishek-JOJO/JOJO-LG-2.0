@@ -18,7 +18,7 @@ async function getAnalyticsBaseUrl(): Promise<string> {
   } catch (error) {
     bffStructuredLogger.error("Failed to fetch analytics dynamic config on server", { error });
   }
-  
+
   if (!url) {
     throw new Error("Analytics base URL is not configured in environment or dynamic config.");
   }
@@ -83,7 +83,7 @@ export async function POST(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "deviceTypeCode": "3",
+        "deviceTypeCode": "5",
         "appversion": appVersion,
         "project": "JOJO",
         "language": language,

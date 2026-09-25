@@ -331,7 +331,7 @@ export default function SubscriptionPage() {
     // Fetch plans from API with dynamic country code
     const { data: plansData, isLoading, error } = useSubscriptionAllPlans({
         country: countryCode,
-        deviceTypeId: 3,
+        deviceTypeId: 5,
         languageId,
     });
 
