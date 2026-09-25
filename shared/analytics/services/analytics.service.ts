@@ -102,9 +102,12 @@ class AnalyticsService {
         timestamp: new Date().toISOString(),
       };
 
+      const rawEventName = typeof event === 'string' ? event : event.name;
+      const formattedEventName = rawEventName.startsWith('lg_tv_') ? rawEventName : `lg_tv_${rawEventName}`;
+
       if (typeof event === 'string') {
         enrichedEvent = {
-          name: event,
+          name: formattedEventName,
           properties: cleanProperties({
             ...defaultProperties,
             ...urlAttribution,
@@ -115,6 +118,7 @@ class AnalyticsService {
       } else {
         enrichedEvent = {
           ...event,
+          name: formattedEventName,
           properties: cleanProperties({
             ...defaultProperties,
             ...urlAttribution,
