@@ -13,7 +13,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useActivePathname } from "@/hooks/useActivePathname";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
-import { setFocus, getCurrentFocusKey } from "@noriginmedia/norigin-spatial-navigation";
+import { setFocus, getCurrentFocusKey, useFocusable } from "@noriginmedia/norigin-spatial-navigation";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { useContentRails } from "../hooks/useContentRails";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
@@ -86,6 +86,69 @@ function PreviewRail(props: ComponentProps<typeof ContentRailSection>) {
   );
 }
 
+function ContentRailsErrorState({ onRetry, errorMessage }: { onRetry: () => void; errorMessage: string }) {
+  const t = useTranslations("contentRails");
+  const { ref, focused } = useFocusable({
+    focusKey: "retry-content-rails-btn",
+    onEnterPress: onRetry,
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        setFocus("retry-content-rails-btn");
+      } catch {}
+    }, 60);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      onRetry();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [onRetry]);
+
+  return (
+    <div className="min-h-[75vh] flex flex-col items-center justify-center px-6 py-20 text-center select-none">
+      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/10 flex items-center justify-center mb-6 backdrop-blur-md">
+        <svg
+          className="w-8 h-8 sm:w-10 sm:h-10 text-theme_13_samecolour"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
+        </svg>
+      </div>
+      <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 tracking-wide">
+        {errorMessage || t("error_load")}
+      </h2>
+      <p className="text-white/60 text-sm sm:text-base max-w-md mb-8">
+        Please check your network connection and try again.
+      </p>
+      <button
+        ref={ref as any}
+        data-focuskey="retry-content-rails-btn"
+        onClick={onRetry}
+        className={`px-8 py-3 rounded-full text-base sm:text-lg font-bold transition-all cursor-pointer outline-none ${
+          focused
+            ? "bg-theme_13_samecolour text-white scale-110 shadow-2xl ring-4 ring-white z-50"
+            : "bg-white/20 text-white hover:bg-white/30"
+        }`}
+      >
+        {t("retry") || "Retry"}
+      </button>
+    </div>
+  );
+}
+
 export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewProps) {
   const t = useTranslations("contentRails");
   const { isAppReady } = useBootstrap();
@@ -137,6 +200,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     isLoading,
     isFetching,
     error,
+    refetch,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -507,11 +571,12 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     );
   }
 
-  if (error) {
+  if (error && mappedRails.length === 0) {
     return (
-      <div className="text-center py-32 text-red-500 font-medium">
-        {t("error_load")}
-      </div>
+      <ContentRailsErrorState
+        onRetry={() => refetch()}
+        errorMessage={t("error_load")}
+      />
     );
   }
 

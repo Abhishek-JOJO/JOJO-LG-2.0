@@ -336,6 +336,7 @@
   },
   "contentRails": {
     "error_load": "Failed to load content. Please try again later.",
+    "retry": "Retry",
     "no_content": "No content available for this section.",
     "continue_watching": "Continue watching",
     "watch_now": "Watch Now",

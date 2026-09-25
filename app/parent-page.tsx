@@ -171,12 +171,20 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
         const prefetchNext = async (index: number) => {
             if (cancelled || index >= uniqueSubnavIds.length) return;
             const subnavId = uniqueSubnavIds[index];
-            await queryClient.prefetchInfiniteQuery({
-                queryKey: ["contentRails", subnavId, sessionId, locale, 20],
-                queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
-                initialPageParam: 1,
-                staleTime: appConfig.STALE_TIME,
-            }).catch(() => {});
+            try {
+                await queryClient.prefetchInfiniteQuery({
+                    queryKey: ["contentRails", subnavId, sessionId, locale, 20],
+                    queryFn: ({ pageParam = 1 }) => getContentRails(subnavId, pageParam as number, sessionId, 20),
+                    initialPageParam: 1,
+                    staleTime: appConfig.STALE_TIME,
+                });
+            } catch {
+                // If background prefetch fails, remove any error entry so tab mount gets a fresh clean attempt
+                queryClient.removeQueries({
+                    queryKey: ["contentRails", subnavId, sessionId, locale, 20],
+                    exact: true,
+                });
+            }
             if (!cancelled) timer = setTimeout(() => void prefetchNext(index + 1), gap);
         };
         timer = setTimeout(() => void prefetchNext(0), startDelay);

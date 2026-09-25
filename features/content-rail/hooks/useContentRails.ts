@@ -13,20 +13,16 @@ export function useContentRails(subnavId: number, isAppReady: boolean, limit: nu
   const clientToken = useAuthStore(state => state.token);
   const clientLocale = useLocaleStore(state => state.locale);
 
-  // Prevent hydration mismatch by using the server's empty defaults on the first render.
-  // The server prefetches rails with no session token because cookies aren't available at build time.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  const sessionId = mounted ? (clientToken || cookiesManager.get("jojo_auth_token") || "") : "";
-  const locale = mounted ? (clientLocale || cookiesManager.get("jojo_locale") || "en") : "en";
+  // Synchronously resolve sessionId and locale to prevent query key jumping
+  const sessionId = clientToken || (typeof window !== "undefined" ? (cookiesManager.get("jojo_auth_token") || localStorage.getItem("auth_token")) : "") || "";
+  const locale = clientLocale || (typeof window !== "undefined" ? (cookiesManager.get("jojo_locale") || localStorage.getItem("locale")) : "") || "en";
 
   return useInfiniteQuery({
     queryKey: ["contentRails", subnavId, sessionId, locale, limit],
     queryFn: async ({ pageParam = 1 }) => {
       logger.info("[Content Rails Hook] Fetching rails for subnavId...", { subnavId, page: pageParam, locale, limit });
 
-      const response = await getContentRails(subnavId, pageParam as number, sessionId ?? undefined, limit) as ApiResponse<any>;
+      const response = await getContentRails(subnavId, pageParam as number, sessionId || undefined, limit) as ApiResponse<any>;
 
       logger.info("[Content Rails Hook] Raw response received:", response);
 
@@ -40,11 +36,15 @@ export function useContentRails(subnavId: number, isAppReady: boolean, limit: nu
       const totalPages = Number(meta.total_pages) || 1;
       return currentPage < totalPages ? currentPage + 1 : undefined;
     },
-    enabled: !!sessionId && isAppReady && !!subnavId,
+    enabled: isAppReady && !!subnavId,
     // A new tab must not display the previous tab's assets while it loads.
     // Pagination still keeps the existing pages in this query's own cache.
     staleTime: appConfig.STALE_TIME, // 5 minutes cache
-    retry: 2,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
+    gcTime: 30 * 60 * 1000, // 30 minutes in memory cache
+    retry: 3,
+    retryOnMount: true,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }

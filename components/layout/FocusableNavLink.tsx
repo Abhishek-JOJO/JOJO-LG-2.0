@@ -146,10 +146,15 @@ export const FocusableNavLink = React.memo(({
         if (sessionId) {
           getQueryClient().prefetchInfiniteQuery({
             queryKey: ["contentRails", subnavId, sessionId, locale, 20],
-            queryFn: () => getContentRails(subnavId, 1, sessionId, 20),
+            queryFn: ({ pageParam = 1 }) => getContentRails(subnavId, pageParam as number, sessionId, 20),
             initialPageParam: 1,
             staleTime: appConfig.STALE_TIME,
-          }).catch(() => {});
+          }).catch(() => {
+            getQueryClient().removeQueries({
+              queryKey: ["contentRails", subnavId, sessionId, locale, 20],
+              exact: true,
+            });
+          });
         }
       }
 
