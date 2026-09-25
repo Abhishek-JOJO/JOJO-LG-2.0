@@ -585,11 +585,6 @@ export function PlayerControls({
                 <SubtitleSelector
                   tracks={subtitleTracks}
                   activeTrackId={activeSubtitleTrackId}
-                  captionSize={captionSize}
-                  captionFontSize={captionFontSize}
-                  captionTextColor={captionTextColor}
-                  captionBgColor={captionBgColor}
-                  captionBgOpacity={captionBgOpacity}
                   onSelect={(id: number) => {
                     onSubtitleChange(id);
                     const selectedTrack = subtitleTracks?.find((t) => t.id === id);
@@ -599,10 +594,6 @@ export function PlayerControls({
                       is_off: id === -1 || id === 0,
                     });
                   }}
-                  onCaptionSizeChange={onCaptionSizeChange}
-                  onCaptionFontSizeChange={onCaptionFontSizeChange}
-                  onCaptionTextColorChange={onCaptionTextColorChange}
-                  onCaptionBgOpacityChange={onCaptionBgOpacityChange}
                   onOpenChange={setShowSubtitles}
                   forceClose={forceCloseMenus}
                   isVisible={isVisible}

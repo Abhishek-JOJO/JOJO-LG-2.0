@@ -930,9 +930,19 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         setStatus('ready');
 
         // Populate track selectors
-        setQualities(engine.getQualities());
-        setAudioTracks(engine.getAudioTracks());
-        setSubtitleTracks(engine.getSubtitleTracks());
+        const syncTracks = () => {
+          if (isCancelled || engineRef.current !== engine) return;
+          const subs = engine.getSubtitleTracks();
+          setSubtitleTracks(subs);
+          const audios = engine.getAudioTracks();
+          setAudioTracks(audios);
+          const quals = engine.getQualities();
+          setQualities(quals);
+        };
+
+        syncTracks();
+        videoEl.addEventListener('loadedmetadata', syncTracks);
+        videoEl.addEventListener('playing', syncTracks, { once: true });
 
         // Apply saved preferences
         const currentMuted = usePlayerStore.getState().isMuted;
