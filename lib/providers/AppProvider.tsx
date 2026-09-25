@@ -427,6 +427,16 @@ export function AppProvider({ children }: AppProviderProps) {
         return;
       }
 
+      // On TV cold boot at root ('/'), do not redirect until splash video finishes
+      const isSplashPlaying = typeof window !== "undefined" && (
+        (window as any).__SPLASH_VIDEO_ACTIVE__ ||
+        sessionStorage.getItem("jojo_splash_video_played") !== "1"
+      );
+      if ((normalizedPath === ROUTES.HOME || normalizedPath === "/") && isSplashPlaying) {
+        logger.info('[AppProvider] 🎬 Splash video is active on root page, deferring login redirect');
+        return;
+      }
+
       if (!isPublic) {
         logger.info('[AppProvider] 📺 TV user not authenticated, redirecting to login', {
           from: normalizedPath,

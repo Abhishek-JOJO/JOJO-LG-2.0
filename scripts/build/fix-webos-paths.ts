@@ -149,6 +149,8 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
       content = content.replaceAll('\\"/images/', `\\"${relPrefix}images/`);
       content = content.replaceAll('"/lottie/', `"${relPrefix}lottie/`);
       content = content.replaceAll('\\"/lottie/', `\\"${relPrefix}lottie/`);
+      content = content.replaceAll('"/video/', `"${relPrefix}video/`);
+      content = content.replaceAll('\\"/video/', `\\"${relPrefix}video/`);
       content = content.replaceAll('"/payment-icon/', `"${relPrefix}payment-icon/`);
       content = content.replaceAll('\\"/payment-icon/', `\\"${relPrefix}payment-icon/`);
       content = content.replaceAll('"/webOSTV.js"', `"${relPrefix}webOSTV.js"`);
@@ -191,7 +193,7 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
       return appBase+u.slice(8);
     }
     if(u.startsWith("/_next/"))return appBase+u.slice(1);
-    if(u.startsWith("/logos/")||u.startsWith("/images/")||u.startsWith("/lottie/")||u.startsWith("/payment-icon/")||u.startsWith("/player-icons/")||u==="/favicon.ico")return appBase+u.slice(1);
+    if(u.startsWith("/logos/")||u.startsWith("/images/")||u.startsWith("/video/")||u.startsWith("/lottie/")||u.startsWith("/payment-icon/")||u.startsWith("/player-icons/")||u==="/favicon.ico")return appBase+u.slice(1);
     if(u.startsWith("/")&&!u.startsWith("//")&&!u.startsWith("http://")&&!u.startsWith("https://"))return appBase+u.slice(1);
     return u;
   }
@@ -246,8 +248,9 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
     }
   }catch(e){}
 
-  // TV Auth Gate: If unauthenticated on root index.html, immediately jump to login/index.html
-  // Defer until DOMContentLoaded so WAM has committed the document frame before location.replace
+  // TV Auth Gate: If unauthenticated on root index.html, transition to login/index.html
+  // CRITICAL FOR TV: Wait for the splash screen video to finish before redirecting,
+  // so the splash video plays ONCE smoothly to completion and does not restart on login!
   if ("${relPrefix}" === "./" && (location.pathname.endsWith("/index.html") || location.pathname.endsWith("/"))) {
     try {
       var _tok = localStorage.getItem("ott_auth_token");
@@ -261,12 +264,26 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
       }
       if (!_auth) {
         var targetLogin = appBase + "login/index.html";
-        if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", function() {
-            window.location.replace(targetLogin);
-          });
-        } else {
+        var _redirected = false;
+        function doRedirect() {
+          if (_redirected) return;
+          _redirected = true;
+          try { sessionStorage.setItem("jojo_splash_video_played", "1"); } catch(e){}
           window.location.replace(targetLogin);
+        }
+        var splashPlayed = "";
+        try { splashPlayed = sessionStorage.getItem("jojo_splash_video_played"); } catch(e){}
+        if (splashPlayed === "1") {
+          if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", doRedirect);
+          } else {
+            doRedirect();
+          }
+        } else {
+          // Splash video is currently playing: wait for it to finish!
+          document.addEventListener("tv-splash-finished", doRedirect, { once: true });
+          // Fallback safety timeout (15s) only fires if app completely hung or crashed
+          setTimeout(doRedirect, 15000);
         }
       }
     } catch(e) {}

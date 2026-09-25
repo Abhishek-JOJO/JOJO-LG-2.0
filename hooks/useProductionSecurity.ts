@@ -129,7 +129,7 @@ export function useProductionSecurity(options: ProductionSecurityOptions = {}) {
 
     window.addEventListener("keydown", handleKeyDown, { capture: true });
 
-    // 3. Suppress Console Logging
+    // 3. Suppress Console Logging (allow bypass via __rawConsole or localStorage)
     const originalConsole = {
       log: console.log,
       info: console.info,
@@ -137,8 +137,25 @@ export function useProductionSecurity(options: ProductionSecurityOptions = {}) {
       debug: console.debug,
       clear: console.clear,
     };
+    (window as any).__rawConsole = originalConsole;
+    (window as any).__restoreConsole = () => {
+      console.log = originalConsole.log;
+      console.info = originalConsole.info;
+      console.warn = originalConsole.warn;
+      console.debug = originalConsole.debug;
+      console.clear = originalConsole.clear;
+      try {
+        localStorage.setItem("jojo_debug_console", "1");
+      } catch {}
+      originalConsole.log("[TV-DEBUG] Console logging restored.");
+    };
 
-    if (suppressConsoleLogs && process.env.NODE_ENV === "production") {
+    const isDebugConsoleAllowed = typeof window !== "undefined" && (
+      localStorage.getItem("jojo_debug_console") === "1" ||
+      new URLSearchParams(window.location.search).get("debug") === "1"
+    );
+
+    if (suppressConsoleLogs && process.env.NODE_ENV === "production" && !isDebugConsoleAllowed) {
       const noop = () => {};
       console.log = noop;
       console.info = noop;
