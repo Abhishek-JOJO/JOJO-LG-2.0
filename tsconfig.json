@@ -70,6 +70,7 @@
     ".next/dev/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "disabled_routes"
   ]
 }

@@ -15,12 +15,8 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://jojoapp.in"),
-  title: {
-    default: "JOJO App: Watch Gujarati Movies, Web Series & Natak Online",
-    template: "%s | JOJO App",
-  },
-  description: "Stream the best Gujarati movies, web series, nataks, comedy shows, and exclusive entertainment content anytime, anywhere on JOJO.",
+  title: "JOJO App",
+  description: "JOJO App for LG webOS TV",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -34,41 +30,6 @@ export const metadata: Metadata = {
       url: "/logos/FAVICON.png",
       sizes: "180x180",
       type: "image/png",
-    },
-  },
-  alternates: {
-    canonical: "https://jojoapp.in",
-  },
-  openGraph: {
-    type: "website",
-    locale: "en_IN",
-    siteName: "JOJO App",
-    title: "JOJO App: Watch Gujarati Movies, Web Series & Natak Online",
-    description: "Stream the best Gujarati movies, web series, nataks, comedy shows, and exclusive entertainment content anytime, anywhere on JOJO.",
-    images: [
-      {
-        url: "/logos/JOJO_LOGO.png",
-        width: 1200,
-        height: 630,
-        alt: "JOJO App - Gujarati Streaming Platform",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "JOJO App: Watch Gujarati Movies, Web Series & Natak Online",
-    description: "Stream the best Gujarati movies, web series, nataks, comedy shows on JOJO.",
-    images: ["/logos/JOJO_LOGO.png"],
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
     },
   },
 };
