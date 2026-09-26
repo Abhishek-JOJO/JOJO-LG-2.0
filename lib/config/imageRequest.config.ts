@@ -40,7 +40,7 @@ export interface JOJOCGSize {
 }
 
 export class JOJOImageRequestConfiguration {
-  static quality: number = 80;
+  static quality: number = 100;
   static format: string = "webp";
   static maximumPixelDimension: number = 1600;
   static minimumTargetDimension: number = 40;

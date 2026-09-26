@@ -284,7 +284,7 @@ export type JOJOCommonImageProps = Omit<
   optimizeRequestURL?: boolean;
 
   /**
-   * Override quality (1-100). Defaults to 80.
+   * Override quality (1-100). Defaults to 100.
    */
   quality?: number;
 

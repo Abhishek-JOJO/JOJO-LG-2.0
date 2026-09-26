@@ -440,7 +440,7 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
               fill
               priority={true}
               sizes="100vw"
-              quality={80}
+              quality={100}
               className="object-cover"
               wrapperClassName="w-full h-full"
             />
