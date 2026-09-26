@@ -50,35 +50,19 @@ export function useTVUpdateCheck() {
     if (checkedRef.current) return;
     checkedRef.current = true;
 
-    // Small delay so it runs after splash screen finishes and home mounts
-    const timer = setTimeout(async () => {
-      try {
-        const appBase = (typeof window !== "undefined" && (window as any).__WEBOS_APP_BASE__) || "";
-        const versionUrl = appBase ? `${appBase}version.json` : "/version.json";
-
-        const res = await fetch(versionUrl, { cache: "no-store" });
-        if (!res.ok) return;
-
-        const data = await res.json();
-        const remoteVersion = (data.version || "").replace(/^[vV]/, "");
-
-        if (remoteVersion && compareVersions(remoteVersion, APP_VERSION) > 0) {
-          console.log(`[TV-UPDATE] Update available: local=${APP_VERSION}, remote=${remoteVersion}`);
-          openUpdateModal({
-            latestVersion: remoteVersion,
-            forceUpdate: data.forceUpdate || false,
-            title: data.title || "New Update Available!",
-            message: data.message || "A new version of JOJO is ready on the LG Content Store. Update now for the best TV experience.",
-            releaseNotes: data.releaseNotes || [
-              "Performance optimizations for LG webOS TV",
-              "Bug fixes and UI improvements",
-            ],
-          });
-        }
-      } catch (err) {
-        // Silently catch in case of offline or local file protocol fetch restriction
-      }
-    }, 5000);
+    // Trigger update popup after app boot/splash finishes
+    const timer = setTimeout(() => {
+      openUpdateModal({
+        latestVersion: "1.0.1",
+        forceUpdate: true,
+        title: "App Update Required",
+        message: "A new version of JOJO (v1.0.1) is available on the LG Content Store. Please update the app to continue streaming your favorite movies, series, and entertainment.",
+        releaseNotes: [
+          "Performance optimizations for LG webOS TV",
+          "Bug fixes and UI improvements",
+        ],
+      });
+    }, 1800);
 
     return () => clearTimeout(timer);
   }, [openUpdateModal]);
