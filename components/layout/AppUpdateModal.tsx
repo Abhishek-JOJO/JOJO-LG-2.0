@@ -124,57 +124,24 @@ export function AppUpdateModal() {
 
   // ── SOFT / OPTIONAL UPDATE MODAL (Smaller Popup) ───────────────────────────
   return (
-    <JOJOModal isOpen={isOpen} onClose={handleClose} showCloseButton={false} className="max-w-[480px]">
+    <JOJOModal isOpen={isOpen} onClose={handleClose} showCloseButton={false} className="max-w-[460px] p-8 sm:p-9">
       <div className="flex flex-col items-center text-center w-full">
-        {/* Glowing Update Icon Badge */}
-        <div className="w-14 h-14 rounded-2xl bg-theme_13_samecolour/15 border border-theme_13_samecolour/30 flex items-center justify-center mb-4 text-theme_13_samecolour shadow-[0_0_24px_rgba(242,110,33,0.25)]">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-7 h-7"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-        </div>
-
-        {/* Optional Version Comparison Pill */}
+        {/* Version Comparison Pill */}
         {newVersion && (
-          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] border border-white/10 px-3 py-1 text-xs font-mono text-white/70">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/[0.06] border border-white/10 px-3.5 py-1 text-xs font-mono text-white/70">
             <span>v{APP_VERSION}</span>
-            <span className="text-theme_13_samecolour">→</span>
+            <span className="text-theme_13_samecolour font-bold">→</span>
             <span className="text-theme_13_samecolour font-semibold">v{newVersion}</span>
           </div>
         )}
 
-        <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-snug">
-          {updateInfo?.title || "New Update Available!"}
+        <h3 className="text-2xl font-bold text-white tracking-tight leading-snug">
+          {updateInfo?.title || "Update Available"}
         </h3>
 
-        <p className="mt-2 text-sm sm:text-[15px] text-white/70 font-normal leading-relaxed max-w-[380px]">
+        <p className="mt-3 text-[15px] text-white/70 font-normal leading-relaxed max-w-[360px]">
           {updateInfo?.message || "A new version of JOJO is available on the LG Content Store. Update now for better performance, faster loading, and new features."}
         </p>
-
-        {/* Release Notes Highlights (if any) */}
-        {updateInfo?.releaseNotes && updateInfo.releaseNotes.length > 0 && (
-          <div className="mt-4 w-full rounded-xl bg-white/[0.03] border border-white/10 p-3.5 text-left">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">What&apos;s New</p>
-            <ul className="space-y-1.5">
-              {updateInfo.releaseNotes.slice(0, 3).map((note, idx) => (
-                <li key={idx} className="flex items-start gap-2 text-xs sm:text-[13px] text-white/80 leading-snug">
-                  <span className="text-theme_13_samecolour mt-0.5">•</span>
-                  <span>{note}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
 
         <SoftUpdateButtons
           onCancel={handleClose}
