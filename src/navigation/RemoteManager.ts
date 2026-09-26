@@ -11,6 +11,7 @@ import { doesFocusableExist, getCurrentFocusKey, setFocus } from '@noriginmedia/
 import { tvNavigate } from './tvNavigate';
 import { ROUTES } from '@/lib/constants/routes';
 import { useTvOverlayStore } from '@/store/useTvOverlayStore';
+import { syncFocusToViewport, stepTVVerticalNavigation } from './focusUtils';
 
 // LG webOS Remote Key Codes
 export const WEBOS_KEYS = {
@@ -23,6 +24,10 @@ export const WEBOS_KEYS = {
   INFO: 457,
   BLUE: 406,
   GREEN: 404,
+  PAGE_UP: 33,
+  PAGE_DOWN: 34,
+  CHANNEL_UP: 427,
+  CHANNEL_DOWN: 428,
 };
 
 /**
@@ -141,6 +146,26 @@ export const useRemoteManager = () => {
           // Toggles the on-screen debug overlay (components/debug/DebugOverlay.tsx)
           document.dispatchEvent(new CustomEvent('tv-debug-toggle'));
           break;
+        case WEBOS_KEYS.CHANNEL_UP:
+        case WEBOS_KEYS.PAGE_UP: {
+          const currentPath = typeof window !== 'undefined' ? normalizePathname(window.location.pathname) : '';
+          const isWatch = currentPath === '/watch' || currentPath.startsWith('/watch/');
+          if (isWatch) return;
+
+          e.preventDefault();
+          stepTVVerticalNavigation('up');
+          break;
+        }
+        case WEBOS_KEYS.CHANNEL_DOWN:
+        case WEBOS_KEYS.PAGE_DOWN: {
+          const currentPath = typeof window !== 'undefined' ? normalizePathname(window.location.pathname) : '';
+          const isWatch = currentPath === '/watch' || currentPath.startsWith('/watch/');
+          if (isWatch) return;
+
+          e.preventDefault();
+          stepTVVerticalNavigation('down');
+          break;
+        }
         default:
           break;
       }

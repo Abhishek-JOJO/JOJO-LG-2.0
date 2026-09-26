@@ -478,12 +478,28 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
         return prev;
       });
       try { setFocus("spotlight-lead-fixed"); } catch {}
+      const section1 = document.querySelector<HTMLElement>('section[data-section-index="1"]');
+      if (section1) {
+        const rect = section1.getBoundingClientRect();
+        if (Math.abs(rect.top - 105) > 10) {
+          const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + rect.top - 105);
+          window.scrollTo({ top: targetTop, behavior: "auto" });
+        }
+      }
       return true;
     }
     if (direction === "up") {
       if (activeRailIndexRef.current > 0) {
         setActiveRailIndex((prev) => Math.max(0, prev - 1));
         try { setFocus("spotlight-lead-fixed"); } catch {}
+        const section1 = document.querySelector<HTMLElement>('section[data-section-index="1"]');
+        if (section1) {
+          const rect = section1.getBoundingClientRect();
+          if (Math.abs(rect.top - 105) > 10) {
+            const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + rect.top - 105);
+            window.scrollTo({ top: targetTop, behavior: "auto" });
+          }
+        }
         return true;
       }
       if (isFirstHero) {
@@ -511,6 +527,20 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     }
     return true;
   }, [contentRails.length, isFirstHero]);
+
+  // Listen for tv-rail-step events triggered by remote slider or channel/page keys
+  useEffect(() => {
+    const handleRailStep = (e: Event) => {
+      const dir = (e as CustomEvent<{ direction: "up" | "down" }>).detail?.direction;
+      if (dir === "down" || dir === "up") {
+        handleArrowUpDown(dir);
+      }
+    };
+    document.addEventListener("tv-rail-step", handleRailStep);
+    return () => {
+      document.removeEventListener("tv-rail-step", handleRailStep);
+    };
+  }, [handleArrowUpDown]);
 
   // Prefetch the next page of rails well before the user can reach the end, so a fast/held-down
   // ArrowDown never outruns the network request and shows the loading spinner. A TV remote can

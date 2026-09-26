@@ -135,18 +135,19 @@ export function useDragScroll(externalRef?: React.RefObject<HTMLDivElement | nul
       }
     };
 
-    // LG Magic Remote wheel: the remote's scroll wheel dispatches standard
-    // `wheel` events (deltaY) while the pointer is active. These rails only
-    // scroll horizontally, so map vertical wheel delta onto scrollLeft —
-    // matches how a trackpad/mouse wheel scrolls a horizontal carousel.
+    // When horizontal scroll is dominant (e.g. trackpad horizontal swipe), scroll this rail.
+    // Vertical scroll (e.g. Magic Remote wheel or mobile app remote slider up/down)
+    // is NOT intercepted here, allowing the page to scroll vertically between rails.
     const handleWheel = (e: WheelEvent) => {
-      if (element.scrollWidth <= element.clientWidth) return;
-
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      if (delta === 0) return;
-
-      e.preventDefault();
-      element.scrollLeft += delta;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        if (element.scrollWidth <= element.clientWidth) return;
+        if (e.deltaX === 0) return;
+        e.preventDefault();
+        let deltaX = e.deltaX;
+        if (e.deltaMode === 1) deltaX *= 36;
+        else if (e.deltaMode === 2) deltaX *= (element.clientWidth * 0.8);
+        element.scrollLeft += deltaX;
+      }
     };
 
     element.addEventListener("mousedown", handleMouseDown);
