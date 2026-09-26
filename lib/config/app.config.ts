@@ -26,6 +26,40 @@ export interface ApiUpdate {
     timestamp: string;
 }
 
+export interface DeviceAppVersion {
+    minimum?: string;
+    latest?: string;
+    forceUpdate?: boolean;
+    isForceUpdateAvailable?: boolean;
+    isUpdateAvailable?: boolean;
+    updateUrl?: string;
+    title?: string;
+    message?: string;
+}
+
+export interface DevicePlatformConfig {
+    header?: {
+        device_id?: number;
+        deviceTypeCode?: string;
+    };
+    appVersion?: DeviceAppVersion;
+    maintenance?: {
+        enabled?: boolean;
+        message?: string;
+        startTime?: string;
+        endTime?: string;
+    };
+    payments?: any;
+    adsConfig?: any;
+    mediaUrls?: any[];
+    misc?: any[];
+}
+
+export interface DevicesConfig {
+    platform?: DevicePlatformConfig;
+    [key: string]: any;
+}
+
 export interface RuntimeConfig {
     apiBaseUrl: string;
     socketUrl: string;
@@ -33,6 +67,8 @@ export interface RuntimeConfig {
     publicIp?: string;
     apiUpdates?: ApiUpdate[];
     analyticUrl: string;
+    devices?: DevicesConfig;
+    rawConfig?: any;
 }
 
 // In-memory config storage
@@ -238,6 +274,12 @@ async function decryptConfig(encrypted: string): Promise<RuntimeConfig> {
         const apiUpdates = data.apiUpdate || [];
         logger.info("[Config] API Updates:", apiUpdates);
 
+        // Extract devices if present (e.g. data.devices or parsed.devices)
+        const devices: DevicesConfig | undefined = data.devices || parsed.devices;
+        if (devices) {
+            logger.info("[Config] Devices config extracted successfully", devices);
+        }
+
         // Map to RuntimeConfig structure
         const config: RuntimeConfig = {
             apiBaseUrl: envType === "prod" ? api.prodBaseUrl : api.stageBaseUrl,
@@ -246,6 +288,8 @@ async function decryptConfig(encrypted: string): Promise<RuntimeConfig> {
             publicIp: data.publicIp,
             apiUpdates: apiUpdates,
             analyticUrl: envType === "prod" ? (api.analyticProdUrl || "") : (api.analyticStageUrl || ""),
+            devices: devices,
+            rawConfig: data,
         };
 
         logger.info("[Config] Mapped config", {
@@ -272,6 +316,7 @@ export function setAppConfig(config: RuntimeConfig): void {
     if (typeof window !== "undefined") {
         try {
             sessionStorage.setItem(RUNTIME_CONFIG_STORAGE_KEY, JSON.stringify(config));
+            window.dispatchEvent(new CustomEvent("app-config-ready", { detail: config }));
         } catch {}
     }
 }
@@ -293,6 +338,35 @@ export function getAppConfig(): RuntimeConfig {
 export function isConfigLoaded(): boolean {
     return runtimeConfig !== null;
 }
+
+/**
+ * Gets device-specific configuration from runtime config
+ */
+export function getAppDevicesConfig(): DevicesConfig | undefined {
+    return runtimeConfig?.devices || getCachedRuntimeConfig()?.devices;
+}
+
+/**
+ * Global AppConfig accessor matching Android / Kotlin pattern:
+ * AppConfig.appConfigData?.devices?.let { ... }
+ */
+export const AppConfig = {
+    get appConfigData(): ({ devices?: DevicesConfig; [key: string]: any }) | null {
+        if (runtimeConfig?.rawConfig) {
+            return runtimeConfig.rawConfig;
+        }
+        if (runtimeConfig?.devices) {
+            return { devices: runtimeConfig.devices };
+        }
+        const cached = getCachedRuntimeConfig();
+        if (cached?.rawConfig) return cached.rawConfig;
+        if (cached?.devices) return { devices: cached.devices };
+        return null;
+    },
+    get devices(): DevicesConfig | undefined {
+        return getAppDevicesConfig();
+    },
+};
 
 /**
  * Gets API update timestamp for a specific resource

@@ -25,7 +25,15 @@ function retrySetFocus(focusKey: string, attempts = 8, intervalMs = 80) {
 /**
  * Launches the native LG Content Store on webOS TV directly to the JOJO application page
  */
-export function launchLGContentStore(appId = LG_APP_ID) {
+export function launchLGContentStore(customUrl?: string, appId = LG_APP_ID) {
+  if (customUrl && typeof window !== "undefined") {
+    // If backend provided a custom web link or direct URL
+    if (customUrl.startsWith("http://") || customUrl.startsWith("https://")) {
+      window.open(customUrl, "_blank");
+      return;
+    }
+  }
+
   if (typeof window !== "undefined" && (window as any).webOS?.service) {
     try {
       (window as any).webOS.service.request("luna://com.webos.applicationManager", {
@@ -42,7 +50,7 @@ export function launchLGContentStore(appId = LG_APP_ID) {
         },
         onFailure: (err: any) => {
           console.warn("[webOS] Luna launch failed, opening fallback link", err);
-          window.location.href = `https://in.lgappstv.com/main/tvapp/detail?appId=${appId}`;
+          window.location.href = customUrl || `https://in.lgappstv.com/main/tvapp/detail?appId=${appId}`;
         },
       });
       return;
@@ -53,7 +61,7 @@ export function launchLGContentStore(appId = LG_APP_ID) {
 
   // Browser/local fallback
   if (typeof window !== "undefined") {
-    window.open(`https://in.lgappstv.com/main/tvapp/detail?appId=${appId}`, "_blank");
+    window.open(customUrl || `https://in.lgappstv.com/main/tvapp/detail?appId=${appId}`, "_blank");
   }
 }
 
@@ -83,11 +91,17 @@ export function AppUpdateModal() {
 
   const handleClose = () => {
     if (isForceUpdate) return;
+    try {
+      sessionStorage.setItem("jojo_dismissed_soft_update", "true");
+    } catch {}
     close();
   };
 
   const handleUpdate = () => {
-    launchLGContentStore();
+    launchLGContentStore(updateInfo?.updateUrl);
+    if (!isForceUpdate) {
+      handleClose();
+    }
   };
 
   const handleExit = () => {
@@ -108,22 +122,65 @@ export function AppUpdateModal() {
     );
   }
 
-  // ── SOFT / OPTIONAL UPDATE MODAL ───────────────────────────────────────────
+  // ── SOFT / OPTIONAL UPDATE MODAL (Smaller Popup) ───────────────────────────
   return (
-    <JOJOModal isOpen={isOpen} onClose={handleClose} showCloseButton={false}>
-      <div className="space-y-3 text-center">
-        <h3 className="text-[22px] sm:text-2xl font-bold text-theme_1 tracking-tight leading-snug">
-          {updateInfo?.title || (newVersion ? `Update Available (v${newVersion})` : "Update Available")}
-        </h3>
-        <p className="text-[14px] sm:text-[15px] text-theme_6 font-normal leading-relaxed">
-          {updateInfo?.message || "A new update is available on the LG Content Store. Please update the app to continue enjoying uninterrupted entertainment."}
-        </p>
-      </div>
+    <JOJOModal isOpen={isOpen} onClose={handleClose} showCloseButton={false} className="max-w-[480px]">
+      <div className="flex flex-col items-center text-center w-full">
+        {/* Glowing Update Icon Badge */}
+        <div className="w-14 h-14 rounded-2xl bg-theme_13_samecolour/15 border border-theme_13_samecolour/30 flex items-center justify-center mb-4 text-theme_13_samecolour shadow-[0_0_24px_rgba(242,110,33,0.25)]">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-7 h-7"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+        </div>
 
-      <SoftUpdateButtons
-        onCancel={handleClose}
-        onUpdate={handleUpdate}
-      />
+        {/* Optional Version Comparison Pill */}
+        {newVersion && (
+          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] border border-white/10 px-3 py-1 text-xs font-mono text-white/70">
+            <span>v{APP_VERSION}</span>
+            <span className="text-theme_13_samecolour">→</span>
+            <span className="text-theme_13_samecolour font-semibold">v{newVersion}</span>
+          </div>
+        )}
+
+        <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-snug">
+          {updateInfo?.title || "New Update Available!"}
+        </h3>
+
+        <p className="mt-2 text-sm sm:text-[15px] text-white/70 font-normal leading-relaxed max-w-[380px]">
+          {updateInfo?.message || "A new version of JOJO is available on the LG Content Store. Update now for better performance, faster loading, and new features."}
+        </p>
+
+        {/* Release Notes Highlights (if any) */}
+        {updateInfo?.releaseNotes && updateInfo.releaseNotes.length > 0 && (
+          <div className="mt-4 w-full rounded-xl bg-white/[0.03] border border-white/10 p-3.5 text-left">
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/40 mb-2">What&apos;s New</p>
+            <ul className="space-y-1.5">
+              {updateInfo.releaseNotes.slice(0, 3).map((note, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-xs sm:text-[13px] text-white/80 leading-snug">
+                  <span className="text-theme_13_samecolour mt-0.5">•</span>
+                  <span>{note}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <SoftUpdateButtons
+          onCancel={handleClose}
+          onUpdate={handleUpdate}
+        />
+      </div>
     </JOJOModal>
   );
 }
@@ -306,15 +363,16 @@ function SoftUpdateButtons({
   });
 
   return (
-    <div className="flex w-full items-center justify-center gap-4 mt-4">
+    <div className="flex w-full items-center justify-center gap-3.5 mt-6">
       <button
         ref={cancelBtnRef as any}
         data-focuskey="app-update-cancel-btn"
+        tabIndex={0}
         onClick={onCancel}
-        className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${
+        className={`flex-1 h-[48px] rounded-xl font-semibold text-sm transition-all cursor-pointer outline-none flex items-center justify-center border ${
           cancelFocused
-            ? "bg-theme_13_samecolour text-white scale-105 shadow-xl ring-4 ring-white z-50"
-            : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
+            ? "border-white bg-white text-[#121218] scale-[1.03] shadow-[0_0_0_3px_rgba(242,110,33,0.8)] z-50"
+            : "border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white"
         }`}
       >
         Later
@@ -323,11 +381,12 @@ function SoftUpdateButtons({
       <button
         ref={updateBtnRef as any}
         data-focuskey="app-update-confirm-btn"
+        tabIndex={0}
         onClick={onUpdate}
-        className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${
+        className={`flex-1 h-[48px] rounded-xl font-bold text-sm transition-all cursor-pointer outline-none flex items-center justify-center gap-2 ${
           updateFocused
-            ? "bg-theme_13_samecolour text-white scale-105 shadow-xl ring-4 ring-white z-50"
-            : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
+            ? "bg-theme_13_samecolour text-white scale-[1.03] ring-4 ring-white ring-offset-2 ring-offset-[#121218] shadow-[0_8px_24px_rgba(242,110,33,0.4)] z-50"
+            : "bg-theme_13_samecolour text-white hover:brightness-110 shadow-[0_4px_16px_rgba(242,110,33,0.25)]"
         }`}
       >
         Update Now

@@ -7,6 +7,7 @@ export interface UpdateInfo {
   title?: string;
   message?: string;
   releaseNotes?: string[];
+  updateUrl?: string;
 }
 
 interface AppUpdateState {
