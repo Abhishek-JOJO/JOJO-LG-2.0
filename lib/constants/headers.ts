@@ -1,3 +1,5 @@
+import { APP_VERSION } from "@/lib/constants/version";
+
 /**
  * HTTP header constants
  * Simple, flat structure for easy access
@@ -27,6 +29,7 @@ export const HEADERS = {
 export const DEFAULT_HEADER_VALUES = {
   DEVICE_TYPE_CODE: "5", // 5= LG TV
   LANGUAGE: "1", // 1 = English
-  APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || "2.0.0",
+  // This is compiled from the same version used by the webOS IPK metadata.
+  APP_VERSION,
   PROJECT: "JOJO",
 } as const;

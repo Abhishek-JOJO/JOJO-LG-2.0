@@ -36,8 +36,8 @@ export function extractBffHeaders(req: any) {
   const deviceId = req.headers.get("deviceid") || req.headers.get("device_id") || "server-bff-session";
   const language = req.headers.get("language") || "1";
   const platform = req.headers.get("platform") || "Web";
-  // Fallback to process.env.NEXT_PUBLIC_APP_VERSION if not provided in headers
-  const appVersion = req.headers.get("appversion") || process.env.NEXT_PUBLIC_APP_VERSION || "2.0.0";
+  // Preserve the TV bundle's version when forwarding a request to the backend.
+  const appVersion = req.headers.get("appversion") || DEFAULT_HEADER_VALUES.APP_VERSION;
   // Safe IP extraction
   const ip = getClientIp(req) || deviceId;
 

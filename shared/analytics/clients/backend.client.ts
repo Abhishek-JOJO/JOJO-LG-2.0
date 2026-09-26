@@ -25,7 +25,7 @@ class BackendClient {
     const storeState = useAuthStore.getState();
     const sessionId = storeState.token || "";
     const locale = useLocaleStore.getState().locale || "1";
-    const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "2.0.0";
+    const appVersion = DEFAULT_HEADER_VALUES.APP_VERSION;
 
     const bffAnalyticsEndpoint = endpointPath.startsWith('/')
       ? `/api${endpointPath}`
@@ -75,7 +75,7 @@ class BackendClient {
       const userId = storeState.user?.id != null ? String(storeState.user.id) : "";
       const profileId = useProfileStore.getState().selectedProfile?.profile_id || "";
       const locale = useLocaleStore.getState().locale || "1";
-      const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "2.0.5";
+      const appVersion = DEFAULT_HEADER_VALUES.APP_VERSION;
 
       // Case: CONTENT_CLICKED
       if (event.name === EVENT_NAMES.CONTENT_CLICKED) {

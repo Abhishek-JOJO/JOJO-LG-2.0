@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useAppUpdateStore } from "@/store/useAppUpdateStore";
 import { APP_VERSION } from "@/lib/constants/version";
 
@@ -27,8 +27,6 @@ export function compareVersions(a: string, b: string): number {
 
 export function useTVUpdateCheck() {
   const openUpdateModal = useAppUpdateStore((s) => s.openUpdateModal);
-  const checkedRef = useRef(false);
-
   useEffect(() => {
     // Expose test helper on window for debugging & inspection on TV
     if (typeof window !== "undefined") {
@@ -47,23 +45,8 @@ export function useTVUpdateCheck() {
       };
     }
 
-    if (checkedRef.current) return;
-    checkedRef.current = true;
-
-    // Trigger update popup after app boot/splash finishes
-    const timer = setTimeout(() => {
-      openUpdateModal({
-        latestVersion: "1.0.1",
-        forceUpdate: true,
-        title: "App Update Required",
-        message: "A new version of JOJO (v1.0.1) is available on the LG Content Store. Please update the app to continue streaming your favorite movies, series, and entertainment.",
-        releaseNotes: [
-          "Performance optimizations for LG webOS TV",
-          "Bug fixes and UI improvements",
-        ],
-      });
-    }, 1800);
-
-    return () => clearTimeout(timer);
+    // Production updates must be opened only after the backend reports a newer
+    // required version for the appversion header sent by this installed bundle.
+    // The helper above remains available for TV inspection when needed.
   }, [openUpdateModal]);
 }

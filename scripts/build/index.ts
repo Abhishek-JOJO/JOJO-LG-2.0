@@ -111,12 +111,10 @@ async function main() {
   // ── Load environment variables for the selected environment ──────────────
   loadEnvForBuild(env);
 
-  // Ensure version starts with 'v' prefix
-  if (!version.startsWith('v')) {
-    version = 'v' + version;
-  }
-
-  printBanner(env, version, loggerAllowed, consoleAllowed);
+  // The webOS manifest and API header use plain semver (for example, 1.0.1).
+  // Only the build banner adds a visual v prefix.
+  version = version.replace(/^v/i, '');
+  printBanner(env, `v${version}`, loggerAllowed, consoleAllowed);
 
   // ── Run Build ──────────────────────────────────────────────────────────────
   runBuild(env, version, loggerAllowed, consoleAllowed);

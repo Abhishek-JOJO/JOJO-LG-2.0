@@ -59,7 +59,7 @@ export function getPackageVersion(): string {
  * Update version in package.json and package-lock.json
  */
 export function updatePackageVersion(version: string): void {
-  const cleanVersion = version.startsWith('v') ? version.slice(1) : version;
+  const cleanVersion = version.replace(/^v/i, '');
 
   // 1. Update package.json
   const pkgPath = path.resolve('package.json');
@@ -90,5 +90,16 @@ export function updatePackageVersion(version: string): void {
       console.log(`[INFO] Updated package-lock.json version to ${cleanVersion}`);
     }
   }
-}
 
+  // webOS reads this manifest when installing the IPK. Keep it identical to the
+  // version embedded in the frontend so API headers identify the installed build.
+  const appInfoPath = path.resolve('public/appinfo.json');
+  if (fs.existsSync(appInfoPath)) {
+    const appInfo = JSON.parse(fs.readFileSync(appInfoPath, 'utf-8'));
+    if (appInfo.version !== cleanVersion) {
+      appInfo.version = cleanVersion;
+      fs.writeFileSync(appInfoPath, JSON.stringify(appInfo, null, 2) + '\n', 'utf-8');
+      console.log(`[INFO] Updated public/appinfo.json version to ${cleanVersion}`);
+    }
+  }
+}
