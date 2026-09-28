@@ -289,11 +289,24 @@ function WatchContent() {
 
 
 
+  let storedSeasons: any[] = [];
+  try {
+    const rawMeta = typeof window !== "undefined" ? (sessionStorage.getItem(`play_metadata_${id}`) || (video?.contentId ? sessionStorage.getItem(`play_metadata_${video.contentId}`) : null)) : null;
+    if (rawMeta) {
+      const parsed = JSON.parse(rawMeta);
+      if (Array.isArray(parsed?.seasons) && parsed.seasons.length > 0) {
+        storedSeasons = parsed.seasons;
+      }
+    }
+  } catch {}
+
   const showAsset = (rawAsset?.seasons && rawAsset.seasons.length > 0)
     ? rawAsset
     : (currentAsset?.seasons && currentAsset.seasons.length > 0)
       ? currentAsset
-      : null;
+      : storedSeasons.length > 0
+        ? { seasons: storedSeasons }
+        : null;
 
   const seasonsData = showAsset?.seasons || [];
 
@@ -306,7 +319,7 @@ function WatchContent() {
         <OTTPlayer
           video={video}
           seasons={seasonsData as any}
-          currentEpisodeId={video?.contentId ? Number(video.contentId) : null}
+          currentEpisodeId={Number(video?.contentId || id) || null}
           onBack={handleBack}
           onGoAdsFree={handleGoAdsFree}
           onEpisodeSelect={(episode) => {
@@ -351,6 +364,7 @@ function WatchContent() {
                       episodeNumber: epNum,
                       nextEpisode: null,
                     },
+                    seasons: seasonsData,
                     certification: showAssetAny.asset_certification ?? null,
                     classifications: showAssetAny.asset_classifications ?? null,
                     isSvodSubscribed: isSubscribed,

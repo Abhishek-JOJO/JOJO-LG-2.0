@@ -212,9 +212,15 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').trim();
 }
 
-function getDefaultPoster(posters: { url: string; is_default?: boolean; ratio_id?: number }[]): string {
-  const def = posters.find((p) => p.is_default);
-  return def?.url ?? posters[0]?.url ?? '';
+function getDefaultPoster(posters: any): string {
+  if (!posters) return '';
+  if (Array.isArray(posters)) {
+    const def = posters.find((p: any) => p?.is_default);
+    return def?.url ?? posters[0]?.url ?? '';
+  }
+  if (typeof posters === 'string') return posters;
+  if (typeof posters === 'object' && posters.url) return posters.url;
+  return '';
 }
 
 function findSeasonIndex(seasons: AssetSeason[], currentEpisodeId?: number | null): number {

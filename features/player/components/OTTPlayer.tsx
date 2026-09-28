@@ -72,6 +72,22 @@ function formatDurationMinutes(totalSeconds: number | string): string {
   return `${m}m`;
 }
 
+function getEpisodePosterUrl(ep: any): string {
+  if (!ep) return '';
+  const posterField = ep.poster;
+  if (Array.isArray(posterField) && posterField.length > 0) {
+    const def = posterField.find((p: any) => p?.is_default);
+    return def?.url ?? posterField[0]?.url ?? '';
+  }
+  if (typeof posterField === 'string' && posterField) {
+    return posterField;
+  }
+  if (posterField && typeof posterField === 'object' && posterField.url) {
+    return posterField.url;
+  }
+  return ep.thumbnailUrl ?? ep.posterImage ?? ep.image ?? '';
+}
+
 function hexToRgb(hex: string) {
   const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
   const fullHex = hex.replace(shorthandRegex, (_, r, g, b) => r + r + g + g + b + b);
@@ -454,7 +470,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       const season = seasons[s];
       const episodes = season.episodes || [];
       const idx = episodes.findIndex((ep: any) => {
-        const epIdStr = String(ep.asset_id ?? ep.assetId ?? "");
+        const epIdStr = String(ep.asset_id ?? ep.assetId ?? ep.id ?? "");
         return epIdStr === curIdStr;
       });
       if (idx !== -1) {
@@ -482,12 +498,12 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     if (video.seriesInfo?.nextEpisode) return video.seriesInfo.nextEpisode;
     if (!nextEpisodeFromList) return null;
     const { episode } = nextEpisodeFromList;
+    const epAny = episode as any;
     return {
-      contentId: String(episode.asset_id),
-      title: episode.asset_title,
-      thumbnailUrl:
-        episode.poster?.find((p: any) => p.is_default)?.url ?? episode.poster?.[0]?.url ?? '',
-      durationSeconds: Number(episode.asset_total_duration) || 0,
+      contentId: String(episode.asset_id ?? epAny.assetId ?? epAny.id ?? ""),
+      title: episode.asset_title ?? epAny.title ?? "",
+      thumbnailUrl: getEpisodePosterUrl(episode),
+      durationSeconds: Number(episode.asset_total_duration ?? epAny.durationSeconds) || 0,
     };
   }, [video.seriesInfo, nextEpisodeFromList]);
 
@@ -513,7 +529,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     if (video.seriesInfo?.nextEpisode) {
       nextId = video.seriesInfo.nextEpisode.contentId;
     } else if (nextEpisodeFromList) {
-      nextId = String(nextEpisodeFromList.episode.asset_id);
+      nextId = String(nextEpisodeFromList.episode.asset_id ?? (nextEpisodeFromList.episode as any).assetId ?? (nextEpisodeFromList.episode as any).id ?? "");
     }
 
     if (!nextId) return;
@@ -545,13 +561,13 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       sessionStorage.setItem(
         `play_metadata_${nextId}`,
         JSON.stringify({
-          title: episode.asset_title,
-          description: episode.asset_description,
+          title: episode.asset_title || (episode as any).title,
+          description: episode.asset_description || (episode as any).description,
           seriesInfo: {
             seriesId: String(seriesId),
             seriesTitle: seriesTitle,
-            seasonNumber: Number(season.season_number ?? 1),
-            episodeNumber: Number(episode.episode_number ?? 1),
+            seasonNumber: Number(season.season_number ?? (season as any).seasonNumber ?? 1),
+            episodeNumber: Number(episode.episode_number ?? (episode as any).episodeNumber ?? 1),
             nextEpisode: null,
           },
           certification: video.certification ?? null,
@@ -561,6 +577,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
           assetCategoryCode,
           assetCategory,
           assetTypeName: 'episode',
+          seasons: seasons || [],
           ...(startAtSeconds !== undefined
             ? { resumeTime: startAtSeconds, bypassResumePrompt: true }
             : {}),
@@ -2096,13 +2113,10 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
             <div className="absolute bottom-24 right-6 z-40">
               <NextEpisodeCard
                 focusKey="next-title-card-play-btn"
-                title={nextEpisodeFromList.episode.asset_title}
-                thumbnailUrl={
-                  nextEpisodeFromList.episode.poster.find((p) => p.is_default)?.url ??
-                  nextEpisodeFromList.episode.poster[0]?.url
-                }
-                episodeLabel={`S${nextEpisodeFromList.season.season_number} EP${nextEpisodeFromList.episode.episode_number}`}
-                durationLabel={formatDurationMinutes(nextEpisodeFromList.episode.asset_total_duration)}
+                title={nextEpisodeFromList.episode.asset_title ?? (nextEpisodeFromList.episode as any).title}
+                thumbnailUrl={getEpisodePosterUrl(nextEpisodeFromList.episode)}
+                episodeLabel={`S${nextEpisodeFromList.season.season_number ?? (nextEpisodeFromList.season as any).seasonNumber ?? 1} EP${nextEpisodeFromList.episode.episode_number ?? (nextEpisodeFromList.episode as any).episodeNumber ?? 1}`}
+                durationLabel={formatDurationMinutes(nextEpisodeFromList.episode.asset_total_duration ?? (nextEpisodeFromList.episode as any).durationSeconds)}
                 countdownSeconds={video.nextTitle.visibleEndSeconds - currentTime}
                 countdownTotalSeconds={
                   video.nextTitle.visibleEndSeconds - video.nextTitle.visibleAtSeconds

@@ -109,12 +109,25 @@ export function useWatchPageGating(id: string): WatchPageGateResult {
   // storedMeta is present almost every time a show is opened — silently
   // starving OTTPlayer's `seasons` prop and breaking both the Next Episode
   // button and end-of-episode auto-advance for shows.
-  const parentId = (currentAsset as any)?.parent_id || (currentAsset as any)?.parentId || storedMeta?.seriesInfo?.seriesId;
+  const parentId = storedMeta?.seriesInfo?.seriesId || (currentAsset as any)?.parent_id || (currentAsset as any)?.parentId;
   const { data: rawAsset, isLoading: isRawAssetLoading, isFetching: isRawAssetFetching, isError: isRawAssetError } = useQuery({
     queryKey: ["raw-parent-asset", parentId, token],
     queryFn: async () => {
       const response = await getAsset(parentId!, token ?? undefined);
-      return response?.data ?? null;
+      const data = response?.data as any;
+      // If the fetched asset is a Season (has parent_id pointing to Show, but no seasons array),
+      // fetch the parent Show to get all seasons and episodes
+      if (data && (!data.seasons || data.seasons.length === 0) && data.parent_id) {
+        try {
+          const showRes = await getAsset(String(data.parent_id), token ?? undefined);
+          if (showRes?.data?.seasons && showRes.data.seasons.length > 0) {
+            return showRes.data;
+          }
+        } catch (e) {
+          logger.warn("[useWatchPageGating] Failed to resolve parent show for season", e);
+        }
+      }
+      return data ?? null;
     },
     enabled: !!parentId,
     staleTime: 5 * 60 * 1000,

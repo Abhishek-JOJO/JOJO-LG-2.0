@@ -271,6 +271,7 @@ export function useWatchGating({
             description: playDescription,
             assetDetailImage: getAssetDetailHandoffImage(asset),
             seriesInfo,
+            seasons: asset.seasons || [],
             certification: asset.certification,
             classifications: asset.classifications,
             assetCategoryCode: asset.assetCategoryCode,
