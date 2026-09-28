@@ -2105,9 +2105,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                             isSelected={idx === selectedSeasonIndex}
                             label={t("season", { number: idx + 1 })}
                             subtitle={
-                              typeof s.episodes?.length === "number" && s.episodes.length > 0
-                                ? `${s.episodes.length} ${t("episodes")}`
-                                : undefined
+                              (() => {
+                                const count = s.totalEpisodes ?? s.total_episodes ?? s.episodes?.length;
+                                return typeof count === "number" && count > 0
+                                  ? `${count} ${t("episodes")}`
+                                  : undefined;
+                              })()
                             }
                             onClick={() => {
                               isEpisodeFocusedRef.current = false;
@@ -2134,19 +2137,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
                     {/* Right Column: Episodes List */}
                     <div className="flex flex-col gap-4 flex-1 min-w-0">
-                      {activeSeason && (
-                        <div className="flex items-center gap-2 text-xs text-neutral-400 font-semibold mb-1">
-                          <span className="uppercase text-theme_13_samecolour">{t("season", { number: selectedSeasonIndex + 1 })}:</span>
-                          {asset.certification && <span>{asset.certification}</span>}
-                          <span>•</span>
-                          <span>{t("gujarati")}</span>
-                          {asset.classifications && asset.classifications.length > 0 && (
-                            <span className="text-neutral-400 text-[11px] sm:text-xs font-normal">
-                              ({asset.classifications.join(", ")})
-                            </span>
-                          )}
-                        </div>
-                      )}
 
                       {displayedEpisodes?.length > 0 ? (
                         <div className="flex flex-col gap-4 sm:gap-5">

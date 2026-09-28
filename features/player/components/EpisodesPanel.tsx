@@ -271,6 +271,7 @@ export const EpisodesPanel = memo(function EpisodesPanel({
         title: sTitle,
         seasonNumber: isNaN(seasonNum) ? idx + 1 : seasonNum,
         totalPages: season.total_pages ?? season.totalPages ?? 1,
+        totalEpisodes: season.total_episodes ?? season.totalEpisodes,
         episodes: Array.isArray(season.episodes)
           ? season.episodes.map((ep: any, epIdx: number) => {
               const rawEpNum = ep.episode_number ?? ep.episodeNumber;
@@ -473,7 +474,10 @@ export const EpisodesPanel = memo(function EpisodesPanel({
               </div>
             )}
             <p className="text-[10px] text-theme_1/40 font-medium tracking-wide mt-1.5 px-1">
-              {displayedEpisodes.length} episode{displayedEpisodes.length === 1 ? '' : 's'}
+              {(() => {
+                const total = mappedSeasons[selectedSeasonIdx]?.totalEpisodes ?? displayedEpisodes.length;
+                return `${total} episode${total === 1 ? '' : 's'}`;
+              })()}
             </p>
           </div>
         </div>

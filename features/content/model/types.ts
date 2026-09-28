@@ -69,6 +69,8 @@ export interface Season {
   title: string;
   seasonNumber: number;
   totalPages: number;
+  /** Total number of episodes in this season (from API metadata) */
+  totalEpisodes?: number;
   /** Page 1 episodes — pre-loaded from the asset API */
   episodes: Episode[];
 }
@@ -193,6 +195,7 @@ export interface SeasonApiShape {
   asset_id: string;
   asset_title: string;
   total_pages: number;
+  total_episodes?: number;
   episodes: EpisodeApiShape[];
 }
 

@@ -100,6 +100,7 @@ function mapSeason(api: SeasonApiShape, index: number): Season {
     title: api.asset_title,
     seasonNumber: index + 1,
     totalPages: api.total_pages ?? 1,
+    totalEpisodes: api.total_episodes,
     episodes: Array.isArray(api.episodes)
       ? api.episodes.map((ep, epIdx) => mapEpisode(ep, epIdx))
       : [],
