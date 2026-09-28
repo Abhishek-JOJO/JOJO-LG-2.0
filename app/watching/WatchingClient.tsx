@@ -145,7 +145,7 @@ export default function WatchingPage({ onProfileSelected }: WatchingPageProps = 
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden -mt-15 lg:-mt-25 bg-[radial-gradient(circle_at_25%_25%,_#3d1a08_0%,_#140a04_50%,_#050201_100%)]">
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_25%_25%,_#3d1a08_0%,_#140a04_50%,_#050201_100%)]">
       <div
         aria-hidden="true"
         className="absolute inset-0 z-0 pointer-events-none bg-black/35"

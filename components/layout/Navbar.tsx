@@ -276,7 +276,18 @@ export function Navbar() {
       window.location.search.includes("&v=")
     ));
 
-  if (isWatchPage) {
+  const isWatchingPage =
+    normalizedPath === ROUTES.WATCHING ||
+    normalizedPath.startsWith(ROUTES.WATCHING + "/") ||
+    normalizedPath === "/watching" ||
+    normalizedPath.startsWith("/watching/") ||
+    pathname?.includes("/watching") ||
+    (typeof window !== "undefined" && (
+      window.location.pathname.includes("/watching") ||
+      window.location.href.includes("/watching")
+    ));
+
+  if (isWatchPage || isWatchingPage) {
     return null;
   }
 

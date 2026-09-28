@@ -112,9 +112,22 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
     normalizedPath.startsWith(ROUTES.LOGIN) ||
     normalizedPath.startsWith(ROUTES.REGISTER);
 
+  const isWatchingPage =
+    normalizedPath === ROUTES.WATCHING ||
+    normalizedPath.startsWith(ROUTES.WATCHING + "/") ||
+    normalizedPath === "/watching" ||
+    normalizedPath.startsWith("/watching/") ||
+    pathname === ROUTES.WATCHING ||
+    pathname?.includes("/watching") ||
+    (typeof window !== "undefined" && (
+      window.location.pathname.includes("/watching") ||
+      window.location.href.includes("/watching")
+    ));
+
   const isStandalonePage =
     isAuthPage ||
     isWatchPage ||
+    isWatchingPage ||
     normalizedPath === ROUTES.DOWNLOAD_APP ||
     normalizedPath === ROUTES.APP_INSTALL ||
     normalizedPath === "/appInstall" ||
@@ -127,7 +140,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
     normalizedPath.startsWith(ROUTES.ACCOUNT_SETTINGS + "/");
 
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
-  const hideBrowseChrome = isStandalonePage || isAssetDetailOpen;
+  const hideBrowseChrome = isStandalonePage || isAssetDetailOpen || isTvOverlayOpen;
   const hideHeaderFooter = hideBrowseChrome || isMobileLegalPage;
   const hideAmbientGlow = hideBrowseChrome || isAccountSettingsPage || isTvOverlayOpen;
 
@@ -135,7 +148,9 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   if (isMobileLegalPage) {
     mainClassName = "min-h-screen flex flex-col";
   } else if (isStandalonePage) {
-    mainClassName = "h-screen h-[100dvh] w-full flex flex-col overflow-hidden";
+    mainClassName = isWatchingPage
+      ? "min-h-screen w-full flex flex-col"
+      : "h-screen h-[100dvh] w-full flex flex-col overflow-hidden";
   }
 
   return (

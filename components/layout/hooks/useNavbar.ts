@@ -104,7 +104,18 @@ export function useNavbar() {
   const isRegisterOtp = pathname === ROUTES.REGISTER_OTP;
   const isCreateAccount = pathname.startsWith(ROUTES.REGISTER_CREATE_ACCOUNT);
   const isAddProfile = pathname.startsWith(ROUTES.ADD_PROFILE);
-  const isWatching = pathname === ROUTES.WATCHING || isWatch;
+  const isWatching =
+    normalizedPath === ROUTES.WATCHING ||
+    normalizedPath.startsWith(ROUTES.WATCHING + "/") ||
+    normalizedPath === "/watching" ||
+    normalizedPath.startsWith("/watching/") ||
+    pathname === ROUTES.WATCHING ||
+    pathname?.includes("/watching") ||
+    (typeof window !== "undefined" && (
+      window.location.pathname.includes("/watching") ||
+      window.location.href.includes("/watching")
+    )) ||
+    isWatch;
   const isAvatar = pathname === ROUTES.AVATAR;
   const isDownloadApp = pathname === ROUTES.DOWNLOAD_APP || pathname === ROUTES.APP_INSTALL || pathname === "/appInstall" || pathname === "/app-install";
   const isHome = pathname.startsWith(ROUTES.HOME);
