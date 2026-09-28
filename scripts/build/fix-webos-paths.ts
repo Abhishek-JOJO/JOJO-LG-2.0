@@ -253,6 +253,15 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
   // so the splash video plays ONCE smoothly to completion and does not restart on login!
   if ("${relPrefix}" === "./" && (location.pathname.endsWith("/index.html") || location.pathname.endsWith("/"))) {
     try {
+      var splashPlayed = "";
+      try { splashPlayed = sessionStorage.getItem("jojo_splash_video_played"); } catch(e){}
+      if (splashPlayed === "1") {
+        var hideStyle = document.createElement("style");
+        hideStyle.id = "webos-early-hide-splash";
+        hideStyle.textContent = "#jojo-splash-container{display:none!important;visibility:hidden!important;pointer-events:none!important;}";
+        document.head.appendChild(hideStyle);
+      }
+
       var _tok = localStorage.getItem("ott_auth_token");
       var _usr = localStorage.getItem("user");
       var _auth = false;
@@ -271,8 +280,6 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
           try { sessionStorage.setItem("jojo_splash_video_played", "1"); } catch(e){}
           window.location.replace(targetLogin);
         }
-        var splashPlayed = "";
-        try { splashPlayed = sessionStorage.getItem("jojo_splash_video_played"); } catch(e){}
         if (splashPlayed === "1") {
           if (document.readyState === "loading") {
             document.addEventListener("DOMContentLoaded", doRedirect);
@@ -329,6 +336,11 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
         content = content.replace(/<script id="webos-early-boot">[\s\S]*?<\/script>/, earlyInterceptorScript);
       } else {
         content = content.replace('<head>', `<head>${earlyInterceptorScript}`);
+      }
+
+      // Strip any pre-rendered static splash container so it NEVER flashes or plays video when navigating back
+      if (content.includes('id="jojo-splash-container"')) {
+        content = content.replace(/<div id="jojo-splash-container"[^>]*>[\s\S]*?<\/div>/g, '');
       }
 
       fs.writeFileSync(filePath, content, 'utf8');

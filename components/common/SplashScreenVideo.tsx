@@ -8,18 +8,10 @@ const SPLASH_SESSION_KEY = "jojo_splash_video_played";
 const EMERGENCY_FALLBACK_TIMEOUT_MS = 10000;
 
 export function SplashScreenVideo() {
-  // Initialize to true during static export / cold start so pre-rendered HTML
-  // covers the screen with the splash curtain, preventing any skeleton/screen flash
-  const [shouldRender, setShouldRender] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        return sessionStorage.getItem(SPLASH_SESSION_KEY) !== "1";
-      } catch {
-        return true;
-      }
-    }
-    return true;
-  });
+  // Initialize to false so static export / pre-rendered HTML does NOT bake in
+  // the splash container or auto-playing video element into out/index.html.
+  // This prevents the splash screen from flashing when navigating back from /watch.
+  const [shouldRender, setShouldRender] = useState(false);
 
   const [isFadingOut, setIsFadingOut] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -120,6 +112,9 @@ export function SplashScreenVideo() {
       const alreadyPlayed = sessionStorage.getItem(SPLASH_SESSION_KEY);
       if (alreadyPlayed === "1") {
         setShouldRender(false);
+        if (typeof window !== "undefined") {
+          (window as any).__SPLASH_VIDEO_ACTIVE__ = false;
+        }
         try {
           document.getElementById("early-splash-curtain-style")?.remove();
         } catch {}
@@ -128,6 +123,8 @@ export function SplashScreenVideo() {
       if (typeof window !== "undefined") {
         (window as any).__SPLASH_VIDEO_ACTIVE__ = true;
       }
+      // Cold boot: splash has not played yet, mount the video container
+      setShouldRender(true);
     } catch {
       // ignore
     }
@@ -137,15 +134,17 @@ export function SplashScreenVideo() {
       dismissSplash();
     }, EMERGENCY_FALLBACK_TIMEOUT_MS);
 
-    // Explicitly call play() on TV to ensure smooth playback
-    if (videoRef.current) {
-      videoRef.current.play().catch(() => {});
-    }
-
     return () => {
       clearTimeout(emergencyTimer);
     };
   }, [dismissSplash]);
+
+  // Explicitly call play() on TV when video mounts during cold boot
+  useEffect(() => {
+    if (shouldRender && videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  }, [shouldRender]);
 
   if (!shouldRender) return null;
 

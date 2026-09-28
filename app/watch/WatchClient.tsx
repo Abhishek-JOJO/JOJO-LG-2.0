@@ -131,6 +131,13 @@ function WatchContent() {
       };
     }
 
+    try {
+      sessionStorage.setItem("jojo_splash_video_played", "1");
+      if (typeof window !== "undefined") {
+        (window as any).__SPLASH_VIDEO_ACTIVE__ = false;
+      }
+    } catch {}
+
     schedulePendingAssetDetailOpen(returnId, returnType, returnTitle, assetToCache);
     safeNavigate(router, ROUTES.HOME, { replace: true });
   }, [video, rawAsset, currentAsset, id, router]);
@@ -163,6 +170,12 @@ function WatchContent() {
         if (status === 403 || errMsg.toLowerCase().includes("subscription")) {
           useTvOverlayStore.getState().open("subscription");
         } else {
+          try {
+            sessionStorage.setItem("jojo_splash_video_played", "1");
+            if (typeof window !== "undefined") {
+              (window as any).__SPLASH_VIDEO_ACTIVE__ = false;
+            }
+          } catch {}
           safeNavigate(router, ROUTES.HOME);
         }
       }, 1500);
@@ -237,7 +250,15 @@ function WatchContent() {
           Please select something to watch from the home page.
         </p>
         <div
-          onClick={() => safeNavigate(router, ROUTES.HOME)}
+          onClick={() => {
+            try {
+              sessionStorage.setItem("jojo_splash_video_played", "1");
+              if (typeof window !== "undefined") {
+                (window as any).__SPLASH_VIDEO_ACTIVE__ = false;
+              }
+            } catch {}
+            safeNavigate(router, ROUTES.HOME);
+          }}
           className="px-6 py-2 bg-theme_13_samecolour text-theme_1 rounded-full text-sm font-medium hover:opacity-90 transition-opacity cursor-pointer"
         >
           Go Home
