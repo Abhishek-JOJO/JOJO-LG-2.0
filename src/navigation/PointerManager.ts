@@ -30,21 +30,23 @@ export const useRemotePointer = () => {
     let wheelCooldownTimer: ReturnType<typeof setTimeout> | null = null;
     const WHEEL_THRESHOLD = 70;
 
-    const handlePointerHover = (e: MouseEvent) => {
-      if (hasCursorStateSupport && !pointerVisible) return;
+    /**
+     * Mouse hover does NOTHING to focus.
+     * On LG webOS TV, cursor drift or hovering over cards must never steal or
+     * disrupt the active remote focus, ensuring the remote focus stays rock-solid
+     * and the wheel/touch slider can scroll smoothly without interruption.
+     */
 
+    /**
+     * When user explicitly clicks with the Magic Remote pointer or presses the
+     * mouse wheel OK/Enter button on an element: focus and activate that element.
+     */
+    const handlePointerClick = (e: MouseEvent) => {
       const target = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-focuskey]');
       const focusKey = target?.getAttribute('data-focuskey');
-      if (!focusKey || focusKey === lastFocusKey) return;
-      if (!doesFocusableExist(focusKey)) return;
-
-      lastFocusKey = focusKey;
-      setFocus(focusKey);
-    };
-
-    const handleCursorStateChange = (e: Event) => {
-      hasCursorStateSupport = true;
-      pointerVisible = Boolean((e as CustomEvent<{ visibility: boolean }>).detail?.visibility);
+      if (focusKey && doesFocusableExist(focusKey)) {
+        setFocus(focusKey);
+      }
     };
 
     /**
@@ -135,13 +137,11 @@ export const useRemotePointer = () => {
       }, 140);
     };
 
-    document.addEventListener('mouseover', handlePointerHover);
-    document.addEventListener('cursorStateChange', handleCursorStateChange);
+    document.addEventListener('click', handlePointerClick, true);
     window.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
-      document.removeEventListener('mouseover', handlePointerHover);
-      document.removeEventListener('cursorStateChange', handleCursorStateChange);
+      document.removeEventListener('click', handlePointerClick, true);
       window.removeEventListener('wheel', handleWheel);
       if (wheelScrollTimer) {
         clearTimeout(wheelScrollTimer);

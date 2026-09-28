@@ -478,6 +478,8 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
         return prev;
       });
       try { setFocus("spotlight-lead-fixed"); } catch {}
+      const leadCard = document.querySelector<HTMLElement>('[data-focuskey="spotlight-lead-fixed"]');
+      leadCard?.focus({ preventScroll: true });
       const section1 = document.querySelector<HTMLElement>('section[data-section-index="1"]');
       if (section1) {
         const rect = section1.getBoundingClientRect();
@@ -492,6 +494,8 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
       if (activeRailIndexRef.current > 0) {
         setActiveRailIndex((prev) => Math.max(0, prev - 1));
         try { setFocus("spotlight-lead-fixed"); } catch {}
+        const leadCard = document.querySelector<HTMLElement>('[data-focuskey="spotlight-lead-fixed"]');
+        leadCard?.focus({ preventScroll: true });
         const section1 = document.querySelector<HTMLElement>('section[data-section-index="1"]');
         if (section1) {
           const rect = section1.getBoundingClientRect();

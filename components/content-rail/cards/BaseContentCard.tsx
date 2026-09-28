@@ -241,22 +241,20 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   }, [isFocusExpanded, isMixedSeries, config.variant]);
 
 
+  // In TV/webOS environment, mouse pointer hover does nothing so remote focus is never lost
   const handleMouseEnter = () => {
-    if (isDragging || isAssetDetailOpen) return;
-    setIsHovered(true);
-    onHoverChange?.(true);
+    // No-op on TV: cursor hover does not trigger card state changes or steal focus
   };
 
   const handleMouseLeave = () => {
-    setIsHovered(false);
-    onHoverChange?.(false);
+    // No-op on TV
   };
 
   // true when hover type is "simple" — no overlay, no scale, no dim
   const isSimple = config.hover.type === "simple" || !config.hover.enabled;
-  const showBorder = config.hover.enabled && isHovered;
+  const showBorder = false;
 
-  const isExpanded = !isMixedSeries && !!config?.hover?.enabled && (isHovered || isFocusExpanded) && !isAssetDetailOpen;
+  const isExpanded = !isMixedSeries && !!config?.hover?.enabled && isFocusExpanded && !isAssetDetailOpen;
   const isLandscapeCard =
     config?.variant === RailCardVariant.LANDSCAPE ||
     config?.variant === RailCardVariant.CONTINUE_WATCHING ||

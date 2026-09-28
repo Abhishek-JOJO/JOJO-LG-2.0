@@ -484,6 +484,10 @@ export function stepTVVerticalNavigation(direction: "up" | "down"): boolean {
 
     // C. Down while already on a rail -> Advance to next rail via tv-rail-step
     if (section1 && leadCard) {
+      leadCard.focus({ preventScroll: true });
+      if (doesFocusableExist("spotlight-lead-fixed")) {
+        setFocus("spotlight-lead-fixed");
+      }
       document.dispatchEvent(new CustomEvent("tv-rail-step", { detail: { direction: "down" } }));
       return true;
     }

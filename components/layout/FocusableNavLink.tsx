@@ -208,10 +208,6 @@ export const FocusableNavLink = React.memo(({
     navigateTab();
   }, [navigateTab]);
 
-  const handleMouseEnter = useCallback(() => {
-    setFocus(`nav-link-${index}`);
-  }, [index]);
-
   return (
     <div
       ref={ref as any}
@@ -219,7 +215,6 @@ export const FocusableNavLink = React.memo(({
       data-active={isItemActive ? "true" : "false"}
       data-focuskey={`nav-link-${index}`}
       onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
       className={`relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none transition-[background-color,color,transform] duration-300 ease-out ${
         focused
           ? "bg-white text-black scale-105"

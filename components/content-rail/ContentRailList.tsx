@@ -562,7 +562,7 @@ export function ContentRailList({
   if (isHeroVariant) {
     if (!items?.length) return null;
 
-    const isHeroActiveFocus = Boolean(focused || isHeroHovered);
+    const isHeroActiveFocus = Boolean(focused);
 
     return (
       <div
@@ -570,8 +570,6 @@ export function ContentRailList({
         ref={focusKeyRef}
         data-focuskey={focusKey}
         tabIndex={0}
-        onMouseEnter={() => setIsHeroHovered(true)}
-        onMouseLeave={() => setIsHeroHovered(false)}
         className={`relative overflow-hidden w-[calc(100%-2rem)] sm:w-[calc(100%-4rem)] lg:w-[calc(100%-5rem)] mx-auto select-none h-[78vh] mt-2 sm:mt-3 rounded-[32px] bg-neutral-950 transition-all duration-300 ${focused ? "z-[99]" : ""}`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
