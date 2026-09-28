@@ -83,6 +83,13 @@ function retrySetFocus(focusKey: string, attempts = 4, intervalMs = 40) {
   setTimeout(attempt, intervalMs);
 }
 
+function cleanCastRole(role?: string): string {
+  if (!role) return "";
+  const trimmed = role.trim();
+  if (!trimmed || trimmed.toLowerCase() === "actor") return "";
+  return trimmed;
+}
+
 const resolvePortraitImage = (itemOrAsset: any): string => {
   if (!itemOrAsset) return "";
   const asset = itemOrAsset?.asset || itemOrAsset?.details || itemOrAsset;
@@ -622,16 +629,20 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       const id = p.id;
       if (!id) return;
 
+      const role = cleanCastRole(p.role);
+
       if (idMap.has(id)) {
         const existing = idMap.get(id)!;
-        if (existing.role && p.role && !existing.role.includes(p.role)) {
-          existing.role = `${existing.role} & ${p.role}`;
+        if (existing.role && role && !existing.role.includes(role)) {
+          existing.role = `${existing.role} & ${role}`;
+        } else if (!existing.role && role) {
+          existing.role = role;
         }
       } else {
         const newItem = {
           id,
           name: p.name,
-          role: p.role,
+          role,
           image: p.image,
         };
         idMap.set(id, newItem);
@@ -2599,9 +2610,11 @@ function FocusableCastItem({
         {cast.name}
       </span>
       {/* Role */}
-      <span className="text-xs sm:text-sm text-neutral-400 line-clamp-1 leading-tight w-full mt-1">
-        {cast.role}
-      </span>
+      {cleanCastRole(cast.role) ? (
+        <span className="text-xs sm:text-sm text-neutral-400 line-clamp-1 leading-tight w-full mt-1">
+          {cleanCastRole(cast.role)}
+        </span>
+      ) : null}
     </div>
   );
 }

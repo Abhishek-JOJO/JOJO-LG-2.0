@@ -107,12 +107,32 @@ function mapSeason(api: SeasonApiShape, index: number): Season {
   };
 }
 
-function mapProfessional(api: any, role: string): Professional {
+function formatRole(role?: string): string {
+  if (!role) return '';
+  const trimmed = role.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'actor') return '';
+  return trimmed
+    .split(/\s+/)
+    .map((word) => (word ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
+    .join(' ');
+}
+
+function mapProfessional(api: any, role: string = ""): Professional {
+  const resolvedRole = (
+    api.portrays_as ||
+    api.character ||
+    api.character_name ||
+    api.designation ||
+    api.role ||
+    role ||
+    ""
+  );
+
   return {
-    id: Number(api.professional_id),
-    name: `${api.first_name || ""} ${api.last_name || ""}`.trim() || api.name_analytics,
-    role: api.portrays_as || role,
-    image: api.professional_image || null,
+    id: Number(api.professional_id || api.id),
+    name: `${api.first_name || ""} ${api.last_name || ""}`.trim() || api.name_analytics || api.name || "",
+    role: formatRole(resolvedRole),
+    image: api.professional_image || api.image || null,
   };
 }
 
@@ -146,7 +166,7 @@ export function mapContentAsset(
     certification: data.asset_certification ?? null,
     genres: Array.isArray(data.asset_genre) ? data.asset_genre : [],
     professionals: Array.isArray(data.asset_professionals)
-      ? data.asset_professionals.map((p) => mapProfessional(p, "Actor"))
+      ? data.asset_professionals.map((p) => mapProfessional(p, ""))
       : [],
     directors: Array.isArray(data.director)
       ? data.director.map((d) => mapProfessional(d, "Director"))
