@@ -1,7 +1,7 @@
 "use client";
 
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
-import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
+import JOJOCommonImage, { JOJOImagePosition, JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import JOJOCommonVideo from "@/components/ui/JOJOCommonVideo";
 import { LikeLovePartHerocarousel } from "@/enums/ui.enum";
 import { useWatchGating } from "@/features/asset/hooks/useWatchGating";
@@ -420,7 +420,7 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
               // is what hides this while not ready. The poster (a separate,
               // ordinary <img> layer on top) fading out over it is what makes
               // the reveal read as a crossfade once the wrapper snaps into place.
-              style={{ objectFit: "cover", objectPosition: "right center" }}
+              style={{ objectFit: "cover", objectPosition: "right top" }}
               wrapperClassName="absolute inset-0 w-full h-full"
             />
           </div>
@@ -437,11 +437,13 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
               width={1600}
               height={900}
               preset={JOJOImagePreset.Banner}
+              position={JOJOImagePosition.Top}
+              style={{ objectPosition: "top" }}
               fill
               priority={true}
               sizes="100vw"
               quality={100}
-              className="object-cover"
+              className="object-cover object-top"
               wrapperClassName="w-full h-full"
             />
           ) : (

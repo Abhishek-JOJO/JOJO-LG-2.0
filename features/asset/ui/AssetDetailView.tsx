@@ -53,7 +53,7 @@ import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
 import { buildPlanDetailAnalytics } from "@/features/asset/utils/buildPlanDetailAnalytics";
 import { useFocusable, setFocus, doesFocusableExist, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
-import { mapApiRailItem } from "@/components/content-rail/utils/contentRail.mapper";
+import { mapApiRailItem, getPortraitFallbackImages } from "@/components/content-rail/utils/contentRail.mapper";
 import { WEBOS_KEYS } from "@/src/navigation/RemoteManager";
 
 // This page's hero preview video fires onTimeUpdate ~4x/sec, which re-renders
@@ -93,6 +93,12 @@ function cleanCastRole(role?: string): string {
 const resolvePortraitImage = (itemOrAsset: any): string => {
   if (!itemOrAsset) return "";
   const asset = itemOrAsset?.asset || itemOrAsset?.details || itemOrAsset;
+
+  // 0. Client portrait fallback cascade
+  const fallbackList = getPortraitFallbackImages(asset, itemOrAsset);
+  if (fallbackList.length > 0) {
+    return fallbackList[0];
+  }
 
   // 1. Dedicated pre-mapped properties
   if (typeof itemOrAsset?.posterImageRatio4 === "string" && itemOrAsset.posterImageRatio4) {

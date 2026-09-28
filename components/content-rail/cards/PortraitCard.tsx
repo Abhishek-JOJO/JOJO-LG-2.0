@@ -102,7 +102,7 @@ export const PortraitCard = React.memo(function PortraitCard({
 
   // 2. Handle Upcoming sub-variant (which has an expand-on-hover layout)
   if (config.variant === RailCardVariant.UPCOMING) {
-    const baseImage = item.portraitImage || item.image;
+    const baseImage = item.portraitFallbackImages?.[0] || item.posterImageRatio4 || item.portraitImage || item.image;
     const hoverImage = item.landscapeImage || item.hoverImage || item.image;
     const hoverWidth = config.hover.width ?? config.width;
     const hoverHeight = config.hover.height ?? config.height;
@@ -200,15 +200,39 @@ export const PortraitCard = React.memo(function PortraitCard({
   const pathname = useActivePathname();
   const isHomePage = !pathname || pathname === "/" || pathname === "/home" || pathname === ROUTES.HOME || pathname === ROUTES.HOMEPAGE;
   const isTopTen = isHomePage && config.variant === RailCardVariant.TOP_TEN;
-  // Prefer the dedicated ratio_id===4 poster crop; when the asset doesn't
-  // have one, fall back to the existing portrait image resolution untouched.
-  const imageUrl = item.posterImageRatio4 || item.portraitImage || item.image;
+
+  // Resolve image for portrait card according to the client-specified fallback cascade:
+  // 1. POSTER Ratio 4 -> 2. POSTER Ratio 3 -> 3. POSTER Ratio 1 -> 4. POSTER (null)
+  // -> 5. LANDSCAPE Ratio 1 -> 6. LANDSCAPE (null) -> 7. PORTRAIT -> 8. Generic
+  const portraitFallbackList = React.useMemo(() => {
+    if (item.portraitFallbackImages && item.portraitFallbackImages.length > 0) {
+      return item.portraitFallbackImages;
+    }
+    const candidates = [
+      item.posterImageRatio4,
+      item.portraitImage,
+      item.posterImage,
+      item.landscapeImage,
+      item.image,
+    ];
+    const seen = new Set<string>();
+    return candidates.filter((u): u is string => {
+      if (typeof u === "string" && u.trim().length > 0 && !seen.has(u)) {
+        seen.add(u);
+        return true;
+      }
+      return false;
+    });
+  }, [item]);
+
+  const imageUrl = portraitFallbackList[0] || item.posterImageRatio4 || item.portraitImage || item.image || "";
 
   const cardContent = (
     <BaseContentCard
       item={item}
       config={config}
       imageUrl={imageUrl}
+      fallbackImages={portraitFallbackList}
       className={`${isTopTen ? "ml-2" : ""} ${className || ""}`}
       index={index}
       itemsLength={itemsLength}

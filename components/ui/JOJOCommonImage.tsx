@@ -172,7 +172,7 @@ const JOJO_IMAGE_PRESET_MAP: Record<
     radius: JOJOImageRadius.Xl,
     aspectRatio: JOJOImageAspectRatio.SixteenByNine,
     contentMode: JOJOImageContentMode.Cover,
-    position: JOJOImagePosition.Center,
+    position: JOJOImagePosition.Top,
   },
 
   [JOJOImagePreset.Logo]: {

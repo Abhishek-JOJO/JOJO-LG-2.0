@@ -11,7 +11,7 @@ import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 import { ContentRailSection } from "@/components/content-rail/ContentRailSection";
 import { RailCardVariant } from "@/components/content-rail/config/contentRail.types";
-import { getPortraitImage, getPosterImage, getLandscapeImage, mapApiRail, mapApiRailItem } from "@/components/content-rail/utils/contentRail.mapper";
+import { getPortraitImage, getPosterImage, getLandscapeImage, getPortraitFallbackImages, mapApiRail, mapApiRailItem } from "@/components/content-rail/utils/contentRail.mapper";
 import { NoResults } from "@/components/search/NoResults";
 import { SearchPagination } from "@/components/search/SearchPagination";
 import JOJOCommonImage, { JOJOImageContentMode, JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
@@ -52,6 +52,13 @@ function resolveSearchPosterUrl(item: any): string {
   if (item?.genre) return item.genre.image || "";
 
   const asset = item?.details || item?.asset || item;
+
+  // Use the standard portrait fallback cascade
+  const fallbackImages = getPortraitFallbackImages(asset, item);
+  if (fallbackImages.length > 0) {
+    return fallbackImages[0];
+  }
+
   const portraitArr = Array.isArray(asset?.portrait) ? asset.portrait : undefined;
   const posterArr = Array.isArray(asset?.poster) ? asset.poster : undefined;
   const landscapeArr = Array.isArray(asset?.landscape) ? asset.landscape : undefined;

@@ -41,6 +41,17 @@ export interface ContentRailItem {
    * poster crop for portrait cards. Undefined when the asset has no such
    * entry; callers should fall back to `portraitImage` in that case. */
   posterImageRatio4?: string;
+  /** Ordered list of fallback image URLs for portrait cards matching the client fallback cascade:
+   * 1. POSTER Ratio 4
+   * 2. POSTER Ratio 3
+   * 3. POSTER Ratio 1
+   * 4. POSTER default / any
+   * 5. LANDSCAPE Ratio 1
+   * 6. LANDSCAPE default / any
+   * 7. PORTRAIT array (ratio 4, ratio 2, or default)
+   * 8. Generic image / thumbnail
+   */
+  portraitFallbackImages?: string[];
   thumbnailImage?: string;
   heroImage?: string;
   title_image?: string;

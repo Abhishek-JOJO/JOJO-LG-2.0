@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { useTranslations } from "next-intl";
 import JOJOCommonImage, { JOJOImageContentMode } from "@/components/ui/JOJOCommonImage";
@@ -18,6 +18,7 @@ interface BaseContentCardProps {
   item: ContentRailItem;
   config: RailCardDesignConfig;
   imageUrl: string;
+  fallbackImages?: string[];
   className?: string;
   children?: React.ReactNode;
   onClick?: (item: ContentRailItem) => void;
@@ -62,6 +63,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   item,
   config,
   imageUrl,
+  fallbackImages,
   className = "",
   children,
   onClick,
@@ -264,13 +266,52 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   let desktopWidth = config.width;
   const desktopHeight = config.height;
 
+  // Candidate URLs for image loading and runtime error fallback cascade
+  const candidateUrls = useMemo(() => {
+    const list = [
+      imageUrl,
+      ...(fallbackImages || []),
+      ...(item?.portraitFallbackImages || []),
+    ];
+    const seen = new Set<string>();
+    return list.filter((u): u is string => {
+      if (typeof u === "string" && u.trim().length > 0 && !seen.has(u)) {
+        seen.add(u);
+        return true;
+      }
+      return false;
+    });
+  }, [imageUrl, fallbackImages, item?.portraitFallbackImages]);
+
+  const [fallbackIndex, setFallbackIndex] = useState(0);
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setFallbackIndex(0);
+    setImageFailed(false);
+  }, [item?.id, imageUrl]);
+
+  const activeRawUrl = !imageFailed && fallbackIndex < candidateUrls.length
+    ? candidateUrls[fallbackIndex]
+    : "";
+
+  const handleImageError = useCallback(() => {
+    setFallbackIndex((prev) => {
+      if (prev + 1 < candidateUrls.length) {
+        return prev + 1;
+      }
+      setImageFailed(true);
+      return prev;
+    });
+  }, [candidateUrls.length]);
+
   // Stable CDN-resized image URL, requested at the card's actual base aspect
   // ratio/size (e.g. 2:3 portrait) so the CDN crop matches the box the browser
   // renders it in — requesting a size doesn't need to change on hover/expand
   // since CSS object-fit: cover already re-crops a same-aspect image cleanly
   // into the wider expanded box.
-  const resizedImageUrl = imageUrl
-    ? jojoResizedImageURL(imageUrl, {
+  const resizedImageUrl = activeRawUrl
+    ? jojoResizedImageURL(activeRawUrl, {
         targetSize: { width: config.width, height: config.height },
         fit: JOJOImageFit.Cover,
       })
@@ -291,12 +332,13 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         outlineOffset: "-2px",
       }}
     >
-      {resizedImageUrl ? (
+      {resizedImageUrl && !imageFailed ? (
         <div className="absolute inset-0 w-full h-full bg-neutral-900" style={{ transform: 'translateZ(0)' }}>
           <img
             key={resizedImageUrl}
             src={resizedImageUrl}
             alt={item?.title || ""}
+            onError={handleImageError}
             className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
             loading="eager"
@@ -305,8 +347,8 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         </div>
       ) : null}
 
-      {/* Fallback title shown only if no image URL is available */}
-      {!imageUrl && (
+      {/* Fallback title shown only if no image URL is available or all fallback candidates failed */}
+      {(!resizedImageUrl || imageFailed) && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-neutral-900 px-2 pointer-events-none select-none">
           <span className="text-[11px] sm:text-xs text-theme_1/50 font-semibold text-center line-clamp-3 leading-snug px-1">
             {item.title}
