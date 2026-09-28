@@ -140,7 +140,8 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
     normalizedPath.startsWith(ROUTES.ACCOUNT_SETTINGS + "/");
 
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
-  const hideBrowseChrome = isStandalonePage || isAssetDetailOpen || isTvOverlayOpen;
+  const isTvWatchingOverlay = isTvOverlayOpen && tvOverlayScreen === "watching";
+  const hideBrowseChrome = isStandalonePage || isAssetDetailOpen || isTvWatchingOverlay;
   const hideHeaderFooter = hideBrowseChrome || isMobileLegalPage;
   const hideAmbientGlow = hideBrowseChrome || isAccountSettingsPage || isTvOverlayOpen;
 
