@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { usePlayerStore } from "./usePlayerStore";
 
 export type TvOverlayScreen = "account-settings" | "watching" | "subscription";
 
@@ -16,6 +17,9 @@ export const useTvOverlayStore = create<TvOverlayState>((set, get) => ({
 
   open: (screen) => {
     if (typeof window === "undefined") return;
+
+    // Dismiss any active search modal so it never covers the overlay screen
+    usePlayerStore.getState().setSearchOpen(false);
 
     // Add one history entry when entering the in-app screen. Moving between
     // Account Settings and Switch Profile reuses that entry, so one Back press

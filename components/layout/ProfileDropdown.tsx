@@ -19,6 +19,7 @@ import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
 import { safeNavigate } from "@/lib/webos/safeNavigate";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
+import { usePlayerStore } from "@/store/usePlayerStore";
 
 // The dropdown mounts several focusables at once (menu links) the
 // moment it opens, via a React portal. norigin's setFocus/addFocusable share a
@@ -217,11 +218,13 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
   const openTvOverlay = useTvOverlayStore((state) => state.open);
   const handleExit = () => {
     closeDropdown();
+    usePlayerStore.getState().setSearchOpen(false);
     openExit();
   };
 
   const handleSwitchProfile = () => {
     closeDropdown();
+    usePlayerStore.getState().setSearchOpen(false);
     if (typeof window !== "undefined" && window.location.protocol === "file:") {
       openTvOverlay("watching");
       return;
@@ -231,6 +234,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
 
   const handleAccountSettings = () => {
     closeDropdown();
+    usePlayerStore.getState().setSearchOpen(false);
     if (typeof window !== "undefined" && window.location.protocol === "file:") {
       openTvOverlay("account-settings");
       return;

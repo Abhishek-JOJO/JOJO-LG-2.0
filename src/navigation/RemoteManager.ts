@@ -49,14 +49,15 @@ export const useRemoteManager = () => {
       // If a component (e.g. modal or video player) already handled & prevented the key, do not override
       if (e.defaultPrevented) return;
 
+      if ((e.keyCode === WEBOS_KEYS.BACK || e.key === "Escape") && useTvOverlayStore.getState().screen) {
+        e.preventDefault();
+        useTvOverlayStore.getState().close();
+        return;
+      }
+
       // Map webOS specific keys to actions
       switch (e.keyCode) {
         case WEBOS_KEYS.BACK:
-          if (useTvOverlayStore.getState().screen) {
-            e.preventDefault();
-            useTvOverlayStore.getState().close();
-            return;
-          }
           const currentPathForBack = typeof window !== 'undefined' ? normalizePathname(window.location.pathname) : '';
           // A full-screen overlay (search, asset detail, the exit-confirm popup
           // itself) owns the Back key while it's open — its own listener closes

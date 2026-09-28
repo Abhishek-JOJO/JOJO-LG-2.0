@@ -296,7 +296,8 @@ export function Navbar() {
 
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
   const isSearchPage = normalizedPath === ROUTES.SEARCH || normalizedPath.startsWith(ROUTES.SEARCH);
-  const isSearchActive = isSearchOpen || isSearchPage;
+  const isTvOverlayOpen = useTvOverlayStore((s) => s.screen !== null);
+  const isSearchActive = !isTvOverlayOpen && (isSearchOpen || isSearchPage);
 
   return (
     <header

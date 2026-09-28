@@ -162,7 +162,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
       {!hideAmbientGlow && <AmbientBackground />}
       {showNavbar && !hideHeaderFooter && !hideBrowseChrome && <Navbar />}
       {isTvOverlayOpen && (
-        <main className={`${mainClassName} bg-transparent`}>
+        <main className={`${mainClassName} bg-transparent relative z-[1000]`}>
           {tvOverlayScreen === "account-settings" ? (
             <AccountSettingsPage />
           ) : tvOverlayScreen === "subscription" ? (
@@ -195,7 +195,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
       </main>
       <CookieBanner />
       <AssetDetailModal />
-      <SearchModal isOpen={isSearchOpen} onClose={() => setSearchOpen(false)} />
+      <SearchModal isOpen={isSearchOpen && !isTvOverlayOpen} onClose={() => setSearchOpen(false)} />
       <GuestLoginPopup />
       <SessionExpiredModal />
       <ExitConfirmModal />

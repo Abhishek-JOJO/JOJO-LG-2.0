@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { SearchModal } from "@/components/search/SearchModal";
 import { ROUTES } from "@/lib/constants/routes";
+import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 
 interface Props {
   initialQuery: string;
@@ -12,6 +13,7 @@ interface Props {
 export default function SearchPageClient({ initialQuery }: Props) {
   const router = useRouter();
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const isTvOverlayOpen = useTvOverlayStore((s) => s.screen !== null);
 
   // Extract the query from URL params (important for static exports where server can't read params)
   const queryParam = searchParams?.get("q") || "";
@@ -45,7 +47,7 @@ export default function SearchPageClient({ initialQuery }: Props) {
 
   return (
     <SearchModal
-      isOpen={true}
+      isOpen={!isTvOverlayOpen}
       onClose={handleClose}
       initialQuery={actualInitialQuery}
       onQueryChange={handleQueryChange}

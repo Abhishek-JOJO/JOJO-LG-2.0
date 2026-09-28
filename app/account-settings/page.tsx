@@ -25,18 +25,19 @@ import { APP_VERSION } from "@/lib/constants/version";
 // video), but retrySetFocus is used anyway for consistency with the rest of
 // the app and safety against the same norigin setFocus/addFocusable race
 // documented in AssetDetailView.tsx.
-function retrySetFocus(focusKey: string, attempts = 6, intervalMs = 90) {
+function retrySetFocus(focusKey: string, attempts = 10, intervalMs = 60) {
   let tries = 0;
   const attempt = () => {
     tries += 1;
     if (doesFocusableExist(focusKey)) {
       setFocus(focusKey);
+      return;
     }
     if (tries < attempts) {
       setTimeout(attempt, intervalMs);
     }
   };
-  setTimeout(attempt, intervalMs);
+  setTimeout(attempt, 40);
 }
 
 function normalizePhoneCode(code: string) {
