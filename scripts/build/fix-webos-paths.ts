@@ -338,11 +338,6 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
         content = content.replace('<head>', `<head>${earlyInterceptorScript}`);
       }
 
-      // Strip any pre-rendered static splash container so it NEVER flashes or plays video when navigating back
-      if (content.includes('id="jojo-splash-container"')) {
-        content = content.replace(/<div id="jojo-splash-container"[^>]*>[\s\S]*?<\/div>/g, '');
-      }
-
       fs.writeFileSync(filePath, content, 'utf8');
       htmlCount++;
     } else if (filePath.endsWith('.js')) {

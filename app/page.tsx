@@ -8,8 +8,8 @@ export default async function Home() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <ParentPage />
       <SplashScreenVideo />
+      <ParentPage />
     </HydrationBoundary>
   );
 }

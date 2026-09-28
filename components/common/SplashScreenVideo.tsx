@@ -3,27 +3,28 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 
+declare global {
+  interface Window {
+    __SPLASH_VIDEO_ACTIVE__?: boolean;
+    __WEBOS_APP_BASE__?: string;
+  }
+}
+
 const SPLASH_SESSION_KEY = "jojo_splash_video_played";
 // Emergency safety cap: video is 3.6s; this 10s timeout ONLY fires if video decoder completely crashes
 const EMERGENCY_FALLBACK_TIMEOUT_MS = 10000;
 
 export function SplashScreenVideo() {
-  // Initialize to false so static export / pre-rendered HTML does NOT bake in
-  // the splash container or auto-playing video element into out/index.html.
-  // This prevents the splash screen from flashing when navigating back from /watch.
+  // The video has exactly one owner: the hydrated client. Rendering it in the
+  // static HTML lets webOS start decoding before React hydrates, then restart
+  // the same media element when React takes ownership. The synchronous boot
+  // curtain in layout.tsx covers Home until this single client mount is ready.
   const [shouldRender, setShouldRender] = useState(false);
 
   const [isFadingOut, setIsFadingOut] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const dismissedRef = useRef(false);
-
-  // Determine correct video source (handles webOS file:// relative path and standard web path)
-  const getVideoSrc = useCallback(() => {
-    if (typeof window !== "undefined" && (window as any).__WEBOS_APP_BASE__) {
-      return `${(window as any).__WEBOS_APP_BASE__}video/APP_INTRO.mp4`;
-    }
-    return "/video/APP_INTRO.mp4";
-  }, []);
+  const playRequestedRef = useRef(false);
 
   const dismissSplash = useCallback(() => {
     if (dismissedRef.current) return;
@@ -32,7 +33,7 @@ export function SplashScreenVideo() {
     try {
       sessionStorage.setItem(SPLASH_SESSION_KEY, "1");
       if (typeof window !== "undefined") {
-        (window as any).__SPLASH_VIDEO_ACTIVE__ = false;
+        window.__SPLASH_VIDEO_ACTIVE__ = false;
       }
     } catch {}
 
@@ -96,7 +97,7 @@ export function SplashScreenVideo() {
       // Fallback redirect in case the early head script was not attached
       if (typeof window !== "undefined") {
         setTimeout(() => {
-          const appBase = (window as any).__WEBOS_APP_BASE__ || "";
+          const appBase = window.__WEBOS_APP_BASE__ || "";
           if (window.location.protocol === "file:") {
             window.location.replace(appBase ? `${appBase}login/index.html` : "login/index.html");
           } else if (window.location.pathname === "/" || window.location.pathname.endsWith("/index.html")) {
@@ -113,7 +114,7 @@ export function SplashScreenVideo() {
       if (alreadyPlayed === "1") {
         setShouldRender(false);
         if (typeof window !== "undefined") {
-          (window as any).__SPLASH_VIDEO_ACTIVE__ = false;
+          window.__SPLASH_VIDEO_ACTIVE__ = false;
         }
         try {
           document.getElementById("early-splash-curtain-style")?.remove();
@@ -121,12 +122,12 @@ export function SplashScreenVideo() {
         return;
       }
       if (typeof window !== "undefined") {
-        (window as any).__SPLASH_VIDEO_ACTIVE__ = true;
+        window.__SPLASH_VIDEO_ACTIVE__ = true;
       }
-      // Cold boot: splash has not played yet, mount the video container
       setShouldRender(true);
     } catch {
-      // ignore
+      // If storage is unavailable, still play the splash once for this mount.
+      setShouldRender(true);
     }
 
     // Emergency safety timeout: ONLY fires if video completely fails or stalls
@@ -139,12 +140,15 @@ export function SplashScreenVideo() {
     };
   }, [dismissSplash]);
 
-  // Explicitly call play() on TV when video mounts during cold boot
+  // Use one guarded playback trigger. Combining the autoplay attribute with an
+  // imperative play() call gives old webOS media pipelines two start requests.
   useEffect(() => {
-    if (shouldRender && videoRef.current) {
-      videoRef.current.play().catch(() => {});
-    }
-  }, [shouldRender]);
+    const video = videoRef.current;
+    if (!shouldRender || !video || playRequestedRef.current) return;
+
+    playRequestedRef.current = true;
+    video.play().catch(dismissSplash);
+  }, [dismissSplash, shouldRender]);
 
   if (!shouldRender) return null;
 
@@ -166,8 +170,7 @@ export function SplashScreenVideo() {
     >
       <video
         ref={videoRef}
-        src={getVideoSrc()}
-        autoPlay
+        src="./video/APP_INTRO.mp4"
         muted
         playsInline
         preload="auto"
@@ -188,4 +191,3 @@ export function SplashScreenVideo() {
 }
 
 export default SplashScreenVideo;
-
