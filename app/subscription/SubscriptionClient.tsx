@@ -58,38 +58,16 @@ function retrySetFocus(focusKey: string, attempts = 8, intervalMs = 100) {
     setTimeout(attempt, intervalMs);
 }
 
-function FocusablePlanCard({ onClick, children, isSelected, isMultiMonth, has3OrMorePlans, badge, cardStyleClass, cardRoundingClass, product, focusKey }: any) {
-    const handleArrowPress = (direction: string) => {
-        if (direction === "down") {
-            setFocus("subscription-proceed-btn");
-            return false;
-        }
-        if (direction === "up") {
-            setFocus("navbar-get-gold");
-            return false;
-        }
-        return true;
-    };
-
-    const { ref, focused } = useFocusable({
-        focusKey,
-        focusable: true,
-        onArrowPress: handleArrowPress,
-        onEnterPress: onClick
-    });
-
+function PlanCard({ onClick, children, isSelected, isMultiMonth, has3OrMorePlans, badge, cardStyleClass, cardRoundingClass, product }: any) {
     return (
         <motion.div
-            ref={ref}
             id={`plan-${product?.productId}`}
-            data-focuskey={focusKey}
             onClick={onClick}
             className={`z-1
                 relative w-full cursor-pointer text-left border-2
                 ${has3OrMorePlans ? "flex flex-row items-center justify-between p-4 sm:p-5" : "flex-1 flex flex-col items-start gap-1 p-4 sm:p-4"}
                 ${cardRoundingClass}
                 ${cardStyleClass}
-                ${focused ? "scale-[1.03]" : ""}
             `}
             style={{
                 background: isSelected && !isMultiMonth
@@ -98,7 +76,7 @@ function FocusablePlanCard({ onClick, children, isSelected, isMultiMonth, has3Or
             }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            animate={{ scale: isSelected || focused ? 1.03 : 1 }}
+            animate={{ scale: isSelected ? 1.03 : 1 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
         >
             {children}
@@ -106,7 +84,7 @@ function FocusablePlanCard({ onClick, children, isSelected, isMultiMonth, has3Or
     );
 }
 
-function FocusableProceedButton({ onClick, children, className, style, focusKey, upKey, ...props }: any) {
+function FocusableProceedButton({ onClick, children, className, style, focusKey, upKey = "navbar-get-gold", ...props }: any) {
     const handleArrowPress = (direction: string) => {
         if (direction === "up" && upKey) {
             setFocus(upKey);
@@ -164,47 +142,22 @@ function PlanFeatureIcon({ src, alt }: { src?: string; alt?: string }) {
     );
 }
 
-function FocusableQrPlanCard({
+function QrPlanCard({
     product,
     isSelected,
-    onSelect,
-    focusKey,
-    index,
 }: {
     product: any;
-    isSelected: boolean;
-    onSelect: () => void;
-    focusKey: string;
-    index: number;
+    isSelected?: boolean;
 }) {
-    const handleArrowPress = (direction: string) => {
-        if (direction === "up" && index === 0) {
-            setFocus("navbar-get-gold");
-            return false;
-        }
-        return true;
-    };
-
-    const { ref, focused } = useFocusable({
-        focusKey,
-        focusable: true,
-        onArrowPress: handleArrowPress,
-        onEnterPress: onSelect,
-    });
-
     const sku = product?.skus?.[0];
     if (!sku) return null;
     const title = getQrPlanTitle(product);
     const featureLimit = product.validityCount === 1 ? 3 : 4;
 
     return (
-        <button
-            ref={ref as any}
-            onClick={onSelect}
-            className={`w-full rounded-2xl border px-7 py-6 text-left transition-all outline-none bg-black/28 text-white backdrop-blur-md ${
-                focused
-                    ? "border-amber-400 ring-4 ring-amber-400/50 scale-[1.03] shadow-xl shadow-amber-500/20"
-                    : isSelected
+        <div
+            className={`w-full rounded-2xl border px-7 py-6 text-left transition-all bg-black/28 text-white backdrop-blur-md ${
+                isSelected
                     ? "border-white/70 bg-white/10"
                     : "border-white/25"
             }`}
@@ -224,17 +177,15 @@ function FocusableQrPlanCard({
                     </div>
                 ))}
             </div>
-        </button>
+        </div>
     );
 }
 
-function SubscriptionQrPage({ products, selectedProduct, onSelectProduct }: { products: any[]; selectedProduct: any; onSelectProduct: (productId: string) => void }) {
+function SubscriptionQrPage({ products, selectedProduct }: { products: any[]; selectedProduct: any; onSelectProduct?: (productId: string) => void }) {
     const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-    const selectedSku = selectedProduct?.skus?.[0];
-    const selectedPlanTitle = getQrPlanTitle(selectedProduct);
 
     useEffect(() => {
-        retrySetFocus("qr-plan-0");
+        retrySetFocus("navbar-get-gold");
     }, []);
 
     useEffect(() => {
@@ -279,14 +230,11 @@ function SubscriptionQrPage({ products, selectedProduct, onSelectProduct }: { pr
                     <p className="mb-6 text-center text-2xl font-bold text-white">Premium Deals, Unlimited Entertainment!</p>
 
                     <div className="flex w-full max-w-[560px] flex-col gap-5">
-                        {products.map((product, index) => (
-                            <FocusableQrPlanCard
+                        {products.map((product) => (
+                            <QrPlanCard
                                 key={product.productId}
                                 product={product}
                                 isSelected={product.productId === selectedProduct?.productId}
-                                onSelect={() => onSelectProduct(product.productId)}
-                                focusKey={`qr-plan-${index}`}
-                                index={index}
                             />
                         ))}
                     </div>
@@ -389,10 +337,10 @@ export default function SubscriptionPage() {
     }, [isGold]);
 
     useEffect(() => {
-        if (!isGold && selectedProduct) {
-            retrySetFocus(`plan-card-${selectedProduct.productId}`);
+        if (!isGold) {
+            retrySetFocus("subscription-proceed-btn");
         }
-    }, [isGold, selectedProduct]);
+    }, [isGold]);
 
     // Render Modal immediately if Gold (No skeleton)
     if (isGold) {
@@ -470,7 +418,7 @@ export default function SubscriptionPage() {
         <div className="relative min-h-screen overflow-hidden bg-theme_12 flex flex-col justify-between">
             <div
                 id="page-focus-entry"
-                data-focuskey={selectedProduct ? `plan-card-${selectedProduct.productId}` : "subscription-proceed-btn"}
+                data-focuskey="subscription-proceed-btn"
                 className="relative z-10 flex-1 flex flex-col items-center justify-center pt-32 sm:pt-36 lg:pt-40 px-4 sm:px-6 lg:px-8 py-8 md:py-12 lg:py-16"
             >
                 <div className="flex flex-col lg:flex-row items-center justify-center gap-12 xl:gap-20 w-full max-w-full mx-auto">
@@ -578,9 +526,8 @@ export default function SubscriptionPage() {
                                     : "rounded-3xl";
 
                                 return (
-                                    <FocusablePlanCard
+                                    <PlanCard
                                         key={product?.productId}
-                                        focusKey={`plan-card-${product?.productId}`}
                                         product={product}
                                         isSelected={isSelected}
                                         isMultiMonth={isMultiMonth}
@@ -684,7 +631,7 @@ export default function SubscriptionPage() {
                                                 </div>
                                             </>
                                         )}
-                                    </FocusablePlanCard>
+                                    </PlanCard>
                                 );
                             })}
                         </div>
@@ -693,7 +640,7 @@ export default function SubscriptionPage() {
                         <FocusableProceedButton
                             id="subscription-proceed-btn"
                             focusKey="subscription-proceed-btn"
-                            upKey={selectedProduct ? `plan-card-${selectedProduct.productId}` : undefined}
+                            upKey="navbar-get-gold"
                             onClick={() => {
                                 try {
                                     if (selectedProduct) {
