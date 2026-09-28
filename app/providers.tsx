@@ -60,7 +60,15 @@ export function Providers({ children, locale: serverLocale = "en", isMobileServe
 
   return (
     <ReactQueryProvider>
-      <NextIntlClientProvider locale={currentLocale} messages={currentMessages} timeZone={TIME_ZONE}>
+      <NextIntlClientProvider
+        locale={currentLocale}
+        messages={currentMessages}
+        timeZone={TIME_ZONE}
+        getMessageFallback={({ key }) => {
+          const leaf = key.includes(".") ? (key.split(".").pop() || key) : key;
+          return leaf.replace(/_/g, " ");
+        }}
+      >
 
         <BootstrapProvider>
           <AnalyticsProvider>

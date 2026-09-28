@@ -2,6 +2,7 @@
   "common": {
     "get_gold": "Get Gold",
     "logout": "Logout",
+    "logging_out": "Logging out...",
     "cancel": "Cancel",
     "exit_app_title": "Exit JOJO?",
     "exit_app_desc": "Are you sure you want to exit the app?",
@@ -329,6 +330,7 @@
     "tv_login": "TV Login",
     "help_and_support": "Help & Support",
     "logout": "Logout",
+    "logging_out": "Logging out...",
     "logout_confirm": "Are you sure you want to log out?",
     "logout_desc": "You will be asked to log in again to watch your favorites.",
     "cancel": "Cancel",
@@ -441,6 +443,7 @@
     "language": "Language",
     "theme": "Theme",
     "logout": "Logout",
+    "logging_out": "Logging out...",
     "dark": "Dark",
     "light": "Light",
     "profile": "Profile",

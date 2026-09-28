@@ -142,7 +142,14 @@ function LogoutModalButtons({
             : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
         }`}
       >
-        {isLoggingOut ? t("logging_out") || "Logging out..." : t("logout")}
+        {isLoggingOut ? (
+          <span className="inline-flex items-center justify-center gap-2">
+            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <span>{typeof t("logging_out") === "string" && !t("logging_out").includes(".") ? t("logging_out") : "Logging out..."}</span>
+          </span>
+        ) : (
+          t("logout")
+        )}
       </button>
 
       {/* Cancel Button */}
