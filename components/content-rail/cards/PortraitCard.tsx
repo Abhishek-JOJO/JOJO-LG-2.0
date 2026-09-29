@@ -230,7 +230,7 @@ export const PortraitCard = React.memo(function PortraitCard({
   const cardContent = (
     <BaseContentCard
       item={item}
-      config={config}
+      config={{ ...config, showBadge: false }}
       imageUrl={imageUrl}
       fallbackImages={portraitFallbackList}
       className={`${isTopTen ? "ml-2" : ""} ${className || ""}`}
@@ -243,6 +243,30 @@ export const PortraitCard = React.memo(function PortraitCard({
       forceFocusRing={forceFocusRing}
       onArrowLeftRight={onArrowLeftRight}
     >
+      {/* Title & Logo overlay for portrait cards (centered with larger width) */}
+      {(item?.title_image || (Boolean((config as any)?.isMixedSeries) && item?.title)) && (
+        <div className="absolute bottom-0 left-0 right-0 z-20 p-3 pb-3.5 sm:p-4 sm:pb-4.5 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center justify-end text-center pointer-events-none">
+          {item?.title_image ? (
+            <div className="relative w-[200px] sm:w-[250px] max-w-[90%] h-[56px] sm:h-[70px] flex justify-center items-end mx-auto">
+              <JOJOCommonImage
+                src={item.title_image}
+                alt={item.title}
+                fill
+                contentMode="contain"
+                position="center"
+                style={{ objectPosition: "center bottom" }}
+                optimizeRequestURL={false}
+                wrapperClassName="w-full h-full drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
+              />
+            </div>
+          ) : (
+            <h3 className="line-clamp-1 text-xs sm:text-sm font-semibold text-white drop-shadow-md text-center px-1">
+              {item?.title}
+            </h3>
+          )}
+        </div>
+      )}
+
       {config.hover.type !== "card" && (
         <div className="absolute bottom-0 left-0 right-0 z-30 translate-y-2 p-3 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
           {config?.hover?.showTitle && (

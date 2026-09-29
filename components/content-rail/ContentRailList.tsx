@@ -149,6 +149,7 @@ function renderSpotlightRailItem(
 
   const portraitConfig: RailCardDesignConfig = {
     ...config,
+    showBadge: false,
     variant: isContinueWatching
       ? RailCardVariant.CONTINUE_WATCHING
       : isTopTen

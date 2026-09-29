@@ -52,6 +52,16 @@ export interface ContentRailItem {
    * 8. Generic image / thumbnail
    */
   portraitFallbackImages?: string[];
+  /** Ordered list of fallback image URLs for landscape cards matching client fallback cascade:
+   * 1. POSTER Ratio 4
+   * 2. POSTER Ratio 1
+   * 3. LANDSCAPE default / any
+   * 4. POSTER Ratio 3
+   * 5. POSTER default / any
+   * 6. PORTRAIT Ratio 2
+   * 7. Generic image / thumbnail
+   */
+  landscapeFallbackImages?: string[];
   thumbnailImage?: string;
   heroImage?: string;
   title_image?: string;

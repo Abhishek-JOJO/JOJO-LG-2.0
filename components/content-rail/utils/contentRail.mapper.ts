@@ -232,6 +232,107 @@ export function getPortraitFallbackImages(asset: any, cr_item?: any): string[] {
   return result;
 }
 
+/**
+ * Resolves an ordered list of fallback image URLs for landscape cards according to the
+ * client fallback cascade:
+ *   1. ImageFallback(ImageType.POSTER, RationType.RATIO_4)
+ *   2. ImageFallback(ImageType.POSTER, RationType.RATIO_1)
+ *   3. ImageFallback(ImageType.LANDSCAPE, null) [default or first landscape]
+ *   4. ImageFallback(ImageType.POSTER, RationType.RATIO_3)
+ *   5. ImageFallback(ImageType.POSTER, null) [default or first poster]
+ *   6. ImageFallback(ImageType.PORTRAIT, RationType.RATIO_2)
+ *   7. Generic image / thumbnail
+ */
+export function getLandscapeFallbackImages(asset: any, cr_item?: any): string[] {
+  if (!asset && !cr_item) return [];
+
+  const rawPosterArr = Array.isArray(asset?.poster)
+    ? asset.poster
+    : Array.isArray(cr_item?.poster)
+      ? cr_item.poster
+      : undefined;
+
+  const rawLandscapeArr = Array.isArray(asset?.landscape)
+    ? asset.landscape
+    : Array.isArray(cr_item?.landscape)
+      ? cr_item.landscape
+      : undefined;
+
+  const rawPortraitArr = Array.isArray(asset?.portrait)
+    ? asset.portrait
+    : Array.isArray(cr_item?.portrait)
+      ? cr_item.portrait
+      : undefined;
+
+  // 1. ImageFallback(ImageType.POSTER, RationType.RATIO_4)
+  const posterRatio4 = rawPosterArr?.find((img: any) => Number(img?.ratio_id) === 4)?.url;
+
+  // 2. ImageFallback(ImageType.POSTER, RationType.RATIO_1)
+  const posterRatio1 = rawPosterArr?.find((img: any) => Number(img?.ratio_id) === 1)?.url;
+
+  // 3. ImageFallback(ImageType.LANDSCAPE, null)
+  const landscapeDefault =
+    rawLandscapeArr?.find((img: any) => img?.is_default)?.url ||
+    rawLandscapeArr?.[0]?.url ||
+    (typeof asset?.landscape === "object" && asset?.landscape !== null && "url" in asset.landscape ? asset.landscape.url : undefined) ||
+    (typeof asset?.landscapeImage === "string" ? asset.landscapeImage : undefined) ||
+    (typeof asset?.landscape_image === "string" ? asset.landscape_image : undefined) ||
+    (typeof asset?.landscape === "string" ? asset.landscape : undefined) ||
+    (typeof cr_item?.landscapeImage === "string" ? cr_item.landscapeImage : undefined) ||
+    (typeof cr_item?.landscape === "string" ? cr_item.landscape : undefined);
+
+  // 4. ImageFallback(ImageType.POSTER, RationType.RATIO_3)
+  const posterRatio3 = rawPosterArr?.find((img: any) => Number(img?.ratio_id) === 3)?.url;
+
+  // 5. ImageFallback(ImageType.POSTER, null)
+  const posterDefault =
+    rawPosterArr?.find((img: any) => img?.is_default)?.url ||
+    rawPosterArr?.[0]?.url ||
+    (typeof asset?.poster === "object" && asset?.poster !== null && "url" in asset.poster ? asset.poster.url : undefined) ||
+    (typeof asset?.posterImage === "string" ? asset.posterImage : undefined) ||
+    (typeof asset?.poster_image === "string" ? asset.poster_image : undefined) ||
+    (typeof asset?.poster === "string" ? asset.poster : undefined) ||
+    (typeof cr_item?.posterImage === "string" ? cr_item.posterImage : undefined) ||
+    (typeof cr_item?.poster === "string" ? cr_item.poster : undefined);
+
+  // 6. ImageFallback(ImageType.PORTRAIT, RationType.RATIO_2)
+  const portraitRatio2 = rawPortraitArr?.find((img: any) => Number(img?.ratio_id) === 2)?.url;
+
+  // 7. General fallback: image / thumbnail / portrait
+  const portraitDefault =
+    rawPortraitArr?.find((img: any) => img?.is_default)?.url ||
+    rawPortraitArr?.[0]?.url ||
+    (typeof asset?.portrait === "object" && asset?.portrait !== null && "url" in asset.portrait ? asset.portrait.url : undefined) ||
+    (typeof asset?.portraitImage === "string" ? asset.portraitImage : undefined);
+
+  const genericImage =
+    (typeof asset?.image === "string" ? asset.image : undefined) ||
+    (typeof asset?.thumbnail === "string" ? asset.thumbnail : undefined) ||
+    (typeof cr_item?.image === "string" ? cr_item.image : undefined) ||
+    (typeof cr_item?.thumbnail === "string" ? cr_item.thumbnail : undefined);
+
+  const rawList: (string | undefined)[] = [
+    posterRatio4,
+    posterRatio1,
+    landscapeDefault,
+    posterRatio3,
+    posterDefault,
+    portraitRatio2,
+    portraitDefault,
+    genericImage,
+  ];
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const url of rawList) {
+    if (typeof url === "string" && url.trim().length > 0 && !seen.has(url)) {
+      seen.add(url);
+      result.push(url);
+    }
+  }
+  return result;
+}
+
 export function mapApiRailItem(
   cr_item: any,
   index: number,
@@ -247,6 +348,7 @@ export function mapApiRailItem(
   let posterImage: string | undefined = undefined;
   let posterImageRatio4: string | undefined = undefined;
   let portraitFallbackImages: string[] = [];
+  let landscapeFallbackImages: string[] = [];
   let heroImage: string | undefined = undefined;
 
   const isGenre =
@@ -293,6 +395,7 @@ export function mapApiRailItem(
       // `portraitImage` themselves when this is undefined.
       posterImageRatio4 = rawPosterArr?.find((img: any) => Number(img?.ratio_id) === 4)?.url;
       portraitFallbackImages = getPortraitFallbackImages(asset, cr_item);
+      landscapeFallbackImages = getLandscapeFallbackImages(asset, cr_item);
 
       const heroPosterUrl = rawPosterArr?.find((img: any) => Number(img?.ratio_id) === 1)?.url;
       posterImage =
@@ -312,6 +415,7 @@ export function mapApiRailItem(
       heroImage = heroPosterUrl || getHeroPosterImage(rawPosterArr || rawLandscapeArr);
 
       image =
+        landscapeFallbackImages[0] ||
         portraitFallbackImages[0] ||
         portraitImage ||
         landscapeImage ||
@@ -323,7 +427,8 @@ export function mapApiRailItem(
         "";
     } else {
       portraitFallbackImages = getPortraitFallbackImages(cr_item);
-      image = cr_item?.image || cr_item?.thumbnail || portraitFallbackImages[0] || "";
+      landscapeFallbackImages = getLandscapeFallbackImages(cr_item);
+      image = cr_item?.image || cr_item?.thumbnail || landscapeFallbackImages[0] || portraitFallbackImages[0] || "";
     }
   }
 
@@ -389,13 +494,17 @@ export function mapApiRailItem(
     description: asset?.asset_description,
     image,
     portraitImage,
-    landscapeImage,
+    landscapeImage: landscapeFallbackImages[0] || landscapeImage,
     posterImage,
     posterImageRatio4,
     portraitFallbackImages,
+    landscapeFallbackImages,
     heroImage,
     thumbnailImage: image,
-    title_image: asset?.title_image,
+    title_image: (() => {
+      const raw = asset?.title_image || asset?.titleImage || cr_item?.title_image || cr_item?.titleImage;
+      return typeof raw === "string" ? raw : (raw?.url || undefined);
+    })(),
     year,
     duration,
     ageRating,
