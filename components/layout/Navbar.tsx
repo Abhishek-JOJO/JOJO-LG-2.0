@@ -106,7 +106,7 @@ function FocusableGetGold({
       className={`cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 text-base sm:text-lg tracking-wide whitespace-nowrap rounded-full transition-all duration-200 shrink-0 border ${
         focused
           ? "bg-gradient-to-r from-[#FAAF3F] via-[#FFD691] to-[#FAAF3F] text-black font-extrabold scale-105 border-transparent"
-          : "bg-transparent border-[#FAAF3F]/40 text-white font-medium hover:border-[#FAAF3F]/70 hover:bg-[#FAAF3F]/10"
+          : "bg-transparent border-white/40 text-white font-medium hover:border-white/70 hover:bg-[#FAAF3F]/10"
       }`}
     >
       {getGoldLabel}
