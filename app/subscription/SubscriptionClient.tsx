@@ -22,7 +22,7 @@ import { StorageKey } from "@/enums/storage.enum";
 import { useToastStore } from "@/store/useToastStore";
 import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
 import { ROUTES } from "@/lib/constants/routes";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
 import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { useOverseasDetection } from "@/features/geo/hooks/useOverseasDetection";
 import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";

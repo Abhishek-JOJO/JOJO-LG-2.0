@@ -23,7 +23,7 @@ import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { extractDominantAmbientColor } from "@/lib/utils/colorExtractor";
 import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 import { preloadImageUrl, preloadRailItems } from "./utils/imagePreloader";
-import { tvSoundManager } from "@/lib/webos/tvSoundManager";
+import { tvSoundManager } from "@/src/platform/audio/tvSoundManager";
 import { useNavStore } from "@/store/useNavStore";
 import { ROUTES } from "@/lib/constants/routes";
 

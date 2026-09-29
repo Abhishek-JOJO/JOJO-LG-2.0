@@ -28,16 +28,31 @@ import { cn, handleLoginKeyDown, isPossiblePhoneInput, normalizePhoneNumber } fr
 import { useOtpStore } from "./otp/store";
 import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { analyticsService } from "@/shared/analytics";
-import { useFocusable, setFocus, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, setFocus, FocusContext, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { LoginModeToggle, LoginMode } from "./components/LoginModeToggle";
 import { QrPairingPanel } from "./components/QrPairingPanel";
 import { AccountNotFoundModal } from "./components/AccountNotFoundModal";
 
+import { TvKeyboard } from "@/components/search/TvKeyboard";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useVerifySubscription } from "@/hooks/useVerifySubscription";
 import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
+
+const LOGIN_KEYBOARD_ROWS = [
+  ["1", "2", "3", "4", "5", "6"],
+  ["7", "8", "9", "0", "@", "."],
+  ["A", "B", "C", "D", "E", "F"],
+  ["G", "H", "I", "J", "K", "L"],
+  ["M", "N", "O", "P", "Q", "R"],
+  ["S", "T", "U", "V", "W", "X"],
+  ["Y", "Z", "_", "-", "+", "#"],
+];
+
+const sanitizeLoginInput = (val: string) => {
+  return val.replace(REGEX.SENITIZE_LOGIN_INPUT, "");
+};
 
 export default function LoginPage() {
   return (
@@ -99,6 +114,31 @@ function LoginPageContent() {
     }, 150);
   }, []);
 
+  const handleTvKeyPress = useCallback((char: string) => {
+    setValue((prev) => {
+      const next = sanitizeLoginInput(prev + char);
+      if (touched) {
+        setError(validate(next.trim()));
+      }
+      return next;
+    });
+  }, [touched]);
+
+  const handleTvBackspace = useCallback(() => {
+    setValue((prev) => {
+      const next = prev.slice(0, -1);
+      if (touched) {
+        setError(validate(next.trim()));
+      }
+      return next;
+    });
+  }, [touched]);
+
+  const handleTvClear = useCallback(() => {
+    setValue("");
+    setError(null);
+  }, []);
+
   // ── Focus setup ──────────────────────────────────────────────────────────
   const { ref: pageRef, focusKey: pageFocusKey } = useFocusable({
     focusKey: 'LOGIN_PAGE_ROOT',
@@ -109,17 +149,30 @@ function LoginPageContent() {
     focusKey: 'login-input',
     focusable: !isNotFoundModalOpen,
     onEnterPress: () => {
-      // Trigger native keyboard
+      // Trigger native keyboard / focus
       const el = document.getElementById("login-input-field") as HTMLInputElement | null;
       if (el) {
         el.focus();
         const len = el.value.length;
         el.setSelectionRange(len, len);
       }
+      if (canSubmit && !initiateOtp.isPending && !checkUserExists.isPending) {
+        const form = document.getElementById("login-form") as HTMLFormElement;
+        if (form) {
+          if (typeof form.requestSubmit === "function") form.requestSubmit();
+          else form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+        }
+      } else if (doesFocusableExist('login-tv-key-0-0')) {
+        setFocus('login-tv-key-0-0');
+      }
     },
     onArrowPress: (direction) => {
       if (direction === 'down') {
-        setFocus('login-submit');
+        if (doesFocusableExist('login-tv-key-0-0')) {
+          setFocus('login-tv-key-0-0');
+        } else {
+          setFocus('login-submit');
+        }
         return false;
       }
       if (direction === 'up') {
@@ -146,7 +199,13 @@ function LoginPageContent() {
     },
     onArrowPress: (direction) => {
       if (direction === 'up') {
-        setFocus('login-input');
+        if (doesFocusableExist('login-tv-key-space')) {
+          setFocus('login-tv-key-space');
+        } else if (doesFocusableExist('login-tv-key-0-0')) {
+          setFocus('login-tv-key-0-0');
+        } else {
+          setFocus('login-input');
+        }
         return false;
       }
       return true;
@@ -290,9 +349,7 @@ function LoginPageContent() {
     return trimmed?.length > 0 && !validate(trimmed);
   }, [value]);
 
-  const sanitizeLoginInput = (value: string) => {
-    return value.replace(REGEX.SENITIZE_LOGIN_INPUT, "");
-  };
+
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const rawValue = sanitizeLoginInput(event.target.value);
@@ -347,7 +404,11 @@ function LoginPageContent() {
     if (e.key === "ArrowDown") {
       e.preventDefault();
       (e.target as HTMLElement)?.blur();
-      setFocus("login-submit");
+      if (doesFocusableExist("login-tv-key-0-0")) {
+        setFocus("login-tv-key-0-0");
+      } else {
+        setFocus("login-submit");
+      }
       return;
     }
     if (e.key === "ArrowUp") {
@@ -357,14 +418,24 @@ function LoginPageContent() {
       return;
     }
     if (e.key === "Enter") {
-      // Prevent Enter key from triggering form submit so user can type on virtual keyboard
       e.preventDefault();
       e.stopPropagation();
-      const el = document.getElementById("login-input-field") as HTMLInputElement | null;
-      if (el && document.activeElement !== el) {
-        el.focus();
-        const len = el.value.length;
-        el.setSelectionRange(len, len);
+      if (canSubmit && !initiateOtp.isPending && !checkUserExists.isPending) {
+        const form = document.getElementById("login-form") as HTMLFormElement;
+        if (form) {
+          if (typeof form.requestSubmit === "function") form.requestSubmit();
+          else form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+        }
+      } else if (doesFocusableExist("login-tv-key-0-0")) {
+        (e.target as HTMLElement)?.blur();
+        setFocus("login-tv-key-0-0");
+      } else {
+        const el = document.getElementById("login-input-field") as HTMLInputElement | null;
+        if (el && document.activeElement !== el) {
+          el.focus();
+          const len = el.value.length;
+          el.setSelectionRange(len, len);
+        }
       }
       return;
     }
@@ -534,12 +605,12 @@ function LoginPageContent() {
         {/* Main Centered Content */}
         <div className={cn(
           "flex-1 flex justify-center pb-4 z-20 w-full",
-          mode === "phone" ? "items-center pt-0" : "items-start pt-10"
+          mode === "phone" ? "items-center pt-0" : "items-start pt-4"
         )}>
           {mode === "phone" ? (
             <QrPairingPanel />
           ) : (
-            <form id="login-form" onSubmit={handleSubmit} noValidate className="w-full max-w-[480px] mx-auto flex flex-col items-center gap-6">
+            <form id="login-form" onSubmit={handleSubmit} noValidate className="w-full max-w-[500px] mx-auto flex flex-col items-center gap-4">
               <div className="w-full flex flex-col items-center">
                 <div
                   ref={inputRef as any}
@@ -602,9 +673,23 @@ function LoginPageContent() {
                   </div>
                 )}
 
-                <p className="text-sm font-normal text-white/40 text-left leading-relaxed max-w-[440px] mt-4 mb-2 self-start">
+                <p className="text-xs font-normal text-white/40 text-left leading-relaxed max-w-[460px] mt-2 mb-0 self-start">
                   {t("disclaimer") || "By proceeding with the login process, we might send a one-time verification code to the phone number linked to your account."}
                 </p>
+              </div>
+
+              {/* On-screen TV Keyboard for remote & simulator input */}
+              <div className="w-full">
+                <TvKeyboard
+                  keyPrefix="login-tv-key"
+                  rows={LOGIN_KEYBOARD_ROWS}
+                  onKeyPress={handleTvKeyPress}
+                  onBackspace={handleTvBackspace}
+                  onClear={handleTvClear}
+                  onTopEdge={() => setFocus('login-input')}
+                  onBottomEdge={() => setFocus('login-submit')}
+                  className="bg-black/50 border-white/10 backdrop-blur-md scale-95 origin-top"
+                />
               </div>
 
               <div
@@ -621,7 +706,7 @@ function LoginPageContent() {
                   type="submit"
                   disabled={!canSubmit || initiateOtp.isPending || checkUserExists.isPending}
                   className={cn(
-                    "w-full h-14 rounded-full font-bold text-lg transition-all duration-200 flex items-center justify-center shadow-xl cursor-pointer outline-none",
+                    "w-full h-12 rounded-full font-bold text-base transition-all duration-200 flex items-center justify-center shadow-xl cursor-pointer outline-none",
                     canSubmit
                       ? "bg-[#ea580c] text-white hover:bg-[#f97316]"
                       : "bg-[#241e1a] text-white/30 cursor-not-allowed border border-white/5"

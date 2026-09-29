@@ -6,3 +6,4 @@
 export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "1.0.0";
 export const APP_BUILD_ID = "2026.09.25";
 export const LG_APP_ID = "in.jojoapp.jojo";
+export const SAMSUNG_APP_ID = process.env.NEXT_PUBLIC_SAMSUNG_APP_ID || "JOJO";

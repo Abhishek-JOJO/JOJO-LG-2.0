@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { init, FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useRemoteManager } from './RemoteManager';
 import { useRemotePointer } from './PointerManager';
@@ -26,7 +26,7 @@ if (typeof window !== 'undefined') {
 }
 
 export const SpatialNavigationProvider = ({ children }: { children: React.ReactNode }) => {
-  // Initialize remote key listeners (including webOS keys)
+  // Initialize the platform adapter and normalized TV remote listener.
   useRemoteManager();
   // Bridge the Magic Remote pointer/cursor into spatial navigation focus
   useRemotePointer();

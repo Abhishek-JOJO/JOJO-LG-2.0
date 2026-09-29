@@ -422,8 +422,8 @@ export const EpisodesPanel = memo(function EpisodesPanel({
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         {/* No on-screen close (X) button — this is a TV remote-first app, and
-            the panel already closes on the remote's Back key (webOS keyCode
-            461, handled in OTTPlayer's global key listener) or a click
+            the panel already closes on the normalized remote Back action
+            (handled in OTTPlayer's global key listener) or a click
             outside on mouse/pointer input. A focusable X here would just be
             a redundant extra D-pad stop for something Back already does
             instantly — real OTT apps (Netflix, Hotstar, Disney+) don't show

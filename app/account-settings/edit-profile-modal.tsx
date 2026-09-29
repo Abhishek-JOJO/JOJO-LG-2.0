@@ -36,9 +36,8 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
-
-const WEBOS_BACK_KEYCODE = 461;
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
+import { isBackEvent } from "@/src/platform";
 
 interface EditProfileModalProps {
     profile: Profile;
@@ -88,10 +87,10 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
 
     // This modal is an in-place overlay (no route/history entry behind it), so the
     // global RemoteManager back-key handler would call history.back() and navigate
-    // away instead of closing it. Intercept the webOS back key here directly.
+    // away instead of closing it. Intercept the platform Back action here.
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.keyCode === WEBOS_BACK_KEYCODE || e.key === "Escape") && !isSubmitting) {
+            if (isBackEvent(e) && !isSubmitting) {
                 e.preventDefault();
                 onClose();
             }

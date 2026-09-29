@@ -18,7 +18,7 @@ import { logger } from "@/lib/logger/logger";
 import { useTranslations } from "next-intl";
 import { useBrowseHiddenStore } from "@/store/useBrowseHiddenStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
 
 interface ContentRailSectionProps {
   cr_title: string;

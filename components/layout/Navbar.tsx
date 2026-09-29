@@ -5,7 +5,7 @@ import { LogoutButton } from "@/features/auth/ui/LogoutButton";
 import { appConfig } from "@/lib/config/app.config";
 import { LOGOS } from "@/lib/constants/assets";
 import { ROUTES } from "@/lib/constants/routes";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
 import { themeColors } from "@/tailwind.config";
 import { Search } from "lucide-react";
 import { useTranslations } from "next-intl";

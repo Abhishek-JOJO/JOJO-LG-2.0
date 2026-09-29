@@ -102,4 +102,27 @@ export function updatePackageVersion(version: string): void {
       console.log(`[INFO] Updated public/appinfo.json version to ${cleanVersion}`);
     }
   }
+
+  const sourceAppInfoPath = path.resolve('platforms/webos/appinfo.json');
+  if (fs.existsSync(sourceAppInfoPath)) {
+    const appInfo = JSON.parse(fs.readFileSync(sourceAppInfoPath, 'utf-8'));
+    if (appInfo.version !== cleanVersion) {
+      appInfo.version = cleanVersion;
+      fs.writeFileSync(sourceAppInfoPath, JSON.stringify(appInfo, null, 2) + '\n', 'utf-8');
+      console.log(`[INFO] Updated platforms/webos/appinfo.json version to ${cleanVersion}`);
+    }
+  }
+
+  const tizenConfigPath = path.resolve('platforms/tizen/config.xml');
+  if (fs.existsSync(tizenConfigPath)) {
+    const config = fs.readFileSync(tizenConfigPath, 'utf-8');
+    const updated = config.replace(
+      /(<widget[\s\S]*?\bversion=")[^"]+("[\s\S]*?>)/,
+      `$1${cleanVersion}$2`,
+    );
+    if (updated !== config) {
+      fs.writeFileSync(tizenConfigPath, updated, 'utf-8');
+      console.log(`[INFO] Updated platforms/tizen/config.xml version to ${cleanVersion}`);
+    }
+  }
 }

@@ -9,8 +9,8 @@ import { RailCardDesignConfig } from "../config/contentRail.config";
 import { getGenreBackground } from "@/lib/utils";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { ROUTES } from "@/lib/constants/routes";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
-import { tvSoundManager } from "@/lib/webos/tvSoundManager";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
+import { tvSoundManager } from "@/src/platform/audio/tvSoundManager";
 
 interface GenreCardProps {
   item: ContentRailItem;

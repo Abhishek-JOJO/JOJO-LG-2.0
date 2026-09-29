@@ -6,39 +6,25 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { useAssetDetailStore } from '@/features/asset/store/useAssetDetailStore';
 import { useExitConfirmStore } from '@/store/useExitConfirmStore';
 import { useNavStore } from '@/store/useNavStore';
-import { tvSoundManager } from '@/lib/webos/tvSoundManager';
+import { tvSoundManager } from '@/src/platform/audio/tvSoundManager';
+import { getRemoteAction, getTVPlatformAdapter, shouldHandleRemoteEvent } from '@/src/platform';
 import { doesFocusableExist, getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { tvNavigate } from './tvNavigate';
 import { ROUTES } from '@/lib/constants/routes';
 import { useTvOverlayStore } from '@/store/useTvOverlayStore';
-import { syncFocusToViewport, stepTVVerticalNavigation } from './focusUtils';
-
-// LG webOS Remote Key Codes
-export const WEBOS_KEYS = {
-  BACK: 461,
-  PLAY: 415,
-  PAUSE: 19,
-  STOP: 413,
-  FF: 417,
-  RW: 412,
-  INFO: 457,
-  BLUE: 406,
-  GREEN: 404,
-  PAGE_UP: 33,
-  PAGE_DOWN: 34,
-  CHANNEL_UP: 427,
-  CHANNEL_DOWN: 428,
-};
+import { stepTVVerticalNavigation } from './focusUtils';
 
 /**
- * Initializes global remote listeners and maps webOS keys.
+ * Initializes the single app-level remote listener. Native LG/Samsung key
+ * values are normalized before the existing navigation policy runs.
  * Used at the root level of the app (e.g., in a Provider).
  *
- * Unlike Tizen, webOS does not require explicit key registration —
- * back/media keys fire as normal keydown events by default.
  */
 export const useRemoteManager = () => {
   useEffect(() => {
+    const platform = getTVPlatformAdapter();
+    platform.initialize();
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Primes the shared TV UI sound AudioContext on the very first remote
       // keypress of the session — the earliest reliable user gesture app-wide,
@@ -47,17 +33,18 @@ export const useRemoteManager = () => {
       tvSoundManager.init();
 
       // If a component (e.g. modal or video player) already handled & prevented the key, do not override
-      if (e.defaultPrevented) return;
+      if (!shouldHandleRemoteEvent(e)) return;
 
-      if ((e.keyCode === WEBOS_KEYS.BACK || e.key === "Escape") && useTvOverlayStore.getState().screen) {
+      const action = getRemoteAction(e);
+
+      if (action === 'BACK' && useTvOverlayStore.getState().screen) {
         e.preventDefault();
         useTvOverlayStore.getState().close();
         return;
       }
 
-      // Map webOS specific keys to actions
-      switch (e.keyCode) {
-        case WEBOS_KEYS.BACK:
+      switch (action) {
+        case 'BACK':
           const currentPathForBack = typeof window !== 'undefined' ? normalizePathname(window.location.pathname) : '';
           // A full-screen overlay (search, asset detail, the exit-confirm popup
           // itself) owns the Back key while it's open — its own listener closes
@@ -127,28 +114,37 @@ export const useRemoteManager = () => {
             window.history.back();
           }
           break;
-        case WEBOS_KEYS.PLAY:
+        case 'PLAY':
+          e.preventDefault();
           document.dispatchEvent(new CustomEvent('tv-media-play'));
           break;
-        case WEBOS_KEYS.PAUSE:
+        case 'PAUSE':
+          e.preventDefault();
           document.dispatchEvent(new CustomEvent('tv-media-pause'));
           break;
-        case WEBOS_KEYS.STOP:
+        case 'PLAY_PAUSE':
+          e.preventDefault();
+          document.dispatchEvent(new CustomEvent('tv-media-play-pause'));
+          break;
+        case 'STOP':
+          e.preventDefault();
           document.dispatchEvent(new CustomEvent('tv-media-stop'));
           break;
-        case WEBOS_KEYS.FF:
+        case 'FAST_FORWARD':
+          e.preventDefault();
           document.dispatchEvent(new CustomEvent('tv-media-ff'));
           break;
-        case WEBOS_KEYS.RW:
+        case 'REWIND':
+          e.preventDefault();
           document.dispatchEvent(new CustomEvent('tv-media-rw'));
           break;
-        case WEBOS_KEYS.INFO:
-        case WEBOS_KEYS.BLUE:
+        case 'INFO':
+        case 'BLUE':
           // Toggles the on-screen debug overlay (components/debug/DebugOverlay.tsx)
           document.dispatchEvent(new CustomEvent('tv-debug-toggle'));
           break;
-        case WEBOS_KEYS.CHANNEL_UP:
-        case WEBOS_KEYS.PAGE_UP: {
+        case 'CHANNEL_UP':
+        case 'PAGE_UP': {
           const currentPath = typeof window !== 'undefined' ? normalizePathname(window.location.pathname) : '';
           const isWatch = currentPath === '/watch' || currentPath.startsWith('/watch/');
           if (isWatch) return;
@@ -157,8 +153,8 @@ export const useRemoteManager = () => {
           stepTVVerticalNavigation('up');
           break;
         }
-        case WEBOS_KEYS.CHANNEL_DOWN:
-        case WEBOS_KEYS.PAGE_DOWN: {
+        case 'CHANNEL_DOWN':
+        case 'PAGE_DOWN': {
           const currentPath = typeof window !== 'undefined' ? normalizePathname(window.location.pathname) : '';
           const isWatch = currentPath === '/watch' || currentPath.startsWith('/watch/');
           if (isWatch) return;
@@ -174,8 +170,20 @@ export const useRemoteManager = () => {
 
     window.addEventListener('keydown', handleKeyDown);
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        document.dispatchEvent(new CustomEvent('tv-app-background'));
+        document.dispatchEvent(new CustomEvent('tv-media-pause'));
+      } else {
+        document.dispatchEvent(new CustomEvent('tv-app-foreground'));
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      platform.destroy();
     };
   }, []);
 };

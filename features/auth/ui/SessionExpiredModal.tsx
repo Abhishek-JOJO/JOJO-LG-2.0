@@ -9,6 +9,7 @@ import { useSessionExpiredStore } from "@/store/useSessionExpiredStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ROUTES } from "@/lib/constants/routes";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
+import { isBackEvent } from "@/src/platform";
 
 /**
  * SessionExpiredModal
@@ -37,7 +38,7 @@ export function SessionExpiredModal() {
     if (!isVisible) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (isBackEvent(e)) {
         e.preventDefault();
         e.stopPropagation();
       }

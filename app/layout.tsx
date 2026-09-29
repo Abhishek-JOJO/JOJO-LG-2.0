@@ -16,7 +16,7 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: "JOJO App",
-  description: "JOJO App for LG webOS TV",
+  description: "JOJO App for Smart TV",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -44,6 +44,7 @@ export default function RootLayout({
   // Static export requires static defaults since there is no server runtime
   const defaultLocale = appConfig.ENGLISH_LANGUAGE_CODE as Locale;
   const isMobileServer = false; // We can't detect user-agent at build time, assume false for TV/Desktop
+  const includeWebOSSDK = process.env.NEXT_PUBLIC_TV_PLATFORM === "webos";
 
   return (
     <html lang={defaultLocale} suppressHydrationWarning data-scroll-behavior="smooth">
@@ -51,11 +52,10 @@ export default function RootLayout({
         <script
           id="early-locale-boot"
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var splashPlayed=sessionStorage.getItem("jojo_splash_video_played");if(splashPlayed!=="1"){window.__SPLASH_VIDEO_ACTIVE__=true;var s=document.createElement("style");s.id="early-splash-curtain-style";s.textContent="html,body{background:#000000!important;overflow:hidden!important;}body:before{content:'';position:fixed;inset:0;z-index:2147483646;background:#000000;}";document.head.appendChild(s);return;}window.__SPLASH_VIDEO_ACTIVE__=false;function readLocale(){var keys=["ott_locale","jojo_locale"];for(var i=0;i<keys.length;i++){var raw=localStorage.getItem(keys[i]);if(!raw)continue;if(raw==="gu"||raw==='"gu"')return "gu";try{var parsed=JSON.parse(raw);if(parsed==="gu")return "gu";}catch(e){}}return "";}var locale=readLocale();if(locale==="gu"){document.documentElement.lang="gu";document.documentElement.classList.add("jojo-locale-booting");var style=document.createElement("style");style.id="early-locale-boot-style";style.textContent="html.jojo-locale-booting body:before{content:'';position:fixed;inset:0;z-index:2147483646;background:radial-gradient(circle at 24% 24%,#3d1a08 0%,#140a04 48%,#050201 100%);}html.jojo-locale-booting body:after{content:'';position:fixed;left:50%;top:50%;width:520px;height:260px;transform:translate(-50%,-50%);z-index:2147483647;border-radius:32px;background:linear-gradient(90deg,rgba(255,255,255,.06) 25%,rgba(255,255,255,.14) 38%,rgba(255,255,255,.06) 63%);background-size:400% 100%;animation:jojoLocaleShimmer 1.2s ease-in-out infinite;box-shadow:0 24px 90px rgba(0,0,0,.45);}@keyframes jojoLocaleShimmer{0%{background-position:100% 0}100%{background-position:0 0}}";document.head.appendChild(style);}}catch(e){}})();`,
+            __html: `(function(){try{var splashPlayed=sessionStorage.getItem("jojo_splash_video_played");var isEntry=location.pathname==="/";if(location.protocol==="file:"&&window.__WEBOS_APP_BASE__){var current=location.href.split(/[?#]/)[0];var entry=new URL("index.html",window.__WEBOS_APP_BASE__).href;isEntry=current===entry;}if(splashPlayed!=="1"&&isEntry){window.__SPLASH_VIDEO_ACTIVE__=true;var s=document.createElement("style");s.id="early-splash-curtain-style";s.textContent="html,body{background:#000000!important;overflow:hidden!important;}body:before{content:'';position:fixed;inset:0;z-index:2147483646;background:#000000;}";document.head.appendChild(s);return;}window.__SPLASH_VIDEO_ACTIVE__=false;function readLocale(){var keys=["ott_locale","jojo_locale"];for(var i=0;i<keys.length;i++){var raw=localStorage.getItem(keys[i]);if(!raw)continue;if(raw==="gu"||raw==='"gu"')return "gu";try{var parsed=JSON.parse(raw);if(parsed==="gu")return "gu";}catch(e){}}return "";}var locale=readLocale();if(locale==="gu"){document.documentElement.lang="gu";document.documentElement.classList.add("jojo-locale-booting");var style=document.createElement("style");style.id="early-locale-boot-style";style.textContent="html.jojo-locale-booting body:before{content:'';position:fixed;inset:0;z-index:2147483646;background:radial-gradient(circle at 24% 24%,#3d1a08 0%,#140a04 48%,#050201 100%);}html.jojo-locale-booting body:after{content:'';position:fixed;left:50%;top:50%;width:520px;height:260px;transform:translate(-50%,-50%);z-index:2147483647;border-radius:32px;background:linear-gradient(90deg,rgba(255,255,255,.06) 25%,rgba(255,255,255,.14) 38%,rgba(255,255,255,.06) 63%);background-size:400% 100%;animation:jojoLocaleShimmer 1.2s ease-in-out infinite;box-shadow:0 24px 90px rgba(0,0,0,.45);}@keyframes jojoLocaleShimmer{0%{background-position:100% 0}100%{background-position:0 0}}";document.head.appendChild(style);}}catch(e){}})();`,
           }}
         />
-        {/* LG webOS TV Web APIs script — self-hosted webOSTV.js from the webOS TV SDK */}
-        <script src="/webOSTV.js" />
+        {includeWebOSSDK && <script src="/webOSTV.js" />}
         {/* Preload critical authentication page background assets */}
         <link rel="preload" href="/images/AUTH_BACKGROUND_IMG.webp" as="image" />
         <link rel="preload" href="/lottie/auth_background_data.json" as="fetch" crossOrigin="anonymous" />

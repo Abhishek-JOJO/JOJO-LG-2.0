@@ -24,6 +24,7 @@ import { ChangeEvent, CSSProperties, KeyboardEvent, Suspense, useCallback, useEf
 import { useOtpStore } from "./store";
 import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
+import { isBackEvent } from "@/src/platform";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useVerifySubscription } from "@/hooks/useVerifySubscription";
 import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
@@ -86,10 +87,10 @@ function OtpPageContent() {
   const isVerifiedRef = useRef(false);
   const lastAttemptedOtpRef = useRef<string | null>(null);
 
-  // Intercept LG remote Back key (keyCode 461 / "GoBack" / "Escape") and navigate back to login
+  // Intercept the browser/LG/Tizen Back action and navigate back to login.
   useEffect(() => {
     const handleBackKey = (e: globalThis.KeyboardEvent) => {
-      const isBack = (e as any).keyCode === 461 || e.key === "GoBack" || e.key === "Escape";
+      const isBack = isBackEvent(e);
       if (isBack) {
         e.preventDefault();
         e.stopPropagation();
@@ -756,7 +757,7 @@ function FocusableOtpInput({ index, digit, activeIndex, hasError, handleChange, 
           }
         }}
         onKeyDown={(e) => {
-          const isBack = (e as any).keyCode === 461 || e.key === "GoBack" || e.key === "Escape";
+          const isBack = isBackEvent(e.nativeEvent);
           if (isBack) {
             e.preventDefault();
             e.stopPropagation();

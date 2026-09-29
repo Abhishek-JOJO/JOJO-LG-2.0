@@ -10,7 +10,7 @@ import { LOGOS } from "@/lib/constants/assets";
 import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
-import { tvSoundManager } from "@/lib/webos/tvSoundManager";
+import { tvSoundManager } from "@/src/platform/audio/tvSoundManager";
 
 interface BaseContentCardProps {
   item: ContentRailItem;

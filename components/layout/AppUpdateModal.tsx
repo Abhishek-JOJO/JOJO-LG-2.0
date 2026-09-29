@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { JOJOModal } from "@/components/ui/JOJOModal";
 import { useAppUpdateStore } from "@/store/useAppUpdateStore";
-import { APP_VERSION, LG_APP_ID } from "@/lib/constants/version";
-import { exitWebOSApp } from "@/lib/webos";
+import { APP_VERSION, LG_APP_ID, SAMSUNG_APP_ID } from "@/lib/constants/version";
+import { exitTVApp, getTVPlatform, isBackEvent, openTVAppStore } from "@/src/platform";
 
 function retrySetFocus(focusKey: string, attempts = 8, intervalMs = 80) {
   let tries = 0;
@@ -22,47 +22,9 @@ function retrySetFocus(focusKey: string, attempts = 8, intervalMs = 80) {
   setTimeout(attempt, intervalMs);
 }
 
-/**
- * Launches the native LG Content Store on webOS TV directly to the JOJO application page
- */
-export function launchLGContentStore(customUrl?: string, appId = LG_APP_ID) {
-  if (customUrl && typeof window !== "undefined") {
-    // If backend provided a custom web link or direct URL
-    if (customUrl.startsWith("http://") || customUrl.startsWith("https://")) {
-      window.open(customUrl, "_blank");
-      return;
-    }
-  }
-
-  if (typeof window !== "undefined" && (window as any).webOS?.service) {
-    try {
-      (window as any).webOS.service.request("luna://com.webos.applicationManager", {
-        method: "launch",
-        parameters: {
-          id: "com.webos.app.discovery",
-          params: {
-            category: "APPSPODS",
-            id: appId,
-          },
-        },
-        onSuccess: () => {
-          console.log("[webOS] Launched LG Content Store for", appId);
-        },
-        onFailure: (err: any) => {
-          console.warn("[webOS] Luna launch failed, opening fallback link", err);
-          window.location.href = customUrl || `https://in.lgappstv.com/main/tvapp/detail?appId=${appId}`;
-        },
-      });
-      return;
-    } catch (e) {
-      console.error("[webOS] Exception calling applicationManager", e);
-    }
-  }
-
-  // Browser/local fallback
-  if (typeof window !== "undefined") {
-    window.open(customUrl || `https://in.lgappstv.com/main/tvapp/detail?appId=${appId}`, "_blank");
-  }
+export function launchTVAppStore(customUrl?: string) {
+  const appId = getTVPlatform() === "tizen" ? SAMSUNG_APP_ID : LG_APP_ID;
+  openTVAppStore(appId, customUrl);
 }
 
 /**
@@ -98,14 +60,14 @@ export function AppUpdateModal() {
   };
 
   const handleUpdate = () => {
-    launchLGContentStore(updateInfo?.updateUrl);
+    launchTVAppStore(updateInfo?.updateUrl);
     if (!isForceUpdate) {
       handleClose();
     }
   };
 
   const handleExit = () => {
-    exitWebOSApp();
+    exitTVApp();
   };
 
   if (!isOpen) return null;
@@ -140,7 +102,7 @@ export function AppUpdateModal() {
         </h3>
 
         <p className="mt-3 text-[15px] text-white/70 font-normal leading-relaxed max-w-[360px]">
-          {updateInfo?.message || "A new version of JOJO is available on the LG Content Store. Update now for better performance, faster loading, and new features."}
+          {updateInfo?.message || "A new version of JOJO is available in your TV app store. Update now for better performance, faster loading, and new features."}
         </p>
 
         <SoftUpdateButtons
@@ -170,10 +132,10 @@ function FullScreenForceUpdateView({
   onUpdate: () => void;
   onExit: () => void;
 }) {
-  // Trap remote Back button on webOS: cleanly exit app rather than bypassing force update
+  // Trap Back on every TV platform so a forced update cannot be bypassed.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.keyCode === 461 || e.key === "Escape" || e.keyCode === 27) {
+      if (isBackEvent(e)) {
         e.preventDefault();
         e.stopPropagation();
         onExit();
@@ -235,7 +197,7 @@ function FullScreenForceUpdateView({
               {updateInfo?.title || "A new version is ready"}
             </h1>
             <p className="mt-5 max-w-[510px] text-[18px] leading-8 text-white/65">
-              {updateInfo?.message || "Update JOJO from the LG Content Store to keep watching your favourite entertainment."}
+              {updateInfo?.message || "Update JOJO from your TV app store to keep watching your favourite entertainment."}
             </p>
           </div>
 
@@ -292,7 +254,7 @@ function ForceUpdateButtons({
             : "bg-theme_13_samecolour text-white hover:brightness-110"
         }`}
       >
-        Update in LG Content Store
+        Update in TV App Store
       </button>
 
       <button

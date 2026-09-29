@@ -7,7 +7,8 @@ import { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
 import { useLocaleStore } from "@/store/useLocaleStore";
 import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { restorePageFocus } from "@/src/navigation/focusUtils";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
+import { isBackEvent } from "@/src/platform";
 
 import { ContentRailSection } from "@/components/content-rail/ContentRailSection";
 import { RailCardVariant } from "@/components/content-rail/config/contentRail.types";
@@ -295,7 +296,7 @@ function SearchClearButton({ onClear, label }: { onClear: () => void; label: str
   );
 }
 
-import { tvSoundManager } from "@/lib/webos/tvSoundManager";
+import { tvSoundManager } from "@/src/platform/audio/tvSoundManager";
 
 // ─── PosterCard ───────────────────────────────────────────────────────────────
 
@@ -893,8 +894,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
-      // e.keyCode 461 is the LG webOS remote's physical Back key.
-      if (e.key === "Escape" || e.keyCode === 461) {
+      if (isBackEvent(e)) {
         e.preventDefault();
         onClose();
         return;

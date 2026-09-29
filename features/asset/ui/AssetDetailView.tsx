@@ -25,7 +25,7 @@ import { decryptSocketData } from "@/lib/socket/decryptResponse";
 import { logger } from "@/lib/logger/logger";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const stripHtml = (html: string) => {
@@ -54,7 +54,7 @@ import { buildPlanDetailAnalytics } from "@/features/asset/utils/buildPlanDetail
 import { useFocusable, setFocus, doesFocusableExist, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
 import { mapApiRailItem, getPortraitFallbackImages } from "@/components/content-rail/utils/contentRail.mapper";
-import { WEBOS_KEYS } from "@/src/navigation/RemoteManager";
+import { isBackEvent } from "@/src/platform";
 
 // This page's hero preview video fires onTimeUpdate ~4x/sec, which re-renders
 // the whole AssetDetailView tree (and every Focusable* child) on the same
@@ -1264,7 +1264,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [assetId, contentOverlayRef]);
 
-  // Escape (browser testing) & webOS Remote Back button (keyCode 461) handling.
+  // Browser, LG and Samsung Back handling.
   // Registered in the CAPTURE phase so it runs before any bubble-phase listeners
   // (e.g. AssetDetailModal, RemoteManager).
   // If the overlay sheet is open, Back closes the overlay sheet first and
@@ -1272,10 +1272,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // is already closed does Back proceed to close the modal or navigate back.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isBackKey =
-        e.keyCode === WEBOS_KEYS.BACK ||
-        e.key === "Escape" ||
-        (e.key === "Backspace" && !(e.target instanceof HTMLElement && ["INPUT", "TEXTAREA"].includes(e.target.tagName)));
+      const isBackKey = isBackEvent(e, { includeBackspace: true });
 
       if (!isBackKey) return;
 
@@ -1327,7 +1324,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
       // 5. If the Content Overlay is already closed and user is in standalone mode without an onClose handler,
       // allow desktop Escape to navigate back in history:
-      if (isStandalone && !onClose && e.key === "Escape") {
+      if (isStandalone && !onClose) {
         e.preventDefault();
         e.stopPropagation();
         window.history.back();

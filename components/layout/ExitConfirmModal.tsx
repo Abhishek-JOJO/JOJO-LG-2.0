@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { JOJOModal } from "@/components/ui/JOJOModal";
 import { useExitConfirmStore } from "@/store/useExitConfirmStore";
-import { exitWebOSApp } from "@/lib/webos";
+import { exitTVApp } from "@/src/platform";
 
 // JOJOModalContent (the shared modal chrome) sets focus to its own container
 // boundary on open, not to any button inside it — on TV hardware that leaves
@@ -35,7 +35,7 @@ function retrySetFocus(focusKey: string, attempts = 8, intervalMs = 80) {
 
 /**
  * "Exit JOJO?" confirmation shown on Back at the home root — see RemoteManager.ts,
- * which opens this instead of calling exitWebOSApp() directly.
+ * which opens this instead of exiting/deactivating the platform directly.
  */
 export function ExitConfirmModal() {
   const isOpen = useExitConfirmStore((s) => s.isOpen);
@@ -69,7 +69,7 @@ export function ExitConfirmModal() {
     });
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        exitWebOSApp();
+        exitTVApp();
       });
     });
   };

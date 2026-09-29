@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { isWebOS } from "@/lib/webos";
+import { isWebOS } from "@/src/platform";
 
 export interface ProductionSecurityOptions {
   /**

@@ -1,0 +1,16 @@
+export const WEBOS_KEYS = {
+  BACK: 461,
+  PLAY: 415,
+  PAUSE: 19,
+  STOP: 413,
+  FAST_FORWARD: 417,
+  REWIND: 412,
+  INFO: 457,
+  RED: 403,
+  GREEN: 404,
+  YELLOW: 405,
+  BLUE: 406,
+  CHANNEL_UP: 427,
+  CHANNEL_DOWN: 428,
+} as const;
+

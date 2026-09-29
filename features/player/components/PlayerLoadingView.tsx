@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { isBackEvent } from "@/src/platform";
 
 /** Player presentation while authorization and the signed stream URL load. */
 export function PlayerLoadingView({ title, onBack }: { title?: string; onBack?: () => void }) {
@@ -8,7 +9,7 @@ export function PlayerLoadingView({ title, onBack }: { title?: string; onBack?: 
     if (!onBack) return;
 
     const handleBack = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" && event.keyCode !== 461) return;
+      if (!isBackEvent(event)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       onBack();

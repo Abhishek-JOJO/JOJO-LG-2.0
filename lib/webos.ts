@@ -6,21 +6,7 @@
  * keydown events out of the box.
  */
 
-declare global {
-  interface Window {
-    webOS?: {
-      platformBack?: () => void;
-      deviceInfo?: (callback: (info: Record<string, unknown>) => void) => void;
-      fetchAppId?: () => string;
-    };
-    PalmSystem?: {
-      deviceInfo?: string;
-      platformBack?: () => void;
-      close?: () => void;
-      deactivate?: () => void;
-    };
-  }
-}
+import { exitTVApp, isWebOS as detectWebOS } from "@/src/platform";
 
 export const isWebOS = (): boolean => {
   // PalmSystem is injected natively by webOS's Web App Manager for every packaged
@@ -29,7 +15,7 @@ export const isWebOS = (): boolean => {
   // real hardware. Checking PalmSystem is the reliable "are we actually on webOS"
   // signal; window.webOS is kept in the check too since some code paths only need
   // its own methods and shouldn't regress if it's ever genuinely absent.
-  return typeof window !== 'undefined' && (window.PalmSystem !== undefined || window.webOS !== undefined);
+  return detectWebOS();
 };
 
 export const getWebOSDeviceID = (): string | null => {
@@ -68,21 +54,5 @@ export const getWebOSDeviceID = (): string | null => {
  * fallbacks for devices/firmware where deactivate itself isn't present.
  */
 export const exitWebOSApp = (): void => {
-  if (isWebOS()) {
-    try {
-      if (window.PalmSystem?.deactivate) {
-        window.PalmSystem.deactivate();
-      } else if (window.PalmSystem?.platformBack) {
-        window.PalmSystem.platformBack();
-      } else if (window.PalmSystem?.close) {
-        window.PalmSystem.close();
-      } else {
-        window.webOS?.platformBack?.();
-      }
-    } catch (e) {
-      console.warn('Failed to minimize webOS app', e);
-    }
-  } else {
-    console.log('[Dev] Simulated webOS deactivate');
-  }
+  exitTVApp();
 };

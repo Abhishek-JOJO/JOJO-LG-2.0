@@ -19,7 +19,7 @@ import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDet
 import { useContentRails } from "@/features/content-rail/hooks/useContentRails";
 import { useAppNavigation } from "@/features/navigation/hooks/useAppNavigation";
 import { ROUTES } from "@/lib/constants/routes";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
 import { restorePageFocus } from "@/src/navigation/focusUtils";
 
 export function GenreListingSkeleton() {

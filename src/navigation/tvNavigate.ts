@@ -1,5 +1,7 @@
+import { getAppRootHref } from "@/src/platform/navigation/safeNavigate";
+
 /**
- * tvNavigate — Clean navigation utility for WebOS TV static export (file://) and browser (http/https).
+ * tvNavigate — Clean navigation utility for WebOS TV, Samsung Tizen static export (file://) and browser (http/https).
  * On TV running via file:// protocol, Next.js client-side router (router.push) fails because RSC flight
  * fetches fail under file:// scheme. This function routes directly to the correct relative/absolute HTML file.
  */
@@ -9,22 +11,16 @@ export function tvNavigate(
   options?: { replace?: boolean }
 ) {
   if (typeof window !== "undefined" && window.location.protocol === "file:") {
-    const appBase = (window as any).__WEBOS_APP_BASE__ || "";
-    let clean = route;
-    if (clean.startsWith("/")) clean = clean.slice(1);
-    const qIdx = clean.search(/[?#]/);
-    let qh = "";
-    if (qIdx !== -1) {
-      qh = clean.slice(qIdx);
-      clean = clean.slice(0, qIdx);
-    }
+    const [routePart, queryPart] = route.split("?");
+    let clean = routePart.startsWith("/") ? routePart.slice(1) : routePart;
     if (clean.endsWith("/")) clean = clean.slice(0, -1);
-    const target = (!clean || clean === "")
+    const relativeFile = (!clean || clean === "")
       ? "index.html"
       : clean.endsWith(".html")
         ? clean
         : `${clean}/index.html`;
-    const finalUrl = appBase ? (appBase + target + qh) : (target + qh);
+    const relative = queryPart ? `${relativeFile}?${queryPart}` : relativeFile;
+    const finalUrl = new URL(relative, getAppRootHref()).href;
     if (options?.replace) {
       window.location.replace(finalUrl);
     } else {

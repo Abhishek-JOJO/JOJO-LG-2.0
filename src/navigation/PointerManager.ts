@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { setFocus, doesFocusableExist } from '@noriginmedia/norigin-spatial-navigation';
 import { syncFocusToViewport, stepTVVerticalNavigation } from './focusUtils';
+import { getTVPlatformAdapter } from '@/src/platform';
 
 /**
  * Bridges the LG Magic Remote's pointer (air-mouse) mode and wheel/touchpad
@@ -21,9 +22,8 @@ import { syncFocusToViewport, stepTVVerticalNavigation } from './focusUtils';
  */
 export const useRemotePointer = () => {
   useEffect(() => {
-    let lastFocusKey: string | null = null;
-    let pointerVisible = true;
-    let hasCursorStateSupport = false;
+    if (!getTVPlatformAdapter().supportsPointer()) return;
+
     let wheelScrollTimer: ReturnType<typeof setTimeout> | null = null;
     let wheelAccumulator = 0;
     let wheelCooldown = false;

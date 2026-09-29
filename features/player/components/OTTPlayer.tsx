@@ -15,7 +15,8 @@ import React, {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { safeNavigate } from '@/lib/webos/safeNavigate';
+import { safeNavigate } from '@/src/platform/navigation/safeNavigate';
+import { isBackEvent } from '@/src/platform';
 import { VideoElement } from './VideoElement';
 import { PlayerControls } from './PlayerControls';
 import { LoadingScreen } from './LoadingScreen';
@@ -163,6 +164,15 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   const pipManagerRef = useRef<PipManager | null>(null);
   const adEngineRef = useRef<ImaAdsEngine | null>(null);
 
+  useEffect(() => {
+    const pauseForBackground = () => {
+      adEngineRef.current?.pause();
+      videoRef.current?.pause();
+    };
+    document.addEventListener('tv-app-background', pauseForBackground);
+    return () => document.removeEventListener('tv-app-background', pauseForBackground);
+  }, []);
+
   // ── Mid-roll ad tracking refs ──────────────────────────────────────────────
   // Tracks which cue points have already triggered an ad (prevents replaying)
   const playedAdCuesRef = useRef<Set<number>>(new Set());
@@ -277,7 +287,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   // second Back press kept re-hiding controls instead of ever navigating.
   useEffect(() => {
     const handleAnyKey = (e: KeyboardEvent) => {
-      if (e.keyCode === 461 || e.key === 'Escape') return;
+      if (isBackEvent(e)) return;
 
       // When controls are hidden, handle directional TV remote navigation:
       if (!controlsVisibleRef.current) {
@@ -1360,10 +1370,10 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     handleBackRef.current = handleBack;
   }, [handleBack]);
 
-  // Handle webOS Back key (461) and Escape key for player overlay dismissal / exit
+  // Handle browser, LG and Samsung Back for player overlay dismissal / exit.
   useEffect(() => {
     const handlePlayerBackKey = (e: KeyboardEvent) => {
-      if (e.keyCode === 461 || e.key === "Escape") {
+      if (isBackEvent(e)) {
         e.preventDefault();
         e.stopPropagation();
 

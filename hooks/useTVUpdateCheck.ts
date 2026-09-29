@@ -139,8 +139,8 @@ export function useTVUpdateCheck() {
       message:
         result.message ||
         (result.isForceUpdate
-          ? "A mandatory update is required to continue enjoying JOJO. Please update the app from the LG Content Store."
-          : "A new version of JOJO is available on the LG Content Store. Update now for better performance, faster loading, and new features."),
+          ? "A mandatory update is required to continue enjoying JOJO. Please update the app from your TV app store."
+          : "A new version of JOJO is available in your TV app store. Update now for better performance, faster loading, and new features."),
       releaseNotes: [
         "Smoother video playback & audio enhancement",
         "Improved TV remote navigation speed",
@@ -190,8 +190,8 @@ export function useTVUpdateCheck() {
           forceUpdate: force,
           title: force ? "Update Required" : "Update Available",
           message: force
-            ? "A mandatory update is required to continue enjoying JOJO. Please update the app from the LG Content Store."
-            : "A new version of JOJO is available on the LG Content Store. Update now for better performance, faster loading, and new features.",
+            ? "A mandatory update is required to continue enjoying JOJO. Please update the app from your TV app store."
+            : "A new version of JOJO is available in your TV app store. Update now for better performance, faster loading, and new features.",
           releaseNotes: [
             "Smoother video playback & audio enhancement",
             "Improved TV remote navigation speed",

@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { isBackEvent } from "@/src/platform";
 
 interface SearchInputProps {
   value: string;
@@ -21,7 +22,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
     }, [isFocused, ref]);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Escape") {
+      if (isBackEvent(e.nativeEvent)) {
         if (value) onClear();
         else onClose();
       }

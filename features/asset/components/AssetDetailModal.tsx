@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 
 import { restorePageFocus } from "@/src/navigation/focusUtils";
+import { isBackEvent } from "@/src/platform";
 
 export function AssetDetailModal() {
   const { activeAssetId, isOpen, closeAssetDetail, resetAssetDetailModal, activePreviewItem } = useAssetDetailStore();
@@ -38,10 +39,10 @@ export function AssetDetailModal() {
   // 1. Lock Body Scroll when modal is open
   useBodyScrollLock(isOpen);
 
-  // 2. Escape / webOS Back Key Listener
+  // 2. Browser/LG/Tizen Back listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.key === "Escape" || e.keyCode === 461) && isOpen) {
+      if (isBackEvent(e) && isOpen) {
         const contentSheet = typeof document !== 'undefined' ? document.getElementById("asset-detail-content-sheet") : null;
         if (contentSheet && contentSheet.getAttribute("data-overlay-open") === "true") {
           // Handled by AssetDetailView's own overlay sheet close logic

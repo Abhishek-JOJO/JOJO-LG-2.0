@@ -15,6 +15,7 @@ import * as readline from 'readline';
 import { loadEnvForBuild, getPackageVersion, updatePackageVersion } from './env';
 import { printBanner } from './utils';
 import { runBuild } from './builder';
+import type { BuildPlatform } from './stage-platform';
 
 // ─── Get version from package.json ───────────────────────────────────────────
 const PKG_VERSION = getPackageVersion();
@@ -23,6 +24,12 @@ const PKG_VERSION = getPackageVersion();
 
 const args = process.argv.slice(2);
 const directEnv = args.find((a) => a === '--prod' || a === '--stage' || a === '--dev');
+const platformArg = args.find((a) => a.startsWith('--platform='))?.split('=')[1];
+const platform = (platformArg || process.env.TV_PLATFORM || process.env.NEXT_PUBLIC_TV_PLATFORM || 'webos') as BuildPlatform;
+
+if (platform !== 'webos' && platform !== 'tizen') {
+  throw new Error(`Unsupported TV platform: ${platform}. Use webos or tizen.`);
+}
 
 function ask(rl: readline.Interface, question: string): Promise<string> {
   return new Promise((resolve) => rl.question(question, resolve));
@@ -62,7 +69,7 @@ async function main() {
 
     if (!versionArg) {
       const otherArg = args.find((a) => {
-        if (a === '--prod' || a === '--stage' || a === '--dev') return false;
+        if (a === '--prod' || a === '--stage' || a === '--dev' || a.startsWith('--platform=')) return false;
         return /[0-9]/.test(a);
       });
       if (otherArg) {
@@ -117,7 +124,7 @@ async function main() {
   printBanner(env, `v${version}`, loggerAllowed, consoleAllowed);
 
   // ── Run Build ──────────────────────────────────────────────────────────────
-  runBuild(env, version, loggerAllowed, consoleAllowed);
+  runBuild(env, version, loggerAllowed, consoleAllowed, platform);
 }
 
 main();

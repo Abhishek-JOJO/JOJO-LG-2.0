@@ -1,0 +1,40 @@
+export const TIZEN_KEYS = {
+  BACK: 10009,
+  PLAY: 415,
+  PAUSE: 19,
+  PLAY_PAUSE: 10252,
+  STOP: 413,
+  FAST_FORWARD: 417,
+  REWIND: 412,
+  TRACK_PREV: 10232,
+  TRACK_NEXT: 10233,
+  INFO: 457,
+  RED: 403,
+  GREEN: 404,
+  YELLOW: 405,
+  BLUE: 406,
+  CHANNEL_UP: 427,
+  CHANNEL_DOWN: 428,
+  SEARCH: 10225,
+} as const;
+
+// Arrow, Enter and Back are mandatory Tizen TV keys and must not be registered.
+export const TIZEN_OPTIONAL_KEY_NAMES = [
+  "MediaPlay",
+  "MediaPause",
+  "MediaPlayPause",
+  "MediaStop",
+  "MediaFastForward",
+  "MediaRewind",
+  "MediaTrackPrevious",
+  "MediaTrackNext",
+  "Info",
+  "ColorF0Red",
+  "ColorF1Green",
+  "ColorF2Yellow",
+  "ColorF3Blue",
+  "ChannelUp",
+  "ChannelDown",
+  "Search",
+] as const;
+

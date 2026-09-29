@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ReactNode } from "react";
 import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
 
 interface ProfileMenuLinkProps {
     href: string;

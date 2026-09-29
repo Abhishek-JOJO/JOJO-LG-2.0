@@ -3,7 +3,7 @@
 import React, { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useFocusable, setFocus, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
-import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
 import { useNavStore } from "@/store/useNavStore";
 import { normalizePathname } from "@/lib/utils/pathname";
 import { BROWSE_ROUTES } from "@/hooks/useActivePathname";

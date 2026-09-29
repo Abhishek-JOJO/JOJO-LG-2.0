@@ -30,7 +30,7 @@ import { appConfig } from "@/lib/config/app.config";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 import { useGuestPopupStore } from "@/store/useGuestPopupStore";
 import { transformTVODToPaymentPlan } from "@/lib/utils/tvodPaymentTransformer";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
 import { fetchVideoDetails } from "@/features/player/services/player.service";
 import { savePreparedPlayback } from "@/features/player/utils/preparedPlayback";
 import { StorageKey } from "@/enums/storage.enum";

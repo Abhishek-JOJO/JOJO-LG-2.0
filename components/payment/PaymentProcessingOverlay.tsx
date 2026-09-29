@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { isBackEvent } from "@/src/platform";
 
 interface PaymentProcessingOverlayProps {
   visible: boolean;
@@ -18,7 +19,7 @@ export default function PaymentProcessingOverlay({
     if (!visible) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (isBackEvent(e)) {
         e.preventDefault();
         e.stopPropagation();
       }

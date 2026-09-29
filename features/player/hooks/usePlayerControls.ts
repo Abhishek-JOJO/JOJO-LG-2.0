@@ -24,6 +24,7 @@ import {
   PLAYBACK_SPEEDS,
 } from '../constants/player.constants';
 import type { SubtitleTrack, PlaybackSpeed } from '../model/types';
+import { getRemoteAction, isBackEvent } from '@/src/platform';
 
 interface UsePlayerControlsOptions {
   engine: PlayerEngine | null;
@@ -310,7 +311,7 @@ export function usePlayerControls({
       // racing that check on every single Back press, so the second press
       // always found controls "still visible" and just re-hid them instead
       // of ever reaching the actual navigation.
-      const isBackOrEscape = e.keyCode === 461 || e.key === 'Escape';
+      const isBackOrEscape = isBackEvent(e);
 
       // Always register activity to keep controls visible while navigating
       if (!isBackOrEscape) onActivityRef.current();
@@ -327,41 +328,10 @@ export function usePlayerControls({
         target.closest('[role="tab"]')
       ) return;
 
-      // Handle webOS specific numeric keyCodes first
-      if (e.keyCode === 415) { // PLAY
-        e.preventDefault();
-        togglePlay();
-        onActivityRef.current();
-        return;
-      }
-      if (e.keyCode === 19) { // PAUSE
-        e.preventDefault();
-        togglePlay();
-        onActivityRef.current();
-        return;
-      }
-      if (e.keyCode === 413) { // STOP
-        e.preventDefault();
-        engine?.pause();
-        onActivityRef.current();
-        return;
-      }
-      if (e.keyCode === 417) { // FF
-        e.preventDefault();
-        if (!isAdPlayingRef.current) {
-          seekForward();
-          onActionFeedbackRef.current?.('seek_forward');
-        }
-        onActivityRef.current();
-        return;
-      }
-      if (e.keyCode === 412) { // RW
-        e.preventDefault();
-        if (!isAdPlayingRef.current) {
-          seekBackward();
-          onActionFeedbackRef.current?.('seek_backward');
-        }
-        onActivityRef.current();
+      // Hardware media keys are normalized and dispatched by RemoteManager.
+      // Do not execute them here as well or one keypress would run twice.
+      const remoteAction = getRemoteAction(e);
+      if (["PLAY", "PAUSE", "PLAY_PAUSE", "STOP", "FAST_FORWARD", "REWIND"].includes(remoteAction)) {
         return;
       }
 
@@ -432,10 +402,15 @@ export function usePlayerControls({
 
     // Global custom media event handlers dispatched by RemoteManager
     const handleTvPlay = () => {
-      togglePlay();
+      if (!isPlaying) togglePlay();
       onActivityRef.current();
     };
     const handleTvPause = () => {
+      if (isAdPlayingRef.current) onAdPlayPauseRef.current?.();
+      else engine?.pause();
+      onActivityRef.current();
+    };
+    const handleTvPlayPause = () => {
       togglePlay();
       onActivityRef.current();
     };
@@ -461,6 +436,7 @@ export function usePlayerControls({
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('tv-media-play', handleTvPlay);
     document.addEventListener('tv-media-pause', handleTvPause);
+    document.addEventListener('tv-media-play-pause', handleTvPlayPause);
     document.addEventListener('tv-media-stop', handleTvStop);
     document.addEventListener('tv-media-ff', handleTvFf);
     document.addEventListener('tv-media-rw', handleTvRw);
@@ -469,11 +445,12 @@ export function usePlayerControls({
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('tv-media-play', handleTvPlay);
       document.removeEventListener('tv-media-pause', handleTvPause);
+      document.removeEventListener('tv-media-play-pause', handleTvPlayPause);
       document.removeEventListener('tv-media-stop', handleTvStop);
       document.removeEventListener('tv-media-ff', handleTvFf);
       document.removeEventListener('tv-media-rw', handleTvRw);
     };
-  }, [isEnabled, togglePlay, seekForward, seekBackward, toggleFullscreen, toggleMute, togglePip, setVolume, engine, volume]);
+  }, [isEnabled, isPlaying, togglePlay, seekForward, seekBackward, toggleFullscreen, toggleMute, togglePip, setVolume, engine, volume]);
 
   // ── Mobile double-tap seek ────────────────────────────────────────────────────
 

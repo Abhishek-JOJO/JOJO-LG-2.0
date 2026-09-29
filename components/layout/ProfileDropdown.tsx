@@ -17,7 +17,8 @@ import { useExitConfirmStore } from "@/store/useExitConfirmStore";
 import { useFocusable, FocusContext, setFocus, doesFocusableExist, getCurrentFocusKey } from "@noriginmedia/norigin-spatial-navigation";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
+import { isBackEvent } from "@/src/platform";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 import { usePlayerStore } from "@/store/usePlayerStore";
 
@@ -196,7 +197,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
       }
     };
     const handleBackKey = (e: KeyboardEvent) => {
-      if (e.keyCode === 461 || e.key === "Back" || e.key === "Escape") {
+      if (isBackEvent(e)) {
         e.preventDefault();
         e.stopPropagation();
         isNavigatingUpFromMenuRef.current = true;

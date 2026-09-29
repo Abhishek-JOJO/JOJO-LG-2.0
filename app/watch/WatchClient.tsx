@@ -20,7 +20,7 @@ import { useBootstrap } from "@lib/bootstrap/BootstrapContext";
 import { useAssetDetailStore, getAssetTypeSlug, slugify, schedulePendingAssetDetailOpen } from "@/features/asset/store/useAssetDetailStore";
 import { logger } from "@/lib/logger/logger";
 import { useWatchPageGating } from "@/features/asset/hooks/useWatchPageGating";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
 import { mapContentAsset } from "@/features/content/model/mapper";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 

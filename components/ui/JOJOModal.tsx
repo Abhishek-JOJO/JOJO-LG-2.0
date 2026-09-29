@@ -51,6 +51,7 @@ interface JOJOModalProps {
 }
 
 import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { isBackEvent } from "@/src/platform";
 
 function FocusableCloseButton({ onClick }: { onClick: () => void }) {
   const { ref, focused } = useFocusable({
@@ -117,7 +118,7 @@ function JOJOModalContent({
     }, 50);
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.keyCode === 461) {
+      if (isBackEvent(e)) {
         e.preventDefault();
         e.stopPropagation();
         onClose();

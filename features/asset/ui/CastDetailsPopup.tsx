@@ -13,8 +13,8 @@ import { useRef, useEffect } from "react";
 import { useFocusable, setFocus, doesFocusableExist, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useTranslations } from "next-intl";
-import { safeNavigate } from "@/lib/webos/safeNavigate";
-import { WEBOS_KEYS } from "@/src/navigation/RemoteManager";
+import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
+import { isBackEvent } from "@/src/platform";
 
 function retrySetFocus(focusKey: string, attempts = 5, intervalMs = 60) {
   if (doesFocusableExist(focusKey)) {
@@ -92,10 +92,10 @@ export function CastDetailsPopup({
   // Lock body scroll when popup is open
   useBodyScrollLock(true);
 
-  // Escape (browser testing) / webOS remote Back button support.
+  // Browser/LG/Tizen remote Back support.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.keyCode === WEBOS_KEYS.BACK) {
+      if (isBackEvent(e)) {
         e.preventDefault();
         e.stopPropagation();
         onClose();
