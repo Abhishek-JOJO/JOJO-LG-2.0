@@ -90,6 +90,19 @@ function resolveTitle(item: any): string {
   return a?.asset_title || a?.name_analytics || a?.title || a?.name || "";
 }
 
+function resolveTitleImage(item: any): string {
+  if (!item || item?.genre) return "";
+
+  const asset = item?.asset || item;
+  const raw =
+    asset?.title_image ||
+    asset?.titleImage ||
+    item?.title_image ||
+    item?.titleImage;
+
+  return typeof raw === "string" ? raw : raw?.url || "";
+}
+
 function resolveId(item: any): string {
   const asset = item?.asset || item;
   return String(asset?.id || asset?.asset_id || item?.item_id || item?.id || "");
@@ -300,6 +313,7 @@ const PosterCard = memo(function PosterCard({
   onClick: () => void;
 }) {
   const title = resolveTitle(item);
+  const titleImage = resolveTitleImage(item);
   const candidates = useMemo(() => resolveSearchPosterCandidates(item), [item]);
   const candidatesKey = candidates.join("\u0000");
   const [fallbackState, setFallbackState] = useState({ candidatesKey, index: 0 });
@@ -374,6 +388,22 @@ const PosterCard = memo(function PosterCard({
       ) : (
         <div className="w-full h-full bg-theme_1/8 flex items-center justify-center p-2 text-center caption-xs-regular text-theme_5">
           {title}
+        </div>
+      )}
+      {titleImage && (
+        <div className="absolute bottom-0 left-0 right-0 z-20 p-3 pb-3.5 sm:p-4 sm:pb-4.5 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center justify-end text-center pointer-events-none">
+          <div className="relative w-[200px] sm:w-[250px] max-w-[90%] h-[56px] sm:h-[70px] flex justify-center items-end mx-auto">
+            <JOJOCommonImage
+              src={titleImage}
+              alt={title}
+              fill
+              contentMode={JOJOImageContentMode.Contain}
+              position="center"
+              style={{ objectPosition: "center bottom" }}
+              optimizeRequestURL={false}
+              wrapperClassName="w-full h-full drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
+            />
+          </div>
         </div>
       )}
       {focused && (
