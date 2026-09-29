@@ -402,7 +402,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         </div>
       )}
 
-      {config?.showBadge && item?.asset_tags_badgeText && (
+      {config?.showBadge && item?.asset_tags_badgeText && !(isLandscapeCard && item.asset_tags_badgeText.toLowerCase().includes("new")) && (
         <div
           className={`absolute bottom-0 left-1/2 -translate-x-1/2 text-center uppercase z-30 font-bold transition-all duration-300 ${isLandscapeCard
             ? "w-[170px] sm:w-[210px] text-xs sm:text-sm tracking-wider py-1 sm:py-1.5 rounded-t-lg shadow-lg"
