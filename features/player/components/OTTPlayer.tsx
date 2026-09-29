@@ -1912,7 +1912,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   }, []);
 
   const captionStyles = {
-    '--caption-font-size': `${captionFontSize}px`,
+    '--caption-font-size': `${captionFontSize + 4}px`,
     '--caption-text-color': captionTextColor,
     '--caption-bg-color': getRgbaColor(captionBgColor, captionBgOpacity),
   } as React.CSSProperties;
