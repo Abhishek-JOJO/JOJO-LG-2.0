@@ -11,8 +11,6 @@ import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.con
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { tvSoundManager } from "@/lib/webos/tvSoundManager";
-import { useActivePathname } from "@/hooks/useActivePathname";
-import { ROUTES } from "@/lib/constants/routes";
 
 interface BaseContentCardProps {
   item: ContentRailItem;
@@ -84,8 +82,6 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   const [isFocusExpanded, setIsFocusExpanded] = useState(false);
   const cardRef = useRef<HTMLAnchorElement>(null);
   const t = useTranslations("contentRails");
-  const pathname = useActivePathname();
-  const isHomePage = !pathname || pathname === "/" || pathname === "/home" || pathname === ROUTES.HOME || pathname === ROUTES.HOMEPAGE;
   const { ref: focusRef, focused, focusKey } = useFocusable({
     focusKey: focusKeyProp,
     focusable,
@@ -370,36 +366,6 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       {/* Dark overlay — only for non-simple types that explicitly enable it */}
       {config.hover.showOverlay && !isSimple && (
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-      )}
-
-      {/* Top 10 rank badge — shows the item's actual rank (1, 2, 3…), only on the home page */}
-      {isHomePage && config?.variant !== RailCardVariant?.TOP_TEN && item?.isTop10 && (
-        <div
-          className={`absolute top-0 left-0 z-30 flex font-bold flex-col items-center leading-none text-theme_1 ${isLandscapeCard
-            ? "px-4 pt-3 pb-2.5 rounded-br-2xl shadow-xl"
-            : "px-3.5 pt-2.5 pb-2 rounded-br-xl shadow-lg"
-            }`}
-          style={{ background: "var(--theme_13_samecolour)" }}
-        >
-          <span
-            className={
-              isLandscapeCard
-                ? "text-sm sm:text-base font-bold tracking-wider"
-                : "text-sm sm:text-base font-bold tracking-wider"
-            }
-          >
-            {t("top")}
-          </span>
-          <span
-            className={
-              isLandscapeCard
-                ? "text-4xl sm:text-5xl font-black -mt-1"
-                : "text-5xl sm:text-6xl font-black -mt-2"
-            }
-          >
-            {item?.rank ?? item?.numberintop10 ?? 10}
-          </span>
-        </div>
       )}
 
       {config?.showBadge && item?.asset_tags_badgeText && !(isLandscapeCard && item.asset_tags_badgeText.toLowerCase().includes("new")) && (
