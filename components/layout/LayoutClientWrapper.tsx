@@ -141,9 +141,18 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
 
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
   const isTvWatchingOverlay = isTvOverlayOpen && tvOverlayScreen === "watching";
+  const isTvSubscriptionOverlay = isTvOverlayOpen && tvOverlayScreen === "subscription";
   const hideBrowseChrome = isStandalonePage || isAssetDetailOpen || isTvWatchingOverlay;
   const hideHeaderFooter = hideBrowseChrome || isMobileLegalPage;
   const hideAmbientGlow = hideBrowseChrome || isAccountSettingsPage || isTvOverlayOpen;
+  const showHeader =
+    showNavbar &&
+    (isTvSubscriptionOverlay || (!hideHeaderFooter && !isTvOverlayOpen));
+
+  // Subscription deliberately keeps the browse navbar for D-pad navigation.
+  // Keep its overlay immediately below the navbar (z-999); the other TV
+  // overlays remain above browse chrome and do not render the navbar at all.
+  const tvOverlayZIndex = isTvSubscriptionOverlay ? "z-[998]" : "z-[1000]";
 
   let mainClassName = "min-h-screen flex flex-col max-lg:pb-20";
   if (isMobileLegalPage) {
@@ -160,9 +169,9 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
           content — on standalone pages, account settings, and full-screen modal overlays,
           hide it completely to prevent gradient bleed-through. */}
       {!hideAmbientGlow && <AmbientBackground />}
-      {showNavbar && !hideHeaderFooter && !hideBrowseChrome && <Navbar />}
+      {showHeader && <Navbar />}
       {isTvOverlayOpen && (
-        <main className={`${mainClassName} bg-transparent relative z-[1000]`}>
+        <main className={`${mainClassName} bg-transparent relative ${tvOverlayZIndex}`}>
           {tvOverlayScreen === "account-settings" ? (
             <AccountSettingsPage />
           ) : tvOverlayScreen === "subscription" ? (

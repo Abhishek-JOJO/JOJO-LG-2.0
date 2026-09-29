@@ -11,7 +11,7 @@ import { safeNavigate } from "@/lib/webos/safeNavigate";
 
 import { ContentRailSection } from "@/components/content-rail/ContentRailSection";
 import { RailCardVariant } from "@/components/content-rail/config/contentRail.types";
-import { getPortraitImage, getPosterImage, getLandscapeImage, getPortraitFallbackImages, mapApiRail, mapApiRailItem } from "@/components/content-rail/utils/contentRail.mapper";
+import { mapApiRail, mapApiRailItem } from "@/components/content-rail/utils/contentRail.mapper";
 import { NoResults } from "@/components/search/NoResults";
 import { SearchPagination } from "@/components/search/SearchPagination";
 import JOJOCommonImage, { JOJOImageContentMode, JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
@@ -42,59 +42,46 @@ import { useBrowseHiddenStore } from "@/store/useBrowseHiddenStore";
 const POSTER_GRID =
   "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-5";
 
+// Keep Search poster requests identical to the standard Home portrait card.
+// JOJOCommonImage otherwise falls back to a 600x338 landscape CDN request,
+// which crops the source before it is rendered inside this 2:3 card.
+const SEARCH_POSTER_IMAGE_SIZE = { width: 326, height: 490 } as const;
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-// Prefers a genuinely portrait-ratio image (ratio_id aware, same helpers
-// mapApiRailItem uses for every other portrait card in the app) before ever
-// falling back to a landscape thumbnail — picking is_default/[0] without
+// Use the same mapped fallback order as Home's PortraitCard. Search results are
+// raw API items while Recently Added items are already mapped, so normalize only
+// when needed and keep one image-selection path for both states.
+function resolveSearchPosterCandidates(item: any): string[] {
+  if (!item) return [];
+  if (item?.genre?.image) return [item.genre.image];
+
+  const mappedItem = Array.isArray(item?.portraitFallbackImages)
+    ? item
+    : mapApiRailItem(item, 0);
+
+  const candidates = mappedItem.portraitFallbackImages?.length > 0
+    ? mappedItem.portraitFallbackImages
+    : [
+        mappedItem.posterImageRatio4,
+        mappedItem.portraitImage,
+        mappedItem.posterImage,
+        mappedItem.landscapeImage,
+        mappedItem.image,
+      ];
+
+  const seen = new Set<string>();
+  return candidates.filter((url: unknown): url is string => {
+    if (typeof url !== "string" || url.trim().length === 0 || seen.has(url)) {
+      return false;
+    }
+    seen.add(url);
+    return true;
+  });
+}
+
 function resolveSearchPosterUrl(item: any): string {
-  if (!item) return "";
-  if (item?.genre) return item.genre.image || "";
-
-  const asset = item?.details || item?.asset || item;
-
-  // Use the standard portrait fallback cascade
-  const fallbackImages = getPortraitFallbackImages(asset, item);
-  if (fallbackImages.length > 0) {
-    return fallbackImages[0];
-  }
-
-  const portraitArr = Array.isArray(asset?.portrait) ? asset.portrait : undefined;
-  const posterArr = Array.isArray(asset?.poster) ? asset.poster : undefined;
-  const landscapeArr = Array.isArray(asset?.landscape) ? asset.landscape : undefined;
-
-  // 1. Ratio-4 poster / portrait image (ideal 2:3 vertical poster)
-  const ratio4Poster = posterArr?.find((img: any) => Number(img?.ratio_id) === 4)?.url;
-  const portraitUrl = getPortraitImage(portraitArr) || ratio4Poster;
-  if (portraitUrl) return portraitUrl;
-
-  // 2. Any entry in portrait or poster array
-  const anyPortrait = portraitArr?.find((img: any) => img?.url)?.url;
-  if (anyPortrait) return anyPortrait;
-
-  const posterUrl = getPosterImage(posterArr) || posterArr?.find((img: any) => img?.url)?.url;
-  if (posterUrl) return posterUrl;
-
-  // 3. String fields on asset
-  if (typeof asset?.portrait === "string" && asset.portrait) return asset.portrait;
-  if (typeof asset?.portraitImage === "string" && asset.portraitImage) return asset.portraitImage;
-  if (typeof asset?.portrait_image === "string" && asset.portrait_image) return asset.portrait_image;
-  if (typeof asset?.poster === "string" && asset.poster) return asset.poster;
-  if (typeof asset?.posterImage === "string" && asset.posterImage) return asset.posterImage;
-  if (typeof asset?.poster_image === "string" && asset.poster_image) return asset.poster_image;
-  if (typeof asset?.image === "string" && asset.image) return asset.image;
-  if (typeof asset?.thumbnail === "string" && asset.thumbnail) return asset.thumbnail;
-
-  // 4. Landscape fallbacks if portrait is unavailable
-  const landscapeUrl = getLandscapeImage(landscapeArr) || landscapeArr?.find((img: any) => img?.url)?.url;
-  if (landscapeUrl) return landscapeUrl;
-  if (typeof asset?.landscape === "string" && asset.landscape) return asset.landscape;
-  if (typeof asset?.landscapeImage === "string" && asset.landscapeImage) return asset.landscapeImage;
-  if (typeof asset?.landscape_image === "string" && asset.landscape_image) return asset.landscape_image;
-
-  // 5. Fallback to mapApiRailItem
-  const mapped = mapApiRailItem(item, 0);
-  return mapped.posterImageRatio4 || mapped.portraitImage || mapped.posterImage || mapped.image || mapped.landscapeImage || "";
+  return resolveSearchPosterCandidates(item)[0] || "";
 }
 
 function resolveTitle(item: any): string {
@@ -313,7 +300,23 @@ const PosterCard = memo(function PosterCard({
   onClick: () => void;
 }) {
   const title = resolveTitle(item);
-  const img = resolveSearchPosterUrl(item);
+  const candidates = useMemo(() => resolveSearchPosterCandidates(item), [item]);
+  const candidatesKey = candidates.join("\u0000");
+  const [fallbackState, setFallbackState] = useState({ candidatesKey, index: 0 });
+  const fallbackIndex = fallbackState.candidatesKey === candidatesKey
+    ? fallbackState.index
+    : 0;
+  const activeUrl = candidates[fallbackIndex] || "";
+
+  const handleImageError = useCallback(() => {
+    setFallbackState((previous) => {
+      const currentIndex = previous.candidatesKey === candidatesKey
+        ? previous.index
+        : 0;
+      return { candidatesKey, index: currentIndex + 1 };
+    });
+  }, [candidatesKey]);
+
   const customFocusKey = typeof index === "number" ? `search-poster-${index}` : undefined;
 
   const handleClick = useCallback(() => {
@@ -354,15 +357,19 @@ const PosterCard = memo(function PosterCard({
         focused ? "z-30 shadow-2xl opacity-100" : "border border-white/5 opacity-90"
       }`}
     >
-      {img ? (
+      {activeUrl ? (
         <JOJOCommonImage
-          src={img}
+          key={activeUrl}
+          src={activeUrl}
           alt={title}
           fill
-          contentMode={JOJOImageContentMode.Fill}
-          className="object-fill pointer-events-none select-none"
+          width={SEARCH_POSTER_IMAGE_SIZE.width}
+          height={SEARCH_POSTER_IMAGE_SIZE.height}
+          contentMode={JOJOImageContentMode.Cover}
+          position="center"
+          className="pointer-events-none select-none"
           wrapperClassName="w-full h-full pointer-events-none select-none"
-          optimizeRequestURL={false}
+          onError={handleImageError}
         />
       ) : (
         <div className="w-full h-full bg-theme_1/8 flex items-center justify-center p-2 text-center caption-xs-regular text-theme_5">

@@ -287,16 +287,22 @@ export function Navbar() {
       window.location.href.includes("/watching")
     ));
 
-  if (isWatchPage || isWatchingPage) {
+  const tvOverlayScreen = useTvOverlayStore((s) => s.screen);
+  const isTvOverlayOpen = tvOverlayScreen !== null;
+  const isSubscriptionOverlay = tvOverlayScreen === "subscription";
+  const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
+
+  if ((isWatchPage || isWatchingPage) && !isSubscriptionOverlay) {
     return null;
   }
 
+  // Subscription is an app-level TV screen. Its header must not depend on the
+  // route hidden underneath the overlay (Home, Asset Detail, or Watch).
+  const showBrowseHeader = isBrowsingMode || isSubscriptionOverlay;
   const shouldDelayLogoUntilGoldStatus = isGoldStatusPending;
   const useGoldLogoSlot = isGold || shouldDelayLogoUntilGoldStatus;
 
-  const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
   const isSearchPage = normalizedPath === ROUTES.SEARCH || normalizedPath.startsWith(ROUTES.SEARCH);
-  const isTvOverlayOpen = useTvOverlayStore((s) => s.screen !== null);
   const isSearchActive = !isTvOverlayOpen && (isSearchOpen || isSearchPage);
 
   return (
@@ -312,7 +318,7 @@ export function Navbar() {
         borderBottom: "none",
       }}
     >
-      {isBrowsingMode ? (
+      {showBrowseHeader ? (
         <div className="relative py-4 sm:py-5 lg:py-6 px-6 sm:px-12 lg:px-16 w-full flex items-center justify-between z-50">
           {/* 1. Left JOJO Logo */}
           <div className="flex items-center shrink-0">
@@ -468,7 +474,7 @@ export function Navbar() {
         pathname={pathname}
       />
 
-      {isBrowsingMode && (
+      {isBrowsingMode && !isTvOverlayOpen && (
         <BottomNav
           navItems={navItems}
           onSearchClick={() => setSearchOpen(true)}

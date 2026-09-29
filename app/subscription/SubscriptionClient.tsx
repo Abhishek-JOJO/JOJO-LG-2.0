@@ -144,10 +144,8 @@ function PlanFeatureIcon({ src, alt }: { src?: string; alt?: string }) {
 
 function QrPlanCard({
     product,
-    isSelected,
 }: {
     product: any;
-    isSelected?: boolean;
 }) {
     const sku = product?.skus?.[0];
     if (!sku) return null;
@@ -156,11 +154,7 @@ function QrPlanCard({
 
     return (
         <div
-            className={`w-full rounded-2xl border px-7 py-6 text-left transition-all bg-black/28 text-white backdrop-blur-md ${
-                isSelected
-                    ? "border-white/70 bg-white/10"
-                    : "border-white/25"
-            }`}
+            className="w-full rounded-2xl bg-black/28 px-7 py-6 text-left text-white backdrop-blur-md"
         >
             <div className="mb-7 flex items-center justify-between gap-4">
                 <span className="text-2xl font-extrabold">{title}</span>
@@ -181,7 +175,7 @@ function QrPlanCard({
     );
 }
 
-function SubscriptionQrPage({ products, selectedProduct }: { products: any[]; selectedProduct: any; onSelectProduct?: (productId: string) => void }) {
+function SubscriptionQrPage({ products }: { products: any[] }) {
     const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
     useEffect(() => {
@@ -234,7 +228,6 @@ function SubscriptionQrPage({ products, selectedProduct }: { products: any[]; se
                             <QrPlanCard
                                 key={product.productId}
                                 product={product}
-                                isSelected={product.productId === selectedProduct?.productId}
                             />
                         ))}
                     </div>
@@ -404,8 +397,6 @@ export default function SubscriptionPage() {
         return (
             <SubscriptionQrPage
                 products={products}
-                selectedProduct={selectedProduct}
-                onSelectProduct={setSelectedProductId}
             />
         );
     }

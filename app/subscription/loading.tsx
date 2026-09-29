@@ -18,7 +18,7 @@ export default function Loading() {
 
           <div className="flex w-full max-w-[560px] flex-col gap-5">
             {/* Card Skeleton 1 */}
-            <div className="w-full rounded-2xl border border-white/20 bg-black/28 p-7 backdrop-blur-md flex flex-col gap-6">
+            <div className="w-full rounded-2xl bg-black/28 p-7 backdrop-blur-md flex flex-col gap-6">
               <div className="flex items-center justify-between">
                 <JOJOSkeleton className="h-7 w-36 rounded-md" />
                 <JOJOSkeleton className="h-7 w-32 rounded-md" />
@@ -34,7 +34,7 @@ export default function Loading() {
             </div>
 
             {/* Card Skeleton 2 */}
-            <div className="w-full rounded-2xl border border-white/20 bg-black/28 p-7 backdrop-blur-md flex flex-col gap-6">
+            <div className="w-full rounded-2xl bg-black/28 p-7 backdrop-blur-md flex flex-col gap-6">
               <div className="flex items-center justify-between">
                 <JOJOSkeleton className="h-7 w-36 rounded-md" />
                 <JOJOSkeleton className="h-7 w-32 rounded-md" />
