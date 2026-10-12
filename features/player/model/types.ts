@@ -9,7 +9,7 @@
 
 export type StreamFormat = 'hls' | 'dash' | 'mp4';
 
-export type AdapterName = 'shaka';
+export type AdapterName = 'shaka' | 'tizen-avplay';
 
 // ── Video Metadata ────────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ export interface VideoDetails {
   /** For resume watching */
   savedPosition: number | null;
   bypassResumePrompt?: boolean;
-  /** DRM config placeholder — not implemented yet */
+  /** Optional DRM configuration for the selected platform player. */
   drmConfig: DrmConfig | null;
   /** Live stream metadata — not implemented yet */
   liveConfig: LiveConfig | null;
@@ -106,6 +106,10 @@ export interface DrmConfig {
   type: 'widevine' | 'fairplay' | 'playready';
   licenseUrl: string;
   certificateUrl?: string;
+  /** Optional headers forwarded to the DRM licence request. */
+  headers?: Record<string, string>;
+  /** Provider-specific DRM custom data (for example PlayReady CustomData). */
+  customData?: string;
 }
 
 // ── Live Streaming (architecture placeholder) ────────────────────────────────
@@ -177,6 +181,17 @@ export interface PlayerError {
 
 // ── Adapter Interface ────────────────────────────────────────────────────────
 
+export interface PlayerAdapterEventHandlers {
+  onPlay(position: number): void;
+  onPause(position: number): void;
+  onBufferingStart(position: number): void;
+  onBufferingEnd(position: number): void;
+  onTimeUpdate(currentTime: number, duration: number, buffered: number): void;
+  onDurationChange(duration: number): void;
+  onEnded(duration: number): void;
+  onError(error: PlayerError): void;
+}
+
 export interface PlayerAdapter {
   readonly name: AdapterName;
   /** Attach adapter to video element and load the manifest */
@@ -199,6 +214,12 @@ export interface PlayerAdapter {
   getQualities(): QualityOption[];
   getAudioTracks(): AudioTrack[];
   getSubtitleTracks(): SubtitleTrack[];
+  getCurrentTime(): number;
+  getDuration(): number;
+  isPaused(): boolean;
+  isEnded(): boolean;
+  /** Native/non-HTML adapters use this to publish the normal player event contract. */
+  setEventHandlers?(handlers: PlayerAdapterEventHandlers | null): void;
   /** Whether this adapter can play the given manifest */
   canPlay(manifestUrl: string, streamFormat: StreamFormat): boolean;
 }

@@ -7,6 +7,8 @@
 
 import { logger } from '@lib/logger/logger';
 import { ShakaAdapter } from './ShakaAdapter';
+import { TizenAVPlayAdapter } from './TizenAVPlayAdapter';
+import { isTizen } from '@/src/platform/detectPlatform';
 import { PlaybackRecoveryManager } from './PlaybackRecoveryManager';
 import { SessionManager } from './SessionManager';
 import { PlayerEventBus } from './PlayerEventBus';
@@ -21,6 +23,7 @@ import type {
   PlaybackSpeed,
   PlayerLoadOptions,
   CaptionSize,
+  PlayerAdapterEventHandlers,
 } from '../model/types';
 
 export class PlayerEngine {
@@ -38,7 +41,7 @@ export class PlayerEngine {
   private destroyed = false;
   private hasFatalError = false;
 
-  // Single adapter — Shaka handles HLS, DASH, and DRM
+  // Shaka remains the default. AVPlay is selected only on a real Tizen runtime.
   private readonly shakaAdapter = new ShakaAdapter();
 
   constructor() {
@@ -55,12 +58,13 @@ export class PlayerEngine {
     video: VideoDetails,
     options?: PlayerLoadOptions
   ): Promise<void> {
+    this.destroyed = false;
     this.videoEl = videoEl;
     this.video = video;
     this.loadOptions = options ?? {};
     this.hasFatalError = false;
 
-    this.attachNativeListeners(videoEl);
+    this.clearNativeListeners();
     this.recoveryManager.reset();
     this.sessionManager.startSession(video.contentId);
 
@@ -80,7 +84,7 @@ export class PlayerEngine {
   }
 
   seek(seconds: number): void {
-    const from = this.videoEl?.currentTime ?? 0;
+    const from = this.getCurrentTime();
     this.adapter?.seek(seconds);
     this.eventBus.emit('SEEK', { from, to: seconds });
   }
@@ -102,7 +106,7 @@ export class PlayerEngine {
     const tracks = this.adapter.getAudioTracks();
     const oldTrack = tracks.find((t) => t.isActive)?.language ?? 'unknown';
     this.adapter.setAudioTrack(trackId);
-    const newTrack = tracks[trackId]?.language ?? 'unknown';
+    const newTrack = tracks.find((track) => track.id === trackId)?.language ?? 'unknown';
     this.eventBus.emit('AUDIO_CHANGED', {
       oldLanguage: oldTrack,
       newLanguage: newTrack,
@@ -114,7 +118,9 @@ export class PlayerEngine {
     const tracks = this.adapter.getSubtitleTracks();
     const oldTrack = tracks.find((t) => t.isActive)?.language ?? 'off';
     this.adapter.setSubtitleTrack(trackId);
-    const newTrack = trackId === -1 ? 'off' : (tracks[trackId]?.language ?? 'off');
+    const newTrack = trackId === -1
+      ? 'off'
+      : (tracks.find((track) => track.id === trackId)?.language ?? 'off');
     this.eventBus.emit('SUBTITLE_CHANGED', {
       oldSubtitle: oldTrack,
       newSubtitle: newTrack,
@@ -147,11 +153,19 @@ export class PlayerEngine {
   }
 
   getCurrentTime(): number {
-    return this.videoEl?.currentTime ?? 0;
+    return this.adapter?.getCurrentTime() ?? this.videoEl?.currentTime ?? 0;
   }
 
   getDuration(): number {
-    return this.videoEl?.duration ?? 0;
+    return this.adapter?.getDuration() ?? this.videoEl?.duration ?? 0;
+  }
+
+  isPaused(): boolean {
+    return this.adapter?.isPaused() ?? this.videoEl?.paused ?? true;
+  }
+
+  isEnded(): boolean {
+    return this.adapter?.isEnded() ?? this.videoEl?.ended ?? false;
   }
 
   getSessionManager(): SessionManager {
@@ -177,8 +191,7 @@ export class PlayerEngine {
       this.videoEl.load();
     }
 
-    for (const cleanup of this.nativeListeners) cleanup();
-    this.nativeListeners.length = 0;
+    this.clearNativeListeners();
 
     if (this.adapter) {
       const a = this.adapter;
@@ -205,12 +218,35 @@ export class PlayerEngine {
     videoEl: HTMLVideoElement,
     video: VideoDetails
   ): Promise<void> {
-    const adapter = this.shakaAdapter;
-
     logger.info('[PlayerEngine] loadAdapter called', {
       manifestUrl: video.manifestUrl,
       streamFormat: video.streamFormat,
     });
+
+    if (isTizen() && TizenAVPlayAdapter.isAvailable()) {
+      const avplayAdapter = new TizenAVPlayAdapter();
+      if (avplayAdapter.canPlay(video.manifestUrl, video.streamFormat)) {
+        logger.info('[PlayerEngine] Loading Samsung AVPlay adapter');
+        try {
+          await avplayAdapter.load(
+            videoEl,
+            video.manifestUrl,
+            video.drmConfig,
+            this.loadOptions,
+          );
+          avplayAdapter.setEventHandlers(this.createAdapterEventHandlers());
+          this.adapter = avplayAdapter;
+          this.eventBus.emit('DURATION_CHANGE', { duration: avplayAdapter.getDuration() });
+          logger.info('[PlayerEngine] Samsung AVPlay adapter loaded');
+          return;
+        } catch (error) {
+          await avplayAdapter.destroy();
+          logger.warn('[PlayerEngine] AVPlay load failed; falling back to Shaka', { error });
+        }
+      }
+    }
+
+    const adapter = this.shakaAdapter;
 
     if (!adapter.canPlay(video.manifestUrl, video.streamFormat)) {
       throw new Error(
@@ -219,6 +255,7 @@ export class PlayerEngine {
     }
 
     logger.info('[PlayerEngine] Loading Shaka adapter');
+    this.attachNativeListeners(videoEl);
 
     // Wrap adapter load in a timeout to prevent infinite hangs if manifest or
     // segment requests get stalled by CORS or SSL protocol errors.
@@ -242,6 +279,54 @@ export class PlayerEngine {
 
     this.adapter = adapter;
     logger.info('[PlayerEngine] Shaka adapter loaded');
+  }
+
+  private clearNativeListeners(): void {
+    for (const cleanup of this.nativeListeners) cleanup();
+    this.nativeListeners.length = 0;
+  }
+
+  private createAdapterEventHandlers(): PlayerAdapterEventHandlers {
+    return {
+      onPlay: (position) => {
+        if (this.destroyed) return;
+        this.sessionManager.onPlay();
+        this.eventBus.emit('PLAY', { position });
+      },
+      onPause: (position) => {
+        if (this.destroyed) return;
+        this.sessionManager.onPause();
+        this.eventBus.emit('PAUSE', { position });
+      },
+      onBufferingStart: (position) => {
+        if (this.destroyed) return;
+        this.bufferStartTime = Date.now();
+        this.eventBus.emit('BUFFER_START', { position });
+      },
+      onBufferingEnd: (position) => {
+        if (this.destroyed) return;
+        const bufferingDurationMs = this.bufferStartTime === null
+          ? 0
+          : Date.now() - this.bufferStartTime;
+        this.bufferStartTime = null;
+        this.eventBus.emit('BUFFER_END', { position, bufferingDurationMs });
+      },
+      onTimeUpdate: (currentTime, duration, buffered) => {
+        if (this.destroyed) return;
+        this.eventBus.emit('TIME_UPDATE', { currentTime, duration, buffered });
+        if (duration > 0) this.sessionManager.updateProgress((currentTime / duration) * 100);
+      },
+      onDurationChange: (duration) => {
+        if (!this.destroyed) this.eventBus.emit('DURATION_CHANGE', { duration });
+      },
+      onEnded: (durationSeconds) => {
+        if (this.destroyed) return;
+        const watchDurationSeconds = this.sessionManager.getWatchDurationSeconds();
+        this.sessionManager.markCompleted();
+        this.eventBus.emit('CONTENT_ENDED', { durationSeconds, watchDurationSeconds });
+      },
+      onError: (error) => { void this.handleError(error); },
+    };
   }
 
   private attachNativeListeners(videoEl: HTMLVideoElement): void {
@@ -352,7 +437,7 @@ export class PlayerEngine {
 
     this.isRecovering = true;
     try {
-      const currentPosition = this.videoEl.currentTime;
+      const currentPosition = this.getCurrentTime();
       const recoveryStartTime = Date.now();
       
       // Notify UI that we are buffering during recovery attempt
@@ -383,7 +468,7 @@ export class PlayerEngine {
       if (recovered) {
         logger.info('[PlayerEngine] Recovery successful');
         this.eventBus.emit('BUFFER_END', {
-          position: this.videoEl?.currentTime ?? currentPosition,
+          position: this.getCurrentTime() || currentPosition,
           bufferingDurationMs: Date.now() - recoveryStartTime,
         });
       } else {

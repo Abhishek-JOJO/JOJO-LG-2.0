@@ -431,6 +431,23 @@ export class ShakaAdapter implements PlayerAdapter {
     }));
   }
 
+  getCurrentTime(): number {
+    return this.videoEl?.currentTime ?? 0;
+  }
+
+  getDuration(): number {
+    const duration = this.videoEl?.duration ?? 0;
+    return Number.isFinite(duration) ? duration : 0;
+  }
+
+  isPaused(): boolean {
+    return this.videoEl?.paused ?? true;
+  }
+
+  isEnded(): boolean {
+    return this.videoEl?.ended ?? false;
+  }
+
   // ── Private ─────────────────────────────────────────────────────────────────
 
   private readonly onPlaying = (): void => {

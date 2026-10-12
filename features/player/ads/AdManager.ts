@@ -20,8 +20,14 @@ export interface AdManagerConfig {
   /** Dedicated ad <video> element — IMA renders creatives here.
    *  Must be separate from the content video element (Shaka owns that one). */
   videoElement: HTMLVideoElement;
-  /** Content <video> element managed by Shaka — paused/resumed around ad breaks. */
+  /** Content element used by IMA for playhead tracking and browser playback. */
   contentVideoElement: HTMLVideoElement;
+  /** Native players (for example Tizen AVPlay) provide playback through this bridge. */
+  contentPlaybackController?: {
+    play(): void | Promise<void>;
+    pause(): void;
+    setMuted?(muted: boolean): void;
+  };
   adContainer: HTMLDivElement;
   eventBus: PlayerEventBus;
   /** Mid-roll cue points in seconds */

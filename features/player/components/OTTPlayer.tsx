@@ -167,7 +167,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   useEffect(() => {
     const pauseForBackground = () => {
       adEngineRef.current?.pause();
-      videoRef.current?.pause();
+      engineRef.current?.pause();
     };
     document.addEventListener('tv-app-background', pauseForBackground);
     return () => document.removeEventListener('tv-app-background', pauseForBackground);
@@ -903,7 +903,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     unsubs.push(
       engine.eventBus.on('ALL_ADS_COMPLETED', () => {
         setAdState({ isPlaying: false, adId: null, adType: null, title: null, description: null, advertiserName: null, adPosition: 1, totalAds: 1, clickThroughUrl: null });
-        if (videoRef.current?.ended) {
+        if (engine.isEnded()) {
           const dur = engine.getDuration();
           const watchDur = engine.getSessionManager().getWatchDurationSeconds();
           engine.eventBus.emit('ENDED', {
@@ -921,7 +921,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
           errorMessage,
           isLoading: false,
         });
-        if (videoRef.current?.ended) {
+        if (engine.isEnded()) {
           const dur = engine.getDuration();
           const watchDur = engine.getSessionManager().getWatchDurationSeconds();
           engine.eventBus.emit('ENDED', {
@@ -999,7 +999,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
             if (pendingAdRequestRef.current && adEngineRef.current) {
               pendingAdRequestRef.current = false;
               try {
-                videoRef.current?.pause();
+                engine.pause();
                 setAdState({ isLoading: true });
                 adEngineRef.current.requestAds('pre_roll');
                 logger.info('[OTTPlayer] Ad request fired from autoplay (bypass resume)');
@@ -1035,7 +1035,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
             if (pendingAdRequestRef.current && adEngineRef.current) {
               pendingAdRequestRef.current = false;
               try {
-                videoRef.current?.pause();
+                engine.pause();
                 setAdState({ isLoading: true });
                 adEngineRef.current.requestAds('pre_roll');
                 logger.info('[OTTPlayer] Ad request fired from autoplay');
@@ -1063,6 +1063,14 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
               vmapXml: effectiveVmapXml ?? undefined,
               videoElement: adVideoRef.current,
               contentVideoElement: videoEl,
+              contentPlaybackController: {
+                play: () => engine.play(),
+                pause: () => engine.pause(),
+                setMuted: (muted) => {
+                  const volume = usePlayerStore.getState().volume;
+                  engine.setVolume(muted ? 0 : volume);
+                },
+              },
               adContainer: adContainerRef.current,
               eventBus: engine.eventBus,
               cuePoints: video.adCuePoints,
@@ -1282,7 +1290,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
 
       // Don't trigger while an ad is already playing or if content is paused
       if (adEngine.isAdPlaying()) return;
-      if (videoRef.current?.paused) return;
+      if (engineRef.current.isPaused()) return;
 
       const ct = engineRef.current.getCurrentTime();
       const delta = ct - lastTimeRef.current;
@@ -1558,14 +1566,14 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       // Pause content immediately — IMA will resume it via CONTENT_RESUME_REQUESTED
       // after the pre-roll completes. Without this, content plays for 1-2s while
       // IMA fetches and loads the ad creative.
-      videoRef.current?.pause();
+      engineRef.current?.pause();
       setAdState({ isLoading: true });
       adEngineRef.current.requestAds('pre_roll');
       logger.info('[OTTPlayer] Ad request fired from user gesture');
       return true;
     } catch (err) {
       logger.error('[OTTPlayer] Failed to request ads from user gesture — bypassing ads', { err });
-      videoRef.current?.play().catch(() => { });
+      engineRef.current?.play();
       return false;
     }
   }, []);

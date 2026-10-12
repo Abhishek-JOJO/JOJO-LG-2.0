@@ -196,15 +196,7 @@ export class ImaAdsEngine implements AdManager {
           errorCode: -999,
           errorMessage: 'Ad request timeout (failsafe)',
         });
-        this.config.contentVideoElement.play().catch((err) => {
-          logger.warn('[ImaAdsEngine] Failsafe content play blocked, trying muted play', { err });
-          if (this.config) {
-            this.config.contentVideoElement.muted = true;
-            this.config.contentVideoElement.play().catch((fallbackErr) => {
-              logger.error('[ImaAdsEngine] Failsafe content play failed even when muted', { fallbackErr });
-            });
-          }
-        });
+        this.playContent('failsafe');
       }
     }, 5000);
 
@@ -377,7 +369,7 @@ export class ImaAdsEngine implements AdManager {
 
     // IMA requires the content video to be paused before adsManager.start().
     // Pause the CONTENT video (Shaka's element) — not the ad video element.
-    this.config.contentVideoElement.pause();
+    this.pauseContent();
 
     try {
       // Prefer adContainer dimensions (always laid out).
@@ -409,7 +401,7 @@ export class ImaAdsEngine implements AdManager {
   private readonly onContentPauseRequested = (): void => {
     this.adPlaying = true;
     this.adBreakActive = true;
-    this.config?.contentVideoElement.pause();
+    this.pauseContent();
     logger.info('[ImaAdsEngine] Content pause requested');
   };
 
@@ -432,15 +424,7 @@ export class ImaAdsEngine implements AdManager {
       adType: 'pre_roll',
     });
 
-    this.config?.contentVideoElement.play().catch((err) => {
-      logger.warn('[ImaAdsEngine] Content resume play blocked, trying muted play', { err });
-      if (this.config) {
-        this.config.contentVideoElement.muted = true;
-        this.config.contentVideoElement.play().catch((fallbackErr) => {
-          logger.error('[ImaAdsEngine] Content resume play failed even when muted', { fallbackErr });
-        });
-      }
-    });
+    this.playContent('content resume');
     logger.info('[ImaAdsEngine] Content resume requested — content restarted');
   };
 
@@ -449,7 +433,7 @@ export class ImaAdsEngine implements AdManager {
     if (!ad) return;
     
     // Failsafe: Ensure content video is paused while ad plays
-    this.config?.contentVideoElement.pause();
+    this.pauseContent();
 
     // Ensure ad volume and mute state are synchronized with IMA adsManager
     try {
@@ -590,15 +574,7 @@ export class ImaAdsEngine implements AdManager {
     }
 
     this.clearFailsafeTimeout();
-    this.config?.contentVideoElement.play().catch((err) => {
-      logger.warn('[ImaAdsEngine] Ad error playback resume blocked, trying muted play', { err });
-      if (this.config) {
-        this.config.contentVideoElement.muted = true;
-        this.config.contentVideoElement.play().catch((fallbackErr) => {
-          logger.error('[ImaAdsEngine] Ad error playback resume failed even when muted', { fallbackErr });
-        });
-      }
-    });
+    this.playContent('ad error recovery');
 
     logger.error('[ImaAdsEngine] Ad error', {
       code,
@@ -632,15 +608,7 @@ export class ImaAdsEngine implements AdManager {
     }
 
     this.clearFailsafeTimeout();
-    this.config?.contentVideoElement.play().catch((err) => {
-      logger.warn('[ImaAdsEngine] Loader error playback resume blocked, trying muted play', { err });
-      if (this.config) {
-        this.config.contentVideoElement.muted = true;
-        this.config.contentVideoElement.play().catch((fallbackErr) => {
-          logger.error('[ImaAdsEngine] Loader error playback resume failed even when muted', { fallbackErr });
-        });
-      }
-    });
+    this.playContent('loader error recovery');
     logger.error('[ImaAdsEngine] Loader error', {
       code,
       message,
@@ -714,6 +682,49 @@ export class ImaAdsEngine implements AdManager {
     if (timeOffset === 0) return 'pre_roll';
     if (timeOffset === -1) return 'post_roll';
     return 'mid_roll';
+  }
+
+  private pauseContent(): void {
+    if (!this.config) return;
+    if (this.config.contentPlaybackController) {
+      this.config.contentPlaybackController.pause();
+      return;
+    }
+    this.config.contentVideoElement.pause();
+  }
+
+  private playContent(reason: string): void {
+    if (!this.config) return;
+    const play = () => this.config?.contentPlaybackController
+      ? this.config.contentPlaybackController.play()
+      : this.config?.contentVideoElement.play();
+
+    try {
+      const result = play();
+      if (result && typeof (result as Promise<void>).catch === 'function') {
+        void (result as Promise<void>).catch((error) => {
+          logger.warn(`[ImaAdsEngine] ${reason} play blocked, trying muted play`, { error });
+          if (!this.config) return;
+          if (this.config.contentPlaybackController?.setMuted) {
+            this.config.contentPlaybackController.setMuted(true);
+          } else {
+            this.config.contentVideoElement.muted = true;
+          }
+          try {
+            const retry = play();
+            if (retry && typeof (retry as Promise<void>).catch === 'function') {
+              void (retry as Promise<void>).catch((fallbackError) => {
+                logger.error(`[ImaAdsEngine] ${reason} play failed when muted`, { fallbackError });
+              });
+            }
+          } catch (fallbackError) {
+            logger.error(`[ImaAdsEngine] ${reason} play failed when muted`, { fallbackError });
+          }
+        });
+      }
+    } catch (error) {
+      logger.error(`[ImaAdsEngine] ${reason} play failed`, { error });
+    }
   }
 
   private updateCuePoints(): void {

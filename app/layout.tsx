@@ -45,6 +45,7 @@ export default function RootLayout({
   const defaultLocale = appConfig.ENGLISH_LANGUAGE_CODE as Locale;
   const isMobileServer = false; // We can't detect user-agent at build time, assume false for TV/Desktop
   const includeWebOSSDK = process.env.NEXT_PUBLIC_TV_PLATFORM === "webos";
+  const includeTizenWebApis = process.env.NEXT_PUBLIC_TV_PLATFORM === "tizen";
 
   return (
     <html lang={defaultLocale} suppressHydrationWarning data-scroll-behavior="smooth">
@@ -56,6 +57,9 @@ export default function RootLayout({
           }}
         />
         {includeWebOSSDK && <script src="/webOSTV.js" />}
+        {/* AVPlay must exist before the application chunks initialize. */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        {includeTizenWebApis && <script src="$WEBAPIS/webapis/webapis.js" />}
         {/* Preload critical authentication page background assets */}
         <link rel="preload" href="/images/AUTH_BACKGROUND_IMG.webp" as="image" />
         <link rel="preload" href="/lottie/auth_background_data.json" as="fetch" crossOrigin="anonymous" />
