@@ -26,7 +26,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ProgressBar } from './ProgressBar';
 import { PlayerIcon } from './PlayerIcon';
 import { SubtitleSelector } from './SubtitleSelector';
-import { PLAYBACK_SPEEDS } from '../constants/player.constants';
 import { useFocusable, setFocus, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { analyticsService } from '@/shared/analytics';
 import { EVENT_NAMES } from '@/shared/analytics/constants/analytics.constants';
@@ -37,6 +36,7 @@ import type {
   PlaybackSpeed,
   CaptionSize,
   ThumbnailCue,
+  PlayerCapabilities,
 } from '../model/types';
 
 // ── Icon button wrapper ────────────────────────────────────────────────────────
@@ -117,6 +117,20 @@ function AudioTrackIcon() {
   );
 }
 
+function MuteIcon({ muted }: { muted: boolean }) {
+  return muted ? (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+      <path d="M5 10v4h3l4 3V7L8 10H5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="m16 10 4 4m0-4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+      <path d="M5 10v4h3l4 3V7L8 10H5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M16 9.5c1.2 1.4 1.2 3.6 0 5M18.5 7c2.7 2.8 2.7 7.2 0 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 interface SettingsOptionRowProps {
   label: string;
   isActive: boolean;
@@ -154,7 +168,9 @@ interface SettingsSelectorProps {
   activeAudioTrackId: number;
   onAudioChange: (id: number) => void;
   speed: PlaybackSpeed;
-  onSpeedChange: (speed: PlaybackSpeed) => void;
+  supportedPlaybackSpeeds: readonly PlaybackSpeed[];
+  qualitySelection: PlayerCapabilities['qualitySelection'];
+  onSpeedChange: (speed: PlaybackSpeed) => boolean;
   /** Called whenever the dropdown opens or closes — used to suppress seekbar thumbnail */
   onOpenChange?: (isOpen: boolean) => void;
   /** Bumped by the parent to force this dropdown closed (e.g. on Back/Escape) —
@@ -179,6 +195,8 @@ function SettingsSelector({
   activeAudioTrackId,
   onAudioChange,
   speed,
+  supportedPlaybackSpeeds,
+  qualitySelection,
   onSpeedChange,
   onOpenChange,
   forceClose,
@@ -186,7 +204,13 @@ function SettingsSelector({
 }: SettingsSelectorProps) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<'quality' | 'audio' | 'speed'>('quality');
-  const lastTriggerKeyRef = useRef('menu-trigger-quality');
+  const lastTriggerKeyRef = useRef(
+    qualitySelection === 'manual'
+      ? 'menu-trigger-quality'
+      : audioTracks.length > 1
+        ? 'menu-trigger-audio'
+        : 'menu-trigger-speed',
+  );
 
   // Focus boundary while open: without this, norigin's default nearest-
   // neighbor search can wander off this popup onto the still-focusable
@@ -205,14 +229,22 @@ function SettingsSelector({
       setTimeout(() => {
         if (view === 'quality' && qualities.length > 0) setFocus(`opt-quality-${qualities[0].id}`);
         else if (view === 'audio' && audioTracks.length > 0) setFocus(`opt-audio-${audioTracks[0].id}`);
-        else if (view === 'speed') setFocus(`opt-speed-${PLAYBACK_SPEEDS[0]}`);
+        else if (view === 'speed' && supportedPlaybackSpeeds.length > 0) {
+          setFocus(`opt-speed-${supportedPlaybackSpeeds[0]}`);
+        }
       }, 50);
     } else {
       setTimeout(() => {
-        if (isVisible) setFocus(lastTriggerKeyRef.current);
+        if (!isVisible) return;
+        if (qualitySelection === 'auto-only' && lastTriggerKeyRef.current === 'menu-trigger-quality') {
+          lastTriggerKeyRef.current = audioTracks.length > 1
+            ? 'menu-trigger-audio'
+            : 'menu-trigger-speed';
+        }
+        setFocus(lastTriggerKeyRef.current);
       }, 50);
     }
-  }, [open, view, isVisible, qualities, audioTracks]);
+  }, [open, view, isVisible, qualities, audioTracks, supportedPlaybackSpeeds, qualitySelection]);
 
   const setOpenWithNotify = (next: boolean) => {
     setOpen(next);
@@ -242,16 +274,27 @@ function SettingsSelector({
 
   return (
     <div className="relative flex items-center gap-2.5 sm:gap-4">
-      <IconBtn
-        focusKey="menu-trigger-quality"
-        onClick={() => openView('quality', 'menu-trigger-quality')}
-        label="Quality"
-        isVisible={isVisible}
-        active={open && view === 'quality'}
-      >
-        <QualityIcon />
-        <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Quality</span>
-      </IconBtn>
+      {qualitySelection === 'manual' ? (
+        <IconBtn
+          focusKey="menu-trigger-quality"
+          onClick={() => openView('quality', 'menu-trigger-quality')}
+          label="Quality"
+          isVisible={isVisible}
+          active={open && view === 'quality'}
+        >
+          <QualityIcon />
+          <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Quality</span>
+        </IconBtn>
+      ) : (
+        <div
+          className="flex items-center justify-center gap-2 px-3.5 py-2 text-theme_1/65"
+          aria-label="Quality: Auto"
+          title="Samsung AVPlay manages video quality automatically"
+        >
+          <QualityIcon />
+          <span className="text-sm sm:text-base font-medium whitespace-nowrap">Auto</span>
+        </div>
+      )}
 
       {audioTracks.length > 1 && (
         <IconBtn
@@ -291,7 +334,7 @@ function SettingsSelector({
               </p>
             </div>
 
-            {view === 'quality' && (
+            {view === 'quality' && qualitySelection === 'manual' && (
               <div className="py-1 max-h-72 overflow-y-auto">
                 {(qualities.length > 0 ? qualities : [{ id: -1, label: 'Auto', height: null, bitrate: null, isAuto: true }]).map((q) => (
                   <SettingsOptionRow
@@ -334,7 +377,7 @@ function SettingsSelector({
 
             {view === 'speed' && (
               <div className="py-1">
-                {PLAYBACK_SPEEDS.map((s) => (
+                {supportedPlaybackSpeeds.map((s) => (
                   <SettingsOptionRow
                     key={s}
                     focusKey={`opt-speed-${s}`}
@@ -342,12 +385,13 @@ function SettingsSelector({
                     isActive={s === speed}
                     isVisible={isVisible && open}
                     onClick={() => {
-                      onSpeedChange(s);
-                      analyticsService.track(EVENT_NAMES.PLAYER_SPEED_CHANGED, {
-                        speed: s,
-                        speed_label: s === 1 ? 'Normal' : `${s}x`,
-                      });
-                      handleClose();
+                      if (onSpeedChange(s)) {
+                        analyticsService.track(EVENT_NAMES.PLAYER_SPEED_CHANGED, {
+                          speed: s,
+                          speed_label: s === 1 ? 'Normal' : `${s}x`,
+                        });
+                        handleClose();
+                      }
                     }}
                   />
                 ))}
@@ -388,6 +432,7 @@ interface PlayerControlsProps {
 
   // Speed
   speed: PlaybackSpeed;
+  capabilities: PlayerCapabilities;
 
   // Screen modes
   isFullscreen: boolean;
@@ -421,7 +466,7 @@ interface PlayerControlsProps {
   onBackward: () => void;
   onVolumeChange: (v: number) => void;
   onMuteToggle: () => void;
-  onSpeedChange: (s: PlaybackSpeed) => void;
+  onSpeedChange: (s: PlaybackSpeed) => boolean;
   onQualityChange: (id: number) => void;
   onAudioChange: (id: number) => void;
   onSubtitleChange: (id: number) => void;
@@ -445,6 +490,8 @@ export function PlayerControls({
   duration,
   buffered,
   speed,
+  capabilities,
+  isMuted,
   isPipActive,
   isPipSupported,
   qualities,
@@ -464,6 +511,7 @@ export function PlayerControls({
   onPlayPause,
   onSeek,
   onSpeedChange,
+  onMuteToggle,
   onQualityChange,
   onAudioChange,
   onSubtitleChange,
@@ -571,14 +619,28 @@ export function PlayerControls({
             TV remote app: OK on the player background already toggles
             play/pause directly (see OTTPlayer's ott-player-main
             onEnterPress), the seek bar's own Left/Right handles ±10s once
-            focused, and volume is the TV remote's own hardware buttons, not
-            an app-level control. Matches the reference design, which shows
-            none of these either. */}
+            focused. Normal volume remains owned by the TV remote; Samsung's
+            native player gets only an explicit app mute/unmute control. */}
         <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-y-2.5 w-full">
           <div
             ref={controlsRowRef as any}
             className="flex items-center gap-2.5 sm:gap-4 md:gap-5 shrink-0"
           >
+            {capabilities.volumeControl === 'mute-only' && (
+              <IconBtn
+                focusKey="player-mute-toggle"
+                onClick={onMuteToggle}
+                label={isMuted ? 'Unmute' : 'Mute'}
+                isVisible={isVisible}
+                active={isMuted}
+              >
+                <MuteIcon muted={isMuted} />
+                <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">
+                  {isMuted ? 'Unmute' : 'Mute'}
+                </span>
+              </IconBtn>
+            )}
+
             {/* Captions / Subtitle selector */}
             {subtitleTracks && subtitleTracks.length > 0 && (
               <div className="relative">
@@ -616,6 +678,8 @@ export function PlayerControls({
               activeAudioTrackId={activeAudioTrackId}
               onAudioChange={onAudioChange}
               speed={speed}
+              supportedPlaybackSpeeds={capabilities.playbackSpeeds}
+              qualitySelection={capabilities.qualitySelection}
               onSpeedChange={onSpeedChange}
               onOpenChange={setShowSettings}
               forceClose={forceCloseMenus}

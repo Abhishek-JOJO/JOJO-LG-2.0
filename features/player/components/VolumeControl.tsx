@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useCallback } from 'react';
+import type { PlayerCapabilities } from '../model/types';
 
 interface VolumeControlProps {
   volume: number;
   isMuted: boolean;
   onVolumeChange: (volume: number) => void;
   onMuteToggle: () => void;
+  mode?: PlayerCapabilities['volumeControl'];
 }
 
 export function VolumeControl({
@@ -14,10 +16,11 @@ export function VolumeControl({
   isMuted,
   onVolumeChange,
   onMuteToggle,
+  mode = 'level',
 }: VolumeControlProps) {
   const displayVolume = isMuted ? 0 : volume;
 
-  const VolumeIcon = () => {
+  const renderVolumeIcon = () => {
     if (isMuted || displayVolume === 0) {
       return (
         <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -46,6 +49,8 @@ export function VolumeControl({
     [onVolumeChange]
   );
 
+  if (mode === 'none') return null;
+
   return (
     <div className="flex items-center gap-1 group/volume">
       <button
@@ -53,19 +58,21 @@ export function VolumeControl({
         className="p-1 text-white hover:text-white/80 transition-colors"
         aria-label={isMuted ? 'Unmute' : 'Mute'}
       >
-        <VolumeIcon />
+        {renderVolumeIcon()}
       </button>
 
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.05}
-        value={displayVolume}
-        onChange={handleSliderChange}
-        aria-label="Volume"
-        className="w-0 overflow-hidden group-hover/volume:w-20 transition-all duration-200 accent-theme_13_samecolour cursor-pointer"
-      />
+      {mode === 'level' && (
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={displayVolume}
+          onChange={handleSliderChange}
+          aria-label="Volume"
+          className="w-0 overflow-hidden group-hover/volume:w-20 transition-all duration-200 accent-theme_13_samecolour cursor-pointer"
+        />
+      )}
     </div>
   );
 }

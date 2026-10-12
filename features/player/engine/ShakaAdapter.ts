@@ -18,7 +18,15 @@ import type {
   StreamFormat,
   PlayerLoadOptions,
   CaptionSize,
+  PlayerCapabilities,
 } from '../model/types';
+
+const SHAKA_CAPABILITIES: PlayerCapabilities = {
+  playbackSpeeds: [0.5, 0.75, 1, 1.25, 1.5, 2],
+  qualitySelection: 'manual',
+  volumeControl: 'level',
+  captionStyling: true,
+};
 
 export class ShakaAdapter implements PlayerAdapter {
   readonly name: AdapterName = 'shaka';
@@ -354,10 +362,10 @@ export class ShakaAdapter implements PlayerAdapter {
     }
   }
 
-  setPlaybackSpeed(speed: PlaybackSpeed): void {
-    if (this.videoEl) {
-      this.videoEl.playbackRate = speed;
-    }
+  setPlaybackSpeed(speed: PlaybackSpeed): boolean {
+    if (!this.videoEl || !SHAKA_CAPABILITIES.playbackSpeeds.includes(speed)) return false;
+    this.videoEl.playbackRate = speed;
+    return this.videoEl.playbackRate === speed;
   }
 
   getQualities(): QualityOption[] {
@@ -446,6 +454,10 @@ export class ShakaAdapter implements PlayerAdapter {
 
   isEnded(): boolean {
     return this.videoEl?.ended ?? false;
+  }
+
+  getCapabilities(): PlayerCapabilities {
+    return SHAKA_CAPABILITIES;
   }
 
   // ── Private ─────────────────────────────────────────────────────────────────

@@ -57,11 +57,19 @@ import type {
   PlaybackSpeed,
   CaptionSize,
   NextEpisodeInfo,
+  PlayerCapabilities,
 } from '../model/types';
 import type { AssetSeason, AssetEpisode } from '@features/asset/model/types';
 import { logger } from '@lib/logger/logger';
 import { analyticsService } from '@/shared/analytics';
 import { EVENT_NAMES } from '@/shared/analytics/constants/analytics.constants';
+
+const DEFAULT_PLAYER_CAPABILITIES: PlayerCapabilities = {
+  playbackSpeeds: [0.5, 0.75, 1, 1.25, 1.5, 2],
+  qualitySelection: 'manual',
+  volumeControl: 'level',
+  captionStyling: true,
+};
 
 function formatDurationMinutes(totalSeconds: number | string): string {
   const secs =
@@ -975,7 +983,13 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         const currentMuted = usePlayerStore.getState().isMuted;
         const currentVolume = usePlayerStore.getState().volume;
         engine.setVolume(currentMuted ? 0 : currentVolume);
-        engine.setPlaybackSpeed(usePlayerStore.getState().speed);
+        const capabilities = engine.getCapabilities();
+        const savedSpeed = usePlayerStore.getState().speed;
+        const requestedSpeed = capabilities.playbackSpeeds.includes(savedSpeed) ? savedSpeed : 1;
+        const speedApplied = engine.setPlaybackSpeed(requestedSpeed);
+        const effectiveSpeed = speedApplied ? requestedSpeed : 1;
+        if (!speedApplied && requestedSpeed !== 1) engine.setPlaybackSpeed(1);
+        if (savedSpeed !== effectiveSpeed) usePlayerStore.getState().setSpeed(effectiveSpeed);
         engine.setCaptionSize(captionSize);
 
         // Helper function to manage playback flow after initialization (and ads) are ready
@@ -1422,9 +1436,17 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     }
   }, [storeSetVolume]);
 
-  const handleSpeedChange = useCallback((s: PlaybackSpeed) => {
+  const handleSpeedChange = useCallback((s: PlaybackSpeed): boolean => {
+    const engine = engineRef.current;
+    if (!engine || !engine.setPlaybackSpeed(s)) {
+      logger.warn('[OTTPlayer] Playback speed rejected by active adapter', {
+        speed: s,
+        adapter: engine?.getActiveAdapterName() ?? 'none',
+      });
+      return false;
+    }
     storeSetSpeed(s);
-    engineRef.current?.setPlaybackSpeed(s);
+    return true;
   }, [storeSetSpeed]);
 
   const handleQualityChange = useCallback((id: number) => {
@@ -1929,6 +1951,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const playerCapabilities = activeEngine?.getCapabilities() ?? DEFAULT_PLAYER_CAPABILITIES;
   const captionStyles = {
     '--caption-font-size': `${captionFontSize + 4}px`,
     '--caption-text-color': captionTextColor,
@@ -1964,9 +1987,9 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
           maxHeight: '100vh',
           maxWidth: '100vw',
           cursor: controlsVisible ? 'default' : 'none',
-          ...captionStyles,
+          ...(playerCapabilities.captionStyling ? captionStyles : {}),
         }}
-        data-caption-size={captionSize}
+        data-caption-size={playerCapabilities.captionStyling ? captionSize : undefined}
         data-controls-visible={controlsVisible}
         onMouseMove={handleContainerMouseMove}
         onMouseLeave={handleContainerMouseLeave}
@@ -2174,6 +2197,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
               volume={volume}
               isMuted={isMuted}
               speed={speed}
+              capabilities={playerCapabilities}
               isFullscreen={isFullscreen}
               isPipActive={isPip}
               isPipSupported={PipManager.isSupported()}

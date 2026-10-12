@@ -25,6 +25,7 @@
     "package:tizen": "tsx scripts/package-tizen.ts",
     "typecheck": "tsc --noEmit",
     "test:platform": "tsx --test src/platform/*.test.ts src/platform/**/*.test.ts",
+    "test:player": "tsx --test features/player/**/*.test.ts",
     "lint": "eslint"
   },
   "dependencies": {

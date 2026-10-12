@@ -156,6 +156,17 @@ export interface SubtitleTrack {
 
 export type PlaybackSpeed = 0.5 | 0.75 | 1 | 1.25 | 1.5 | 2;
 
+export interface PlayerCapabilities {
+  /** Rates that should be presented by the UI for this adapter. */
+  playbackSpeeds: readonly PlaybackSpeed[];
+  /** AVPlay owns ABR and does not expose stable cross-model manual selection. */
+  qualitySelection: 'manual' | 'auto-only';
+  /** HTML video supports per-stream gain; AVPlay only maps app mute state. */
+  volumeControl: 'level' | 'mute-only' | 'none';
+  /** Whether application-defined caption appearance can be applied. */
+  captionStyling: boolean;
+}
+
 // ── Player UI State ──────────────────────────────────────────────────────────
 
 export type PlayerStatus =
@@ -210,7 +221,8 @@ export interface PlayerAdapter {
   setSubtitleTrack(trackId: number): void;
   setCaptionSize(size: CaptionSize): void;
   setVolume(volume: number): void;
-  setPlaybackSpeed(speed: PlaybackSpeed): void;
+  /** Returns true only when the requested rate was actually applied. */
+  setPlaybackSpeed(speed: PlaybackSpeed): boolean;
   getQualities(): QualityOption[];
   getAudioTracks(): AudioTrack[];
   getSubtitleTracks(): SubtitleTrack[];
@@ -218,6 +230,7 @@ export interface PlayerAdapter {
   getDuration(): number;
   isPaused(): boolean;
   isEnded(): boolean;
+  getCapabilities(): PlayerCapabilities;
   /** Native/non-HTML adapters use this to publish the normal player event contract. */
   setEventHandlers?(handlers: PlayerAdapterEventHandlers | null): void;
   /** Whether this adapter can play the given manifest */

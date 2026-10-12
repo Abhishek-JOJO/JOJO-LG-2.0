@@ -24,6 +24,7 @@ import type {
   PlayerLoadOptions,
   CaptionSize,
   PlayerAdapterEventHandlers,
+  PlayerCapabilities,
 } from '../model/types';
 
 export class PlayerEngine {
@@ -91,6 +92,13 @@ export class PlayerEngine {
 
   setQuality(qualityId: number): void {
     if (!this.adapter || !this.video) return;
+    if (this.getCapabilities().qualitySelection === 'auto-only' && qualityId !== -1) {
+      logger.warn('[PlayerEngine] Ignoring unsupported manual quality selection', {
+        adapter: this.adapter.name,
+        qualityId,
+      });
+      return;
+    }
     const oldQuality = this.getActiveQualityLabel();
     this.adapter.setQuality(qualityId);
     const newQuality = qualityId === -1 ? 'Auto' : `${qualityId}`;
@@ -129,15 +137,19 @@ export class PlayerEngine {
 
   setCaptionSize(size: CaptionSize): void {
     this.loadOptions = { ...this.loadOptions, captionSize: size };
-    this.adapter?.setCaptionSize(size);
+    if (this.getCapabilities().captionStyling) this.adapter?.setCaptionSize(size);
   }
 
   setVolume(volume: number): void {
-    this.adapter?.setVolume(volume);
+    if (!this.adapter) return;
+    const mode = this.getCapabilities().volumeControl;
+    if (mode === 'none') return;
+    this.adapter.setVolume(mode === 'mute-only' ? (volume === 0 ? 0 : 1) : volume);
   }
 
-  setPlaybackSpeed(speed: PlaybackSpeed): void {
-    this.adapter?.setPlaybackSpeed(speed);
+  setPlaybackSpeed(speed: PlaybackSpeed): boolean {
+    if (!this.adapter || !this.getCapabilities().playbackSpeeds.includes(speed)) return false;
+    return this.adapter.setPlaybackSpeed(speed);
   }
 
   getQualities(): QualityOption[] {
@@ -174,6 +186,10 @@ export class PlayerEngine {
 
   getActiveAdapterName(): AdapterName | null {
     return this.adapter?.name ?? null;
+  }
+
+  getCapabilities(): PlayerCapabilities {
+    return this.adapter?.getCapabilities() ?? this.shakaAdapter.getCapabilities();
   }
 
   /**

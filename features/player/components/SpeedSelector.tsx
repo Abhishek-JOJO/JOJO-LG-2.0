@@ -7,9 +7,10 @@ import type { PlaybackSpeed } from '../model/types';
 interface SpeedSelectorProps {
   speed: PlaybackSpeed;
   onSelect: (speed: PlaybackSpeed) => void;
+  supportedSpeeds?: readonly PlaybackSpeed[];
 }
 
-export function SpeedSelector({ speed, onSelect }: SpeedSelectorProps) {
+export function SpeedSelector({ speed, onSelect, supportedSpeeds = PLAYBACK_SPEEDS }: SpeedSelectorProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -25,7 +26,7 @@ export function SpeedSelector({ speed, onSelect }: SpeedSelectorProps) {
 
       {open && (
         <div className="absolute bottom-full right-0 mb-2 bg-black/90 border border-theme_1/10 rounded-lg overflow-hidden min-w-[90px] z-50">
-          {PLAYBACK_SPEEDS.map((s) => (
+          {supportedSpeeds.map((s) => (
             <button
               key={s}
               onClick={() => {

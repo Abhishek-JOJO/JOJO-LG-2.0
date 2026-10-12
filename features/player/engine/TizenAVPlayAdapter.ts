@@ -16,6 +16,7 @@ import type {
   PlayerAdapter,
   PlayerAdapterEventHandlers,
   PlayerLoadOptions,
+  PlayerCapabilities,
   QualityOption,
   StreamFormat,
   SubtitleTrack,
@@ -23,6 +24,13 @@ import type {
 
 const TIZEN_LOGICAL_WIDTH = 1920;
 const TIZEN_LOGICAL_HEIGHT = 1080;
+
+const TIZEN_AVPLAY_CAPABILITIES: PlayerCapabilities = {
+  playbackSpeeds: [1, 2],
+  qualitySelection: 'auto-only',
+  volumeControl: 'mute-only',
+  captionStyling: false,
+};
 
 interface ParsedTrackInfo {
   language?: string;
@@ -234,13 +242,16 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     }
   }
 
-  setPlaybackSpeed(speed: PlaybackSpeed): void {
-    if (!this.avplay?.setSpeed) return;
+  setPlaybackSpeed(speed: PlaybackSpeed): boolean {
+    if (!this.avplay?.setSpeed || !TIZEN_AVPLAY_CAPABILITIES.playbackSpeeds.includes(speed)) {
+      return false;
+    }
     try {
-      // AVPlay support varies by model; unsupported rates throw and leave 1x intact.
       this.avplay.setSpeed(speed);
+      return true;
     } catch (error) {
       logger.warn('[TizenAVPlayAdapter] Playback speed is unsupported on this TV', { speed, error });
+      return false;
     }
   }
 
@@ -302,6 +313,10 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
 
   isEnded(): boolean {
     return this.ended;
+  }
+
+  getCapabilities(): PlayerCapabilities {
+    return TIZEN_AVPLAY_CAPABILITIES;
   }
 
   async destroy(): Promise<void> {
