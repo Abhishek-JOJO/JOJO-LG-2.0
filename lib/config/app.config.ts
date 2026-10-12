@@ -4,6 +4,7 @@ import { DEFAULT_HEADER_VALUES, HEADERS } from "@lib/constants/headers";
 import { decrypt } from "@lib/crypto/decrypt";
 import { logger } from "@lib/logger/logger";
 import { env } from "./env";
+import { getDeviceTypeCode } from "@/src/platform/deviceProfile";
 
 export const HTTP_STATUS_PAGES: Record<HttpStatus, string> = {
     [HttpStatus.OK]: "/",
@@ -171,7 +172,7 @@ async function performFetch(): Promise<RuntimeConfig> {
                 headers: {
                     [HEADERS.CONTENT_TYPE]: HEADERS.JSON,
                     // Add custom headers like other API calls
-                    [HEADERS.DEVICE_TYPE_CODE]: DEFAULT_HEADER_VALUES.DEVICE_TYPE_CODE,
+                    [HEADERS.DEVICE_TYPE_CODE]: getDeviceTypeCode(),
                     [HEADERS.DEVICE_ID]: typeof window !== 'undefined' && typeof localStorage !== 'undefined' ? (localStorage.getItem('browser_uid') || '') : '',
                     [HEADERS.LANGUAGE]: (typeof window !== 'undefined' && typeof localStorage !== 'undefined' && localStorage.getItem(StorageKey.LOCALE) === 'gu') ? '2' : '1',
                     [HEADERS.APP_VERSION]: DEFAULT_HEADER_VALUES.APP_VERSION,

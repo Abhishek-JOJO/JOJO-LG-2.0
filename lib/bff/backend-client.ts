@@ -3,6 +3,7 @@ import http from "node:http";
 import https from "node:https";
 import { HEADERS, DEFAULT_HEADER_VALUES } from "@lib/constants/headers";
 import { logger } from "@lib/logger/logger";
+import { getDeviceTypeCode } from "@/src/platform/deviceProfile";
 
 const getBackendBaseUrl = (): string => {
   const url =
@@ -25,7 +26,7 @@ export const backendClient = axios.create({
   headers: {
     [HEADERS.CONTENT_TYPE]: HEADERS.JSON,
     [HEADERS.ACCEPT]: HEADERS.JSON,
-    [HEADERS.DEVICE_TYPE_CODE]: DEFAULT_HEADER_VALUES.DEVICE_TYPE_CODE,
+    [HEADERS.DEVICE_TYPE_CODE]: getDeviceTypeCode(),
     [HEADERS.APP_VERSION]: DEFAULT_HEADER_VALUES.APP_VERSION,
     [HEADERS.PROJECT]: DEFAULT_HEADER_VALUES.PROJECT,
   },

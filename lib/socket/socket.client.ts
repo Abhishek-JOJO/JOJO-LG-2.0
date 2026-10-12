@@ -6,8 +6,8 @@
 import { io, Socket } from "socket.io-client";
 import { encrypt } from "@lib/crypto/encrypt";
 import { logger } from "@lib/logger/logger";
-import { DEFAULT_HEADER_VALUES } from "@lib/constants/headers";
 import { useLocaleStore } from "@store/useLocaleStore";
+import { getDeviceTypeCode } from "@/src/platform/deviceProfile";
 
 class SocketClient {
   private socket: Socket | null = null;
@@ -31,7 +31,7 @@ class SocketClient {
     const currentLocale = useLocaleStore.getState().locale;
     this.socket = io(socketUrl, {
       auth: {
-        devicetypecode: DEFAULT_HEADER_VALUES.DEVICE_TYPE_CODE,
+        devicetypecode: getDeviceTypeCode(),
         deviceID: deviceId,
         sessionid: sessionId,
         language: currentLocale === "gu" ? 2 : 1,

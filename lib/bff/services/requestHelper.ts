@@ -6,6 +6,7 @@ import { getOrCreateCorrelationId } from "../correlation";
 import { bffCache } from "../cache";
 import { HEADERS, DEFAULT_HEADER_VALUES } from "@lib/constants/headers";
 import { AxiosRequestConfig } from "axios";
+import { getDeviceTypeCode } from "@/src/platform/deviceProfile";
 
 export interface BffRequestOptions {
   method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -38,10 +39,11 @@ export function extractBffHeaders(req: any) {
   const platform = req.headers.get("platform") || "Web";
   // Preserve the TV bundle's version when forwarding a request to the backend.
   const appVersion = req.headers.get("appversion") || DEFAULT_HEADER_VALUES.APP_VERSION;
+  const deviceTypeCode = req.headers.get(HEADERS.DEVICE_TYPE_CODE) || getDeviceTypeCode();
   // Safe IP extraction
   const ip = getClientIp(req) || deviceId;
 
-  return { deviceId, language, platform, appVersion, ip };
+  return { deviceId, deviceTypeCode, language, platform, appVersion, ip };
 }
 
 /**
@@ -86,7 +88,7 @@ export async function executeBackendRequest<T = any>({
   const requestHeaders: Record<string, string> = {
     [HEADERS.CONTENT_TYPE]: HEADERS.JSON,
     [HEADERS.ACCEPT]: HEADERS.JSON,
-    [HEADERS.DEVICE_TYPE_CODE]: DEFAULT_HEADER_VALUES.DEVICE_TYPE_CODE,
+    [HEADERS.DEVICE_TYPE_CODE]: headers[HEADERS.DEVICE_TYPE_CODE] || getDeviceTypeCode(),
     [HEADERS.APP_VERSION]: DEFAULT_HEADER_VALUES.APP_VERSION,
     [HEADERS.PROJECT]: DEFAULT_HEADER_VALUES.PROJECT,
     [HEADERS.DEVICE_ID]: headers["deviceID"] || headers["device_id"] || "server-bff-session",

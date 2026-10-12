@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "dotenv -e .env.development -- next dev --experimental-https",
-    "dev:stage": "dotenv -e .env.stage -- next dev --experimental-https",
-    "dev:prod": "dotenv -e .env.production -- next dev --experimental-https",
+    "dev": "dotenv -e .env.development -- next dev --webpack --experimental-https",
+    "dev:stage": "dotenv -e .env.stage -- next dev --webpack --experimental-https",
+    "dev:prod": "dotenv -e .env.production -- next dev --webpack --experimental-https",
     "build": "set NODE_OPTIONS=--no-deprecation && tsx scripts/build/index.ts",
     "build:prod": "tsx scripts/build/index.ts --prod --platform=webos",
     "build:stage": "tsx scripts/build/index.ts --stage --platform=webos",
@@ -24,7 +24,7 @@
     "package:webos": "ares-package --no-minify ./dist/webos",
     "package:tizen": "tsx scripts/package-tizen.ts",
     "typecheck": "tsc --noEmit",
-    "test:platform": "tsx --test src/platform/**/*.test.ts",
+    "test:platform": "tsx --test src/platform/*.test.ts src/platform/**/*.test.ts",
     "lint": "eslint"
   },
   "dependencies": {

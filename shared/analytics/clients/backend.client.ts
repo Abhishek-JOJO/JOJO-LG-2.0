@@ -9,6 +9,7 @@ import { useProfileStore } from "@/store/useProfileStore";
 import { getSourceLink } from "../utils/getSourceLink";
 import { appConfig, isConfigLoaded, getAppConfig } from "@/lib/config/app.config";
 import { DEFAULT_HEADER_VALUES } from "@/lib/constants/headers";
+import { getDeviceProfile, getDeviceTypeCode } from "@/src/platform/deviceProfile";
 
 class BackendClient {
   private isEnabled = true;
@@ -49,7 +50,7 @@ class BackendClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "deviceTypeCode": DEFAULT_HEADER_VALUES.DEVICE_TYPE_CODE,
+        "deviceTypeCode": getDeviceTypeCode(),
         "appversion": appVersion,
         "project": "JOJO",
         "language": locale,
@@ -76,6 +77,7 @@ class BackendClient {
       const profileId = useProfileStore.getState().selectedProfile?.profile_id || "";
       const locale = useLocaleStore.getState().locale || "1";
       const appVersion = DEFAULT_HEADER_VALUES.APP_VERSION;
+      const deviceProfile = getDeviceProfile();
 
       // Case: CONTENT_CLICKED
       if (event.name === EVENT_NAMES.CONTENT_CLICKED) {
@@ -118,7 +120,7 @@ class BackendClient {
           user_id: userId,
           sessionid: sessionId,
           appVersion: appVersion,
-          deviceTypeCode: "5",
+          deviceTypeCode: deviceProfile.deviceTypeCode,
           language: locale,
           event: EVENT_NAMES.CONTENT_CLICKED,
           consumedAt: new Date().toISOString(),
@@ -153,7 +155,7 @@ class BackendClient {
 
         const payload: Record<string, any> = {
           custom_platform: appConfig.CUSTOME_PLATFORM_EVENT_NAME,
-          platform: "LGTV",
+          platform: deviceProfile.analyticsPlatform,
           version: properties.version || appVersion,
           asset_id: parsedAssetId,
           asset_name: properties.asset_name || properties.asset_title || properties.title || "",
@@ -172,7 +174,7 @@ class BackendClient {
           sessionid: sessionId,
           user_id: userId,
           appVersion: appVersion,
-          deviceTypeCode: "5",
+          deviceTypeCode: deviceProfile.deviceTypeCode,
           language: locale,
           event: EVENT_NAMES.PLAYBACK_STARTED,
           consumedAt: new Date().toISOString(),
@@ -204,7 +206,7 @@ class BackendClient {
           sessionid: sessionId,
           user_id: userId,
           appVersion: appVersion,
-          deviceTypeCode: "5",
+          deviceTypeCode: deviceProfile.deviceTypeCode,
           language: locale,
           event: EVENT_NAMES.PLAYBACK_END,
           consumedAt: new Date().toISOString(),

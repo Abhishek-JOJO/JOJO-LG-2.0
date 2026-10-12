@@ -6,12 +6,16 @@
  * DO NOT use for security decisions
  */
 
+import { detectTVPlatform } from "@/src/platform/detectPlatform";
+
 export type Platform = 
   | "android" 
   | "ios" 
   | "windows" 
   | "mac" 
   | "linux" 
+  | "webos"
+  | "tizen"
   | "unknown";
 
 /**
@@ -20,6 +24,9 @@ export type Platform =
  * @returns Platform identifier for API headers
  */
 export const getPlatform = (): Platform => {
+  const tvPlatform = detectTVPlatform();
+  if (tvPlatform === "webos" || tvPlatform === "tizen") return tvPlatform;
+
   // SSR guard
   if (typeof navigator === "undefined") return "unknown";
 

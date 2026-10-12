@@ -26,6 +26,7 @@ import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
 import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { useOverseasDetection } from "@/features/geo/hooks/useOverseasDetection";
 import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+import { getDeviceTypeId } from "@/src/platform/deviceProfile";
 
 const SUBSCRIPTION_QR_URL = "https://jojoapp.in/subscription";
 
@@ -272,7 +273,7 @@ export default function SubscriptionPage() {
     // Fetch plans from API with dynamic country code
     const { data: plansData, isLoading, error } = useSubscriptionAllPlans({
         country: countryCode,
-        deviceTypeId: 5,
+        deviceTypeId: getDeviceTypeId(),
         languageId,
     });
 

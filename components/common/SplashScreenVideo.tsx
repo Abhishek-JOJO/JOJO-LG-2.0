@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+import { useRouter } from "next/navigation";
+import { ROUTES } from "@/lib/constants/routes";
 
 declare global {
   interface Window {
@@ -15,6 +17,7 @@ const SPLASH_SESSION_KEY = "jojo_splash_video_played";
 const EMERGENCY_FALLBACK_TIMEOUT_MS = 10000;
 
 export function SplashScreenVideo() {
+  const router = useRouter();
   // The video has exactly one owner: the hydrated client. Rendering it in the
   // static HTML lets webOS start decoding before React hydrates, then restart
   // the same media element when React takes ownership. The synchronous boot
@@ -101,12 +104,15 @@ export function SplashScreenVideo() {
           if (window.location.protocol === "file:") {
             window.location.replace(appBase ? `${appBase}login/index.html` : "login/index.html");
           } else if (window.location.pathname === "/" || window.location.pathname.endsWith("/index.html")) {
-            window.location.replace("/login");
+            // Browser builds have the Next.js router available, so keep this
+            // transition inside the current document. A hard location.replace
+            // here reloads the entire app immediately after the splash.
+            router.replace(ROUTES.LOGIN);
           }
         }, 120);
       }
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     try {

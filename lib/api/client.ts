@@ -10,6 +10,7 @@ import { getPlatform } from "@lib/utils/platform";
 import { useLocaleStore } from "@store/useLocaleStore";
 import { useSessionExpiredStore } from "@store/useSessionExpiredStore";
 import { useAuthStore } from "@store/useAuthStore";
+import { getDeviceTypeCode } from "@/src/platform/deviceProfile";
 
 interface RequestOptions {
   headers?: Record<string, string>;
@@ -129,7 +130,7 @@ async function request<T>(
           headers[HEADERS.CONTENT_TYPE] = HEADERS.JSON;
         }
         headers[HEADERS.ACCEPT] = HEADERS.JSON;
-        headers[HEADERS.DEVICE_TYPE_CODE] = DEFAULT_HEADER_VALUES.DEVICE_TYPE_CODE;
+        headers[HEADERS.DEVICE_TYPE_CODE] = getDeviceTypeCode();
 
         if (typeof window === "undefined") {
           let serverToken = "";

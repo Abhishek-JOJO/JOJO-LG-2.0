@@ -28,7 +28,7 @@ import { AttributionManager } from "@/lib/deeplink/attributionManager";
 import { appConfig } from '@/lib/config/app.config';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfileStore } from '@/store/useProfileStore';
-import { DEFAULT_HEADER_VALUES } from '@/lib/constants/headers';
+import { getDeviceProfile } from '@/src/platform/deviceProfile';
 
 class AnalyticsService {
   private isInitialized = false;
@@ -92,14 +92,15 @@ class AnalyticsService {
       const authState = useAuthStore.getState();
       const profileState = useProfileStore.getState();
 
+      const deviceProfile = getDeviceProfile();
       const defaultProperties = {
         custom_platform: appConfig.CUSTOME_PLATFORM_EVENT_NAME,
-        platform: "LGTV",
+        platform: deviceProfile.analyticsPlatform,
         version: process.env.NEXT_PUBLIC_APP_VERSION,
         profile_id: profileState.selectedProfile?.profile_id || "",
         user_id: authState.user?.id ? String(authState.user.id) : "",
         sessionid: authState.token || "",
-        deviceTypeCode: DEFAULT_HEADER_VALUES.DEVICE_TYPE_CODE,
+        deviceTypeCode: deviceProfile.deviceTypeCode,
         timestamp: new Date().toISOString(),
       };
 

@@ -18,7 +18,7 @@ import { getPlayback } from '@features/content/api/getPlayback';
 import { useAuthStore } from '@store/useAuthStore';
 import { getAsset } from '@features/asset/api/getAsset';
 import { getAppConfig } from '@lib/config/app.config';
-import { DEFAULT_HEADER_VALUES } from '@lib/constants/headers';
+import { getDeviceTypeCode } from '@/src/platform/deviceProfile';
 
 /**
  * Fetch VMAP XML from the ads endpoint.
@@ -29,14 +29,11 @@ import { DEFAULT_HEADER_VALUES } from '@lib/constants/headers';
  * Returns null on any failure — ads must never block content playback.
  */
 
-/** Device type code for the VMAP ads endpoint (derived from common headers) */
-const VMAP_DEVICE_TYPE_CODE = DEFAULT_HEADER_VALUES.DEVICE_TYPE_CODE;
-
 async function fetchVmapXml(assetId: string): Promise<string | null> {
   try {
     const config = getAppConfig();
     const baseUrl = config.apiBaseUrl.replace(/\/$/, '');
-    const vmapUrl = `${baseUrl}${ApiEndpoint.GET_VMAP}/${assetId}/${VMAP_DEVICE_TYPE_CODE}`;
+    const vmapUrl = `${baseUrl}${ApiEndpoint.GET_VMAP}/${assetId}/${getDeviceTypeCode()}`;
 
     logger.info('[Player Service] Fetching VMAP XML', { vmapUrl });
 

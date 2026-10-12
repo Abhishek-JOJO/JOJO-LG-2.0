@@ -27,7 +27,6 @@ export const HEADERS = {
  * Default header values
  */
 export const DEFAULT_HEADER_VALUES = {
-  DEVICE_TYPE_CODE: "5", // 5= LG TV
   LANGUAGE: "1", // 1 = English
   // This is compiled from the same version used by the webOS IPK metadata.
   APP_VERSION,
