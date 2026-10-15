@@ -201,6 +201,10 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
   function fixNavUrl(u){
     if(typeof u!=="string")return u;
     var clean=u;
+    // The simulator serves the packaged app over HTTP. Absolute URLs that
+    // already point at that server (and external URLs) must not be expanded
+    // as if they were Next.js route paths.
+    if(/^(?:https?:|blob:|data:|about:)/i.test(clean))return clean;
     if(clean.startsWith("file:///")){
       if(clean.startsWith(appBase)||clean.startsWith("file:///usr/")||clean.startsWith("file:///media/"))return clean;
       clean=clean.slice(8);
@@ -251,7 +255,11 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
   // TV Auth Gate: If unauthenticated on root index.html, transition to login/index.html
   // CRITICAL FOR TV: Wait for the splash screen video to finish before redirecting,
   // so the splash video plays ONCE smoothly to completion and does not restart on login!
-  if ("${relPrefix}" === "./" && (location.pathname.endsWith("/index.html") || location.pathname.endsWith("/"))) {
+  // Avoid a regex literal here. Escaped slashes inside this TypeScript
+  // template string were emitted as a line comment, preventing the
+  // entire early boot script from running.
+  var isTizenWebSimulator=location.pathname.indexOf("/appLauncher/app/")!==-1;
+  if (!isTizenWebSimulator && "${relPrefix}" === "./" && (location.pathname.endsWith("/index.html") || location.pathname.endsWith("/"))) {
     try {
       var splashPlayed = "";
       try { splashPlayed = sessionStorage.getItem("jojo_splash_video_played"); } catch(e){}
@@ -272,7 +280,9 @@ export function fixWebOSPaths(outDir: string = path.resolve('./out')) {
         }
       }
       if (!_auth) {
-        var targetLogin = appBase + "login/index.html";
+        // Keep the entry-to-login transition relative. It works even when a
+        // simulator prevents Location.prototype from being monkey-patched.
+        var targetLogin = "login/index.html";
         var _redirected = false;
         function doRedirect() {
           if (_redirected) return;

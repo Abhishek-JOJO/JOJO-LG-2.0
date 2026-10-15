@@ -5,6 +5,7 @@ import { useAppUpdateStore } from "@/store/useAppUpdateStore";
 import { APP_VERSION } from "@/lib/constants/version";
 import { getCachedRuntimeConfig, AppConfig, DevicesConfig } from "@/lib/config/app.config";
 import { logger } from "@/lib/logger/logger";
+import { isTizenWebSimulator } from "@/src/platform/detectPlatform";
 
 /**
  * Compares two semantic version strings (e.g. "1.0.1" > "1.0.0")
@@ -97,6 +98,14 @@ export function useTVUpdateCheck() {
   const openUpdateModal = useAppUpdateStore((s) => s.openUpdateModal);
 
   const checkAndUpdate = useCallback((devices?: DevicesConfig | null) => {
+    // The Web Simulator has no Samsung app-store update lifecycle. Enforcing
+    // store versions here blocks local QA and cannot actually install an update.
+    // Physical Tizen TVs still use the backend minimum/latest configuration.
+    if (isTizenWebSimulator()) {
+      logger.info("[AppUpdate] Skipping store update check in Samsung Web Simulator");
+      return;
+    }
+
     // Check runtime devices from parameter, AppConfig accessor, or cached runtime config
     const devicesConfig = devices || AppConfig.devices || getCachedRuntimeConfig()?.devices;
     if (!devicesConfig) return;

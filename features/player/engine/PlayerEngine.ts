@@ -239,18 +239,18 @@ export class PlayerEngine {
       streamFormat: video.streamFormat,
     });
 
-    if (isTizen() && TizenAVPlayAdapter.isAvailable()) {
+    if (TizenAVPlayAdapter.isAvailable()) {
       const avplayAdapter = new TizenAVPlayAdapter();
       if (avplayAdapter.canPlay(video.manifestUrl, video.streamFormat)) {
         logger.info('[PlayerEngine] Loading Samsung AVPlay adapter');
         try {
+          avplayAdapter.setEventHandlers(this.createAdapterEventHandlers());
           await avplayAdapter.load(
             videoEl,
             video.manifestUrl,
             video.drmConfig,
             this.loadOptions,
           );
-          avplayAdapter.setEventHandlers(this.createAdapterEventHandlers());
           this.adapter = avplayAdapter;
           this.eventBus.emit('DURATION_CHANGE', { duration: avplayAdapter.getDuration() });
           logger.info('[PlayerEngine] Samsung AVPlay adapter loaded');

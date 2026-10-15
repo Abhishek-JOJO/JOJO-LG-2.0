@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -27,6 +34,25 @@ import WatchingClient from "@/app/watching/WatchingClient";
 import SubscriptionPage from "@/app/subscription/SubscriptionClient";
 import { normalizePathname } from "@/lib/utils/pathname";
 
+type LayoutChromeContextValue = {
+  setInlineStandalonePage: (active: boolean) => void;
+};
+
+const LayoutChromeContext = createContext<LayoutChromeContextValue | null>(null);
+
+/**
+ * Lets an in-document TV screen opt out of the browse navbar/footer even when
+ * its URL cannot change. Samsung's Web Simulator uses this for inline login
+ * because navigating from `/` to `/login/` relaunches the application.
+ */
+export function useLayoutChrome() {
+  const context = useContext(LayoutChromeContext);
+  if (!context) {
+    throw new Error("useLayoutChrome must be used inside LayoutClientWrapper");
+  }
+  return context;
+}
+
 export function LayoutClientWrapper({ children }: { children: React.ReactNode }) {
   useTVUpdateCheck();
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
@@ -35,6 +61,11 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   const closeTvOverlay = useTvOverlayStore((s) => s.close);
   const clearTvOverlay = useTvOverlayStore((s) => s.clear);
   const setActiveBrowseTab = useNavStore((s) => s.setActiveBrowseTab);
+  const [isInlineStandalonePage, setInlineStandalonePage] = useState(false);
+  const layoutChromeContext = useMemo(
+    () => ({ setInlineStandalonePage }),
+    [],
+  );
   const isTvOverlayOpen =
     typeof window !== "undefined" &&
     tvOverlayScreen !== null;
@@ -125,6 +156,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
     ));
 
   const isStandalonePage =
+    isInlineStandalonePage ||
     isAuthPage ||
     isWatchPage ||
     isWatchingPage ||
@@ -164,7 +196,7 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   }
 
   return (
-    <>
+    <LayoutChromeContext.Provider value={layoutChromeContext}>
       {/* Warm hover/focus-tinted glow meant to sit behind browse/home rail
           content — on standalone pages, account settings, and full-screen modal overlays,
           hide it completely to prevent gradient bleed-through. */}
@@ -212,6 +244,6 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
       <AppVersionWatermark />
       {showFooter && !hideHeaderFooter && !isTvOverlayOpen && <Footer />}
       <StatusLine />
-    </>
+    </LayoutChromeContext.Provider>
   );
 }

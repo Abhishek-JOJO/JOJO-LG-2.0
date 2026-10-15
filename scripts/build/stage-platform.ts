@@ -34,6 +34,33 @@ export function stagePlatformBuild(platform: BuildPlatform, version: string): st
     fs.writeFileSync(path.join(targetDir, "config.xml"), versionedConfig, "utf8");
     fs.rmSync(path.join(targetDir, "appinfo.json"), { force: true });
     fs.rmSync(path.join(targetDir, "webOSTV.js"), { force: true });
+
+    // Copy Tizen Studio / Eclipse project descriptors if present
+    for (const projectFile of [".project", ".tproject"]) {
+      const srcFile = path.resolve("platforms/tizen", projectFile);
+      if (fs.existsSync(srcFile)) {
+        fs.copyFileSync(srcFile, path.join(targetDir, projectFile));
+      }
+    }
+
+    // Inject $WEBAPIS/webapis/webapis.js into the <head> of every HTML file for Samsung Tizen AVPlay & WebAPIs
+    const injectWebApisScript = (dir: string) => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          injectWebApisScript(fullPath);
+        } else if (entry.isFile() && entry.name.endsWith(".html")) {
+          let html = fs.readFileSync(fullPath, "utf8");
+          if (!html.includes("$WEBAPIS/webapis/webapis.js")) {
+            const scriptTag = '<script type="text/javascript" src="$WEBAPIS/webapis/webapis.js"></script>';
+            html = html.replace(/<head>/i, `<head>${scriptTag}`);
+            fs.writeFileSync(fullPath, html, "utf8");
+          }
+        }
+      }
+    };
+    injectWebApisScript(targetDir);
   }
 
   console.log(`[INFO] Staged ${platform} package at ${targetDir}`);

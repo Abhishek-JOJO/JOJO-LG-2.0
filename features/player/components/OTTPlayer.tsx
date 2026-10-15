@@ -792,10 +792,16 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     const unsubs: Array<() => void> = [];
 
     unsubs.push(
-      engine.eventBus.on('PLAY', () => setIsPlaying(true))
+      engine.eventBus.on('PLAY', () => {
+        setIsPlaying(true);
+        setStatus('playing');
+      })
     );
     unsubs.push(
-      engine.eventBus.on('PAUSE', () => setIsPlaying(false))
+      engine.eventBus.on('PAUSE', () => {
+        setIsPlaying(false);
+        setStatus('paused');
+      })
     );
     unsubs.push(
       engine.eventBus.on('BUFFER_START', () => {
@@ -818,7 +824,8 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
           clearTimeout(seekingGraceTimerRef.current);
           seekingGraceTimerRef.current = null;
         }
-        setStatus(isPlaying ? 'playing' : 'paused');
+        setIsPlaying(true);
+        setStatus('playing');
       })
     );
     unsubs.push(
@@ -838,6 +845,11 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         setCurrentTime(ct);
         setDuration(dur);
         setBuffered(buf);
+        // Ensure loader dismisses when playback timeline is actively advancing
+        const curStatus = usePlayerStore.getState().status;
+        if (curStatus === 'loading' || curStatus === 'buffering' || curStatus === 'ready') {
+          setStatus('playing');
+        }
       })
     );
     unsubs.push(
@@ -2066,7 +2078,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         )}
 
         {/* Loading */}
-        {(status === 'loading' || status === 'buffering' || adState.isLoading || (adState.hasError && status === 'ready')) && !error && (
+        {(status === 'loading' || status === 'buffering' || adState.isLoading) && !error && (
           <LoadingScreen
             message={status === 'buffering' ? 'Buffering...' : 'Loading...'}
             isBuffering={status === 'buffering'}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { useRouter } from "next/navigation";
 import { ROUTES } from "@/lib/constants/routes";
+import { isTizenWebSimulator } from "@/src/platform/detectPlatform";
 
 declare global {
   interface Window {
@@ -100,9 +101,16 @@ export function SplashScreenVideo() {
       // Fallback redirect in case the early head script was not attached
       if (typeof window !== "undefined") {
         setTimeout(() => {
-          const appBase = window.__WEBOS_APP_BASE__ || "";
+          if (isTizenWebSimulator()) {
+            // TVEntryContent swaps to login in the same document. Navigating
+            // nested file URLs makes Samsung Web Simulator relaunch index.html.
+            return;
+          }
           if (window.location.protocol === "file:") {
-            window.location.replace(appBase ? `${appBase}login/index.html` : "login/index.html");
+            // Splash exists only on the package entry document, so this
+            // sibling-relative URL works with both native Location and the
+            // TV build's navigation interceptor.
+            window.location.replace("login/index.html");
           } else if (window.location.pathname === "/" || window.location.pathname.endsWith("/index.html")) {
             // Browser builds have the Next.js router available, so keep this
             // transition inside the current document. A hard location.replace

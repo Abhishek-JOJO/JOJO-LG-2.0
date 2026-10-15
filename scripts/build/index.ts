@@ -12,13 +12,10 @@
  */
 
 import * as readline from 'readline';
-import { loadEnvForBuild, getPackageVersion, updatePackageVersion } from './env';
+import { loadEnvForBuild, getPlatformVersion, updatePlatformVersion } from './env';
 import { printBanner } from './utils';
 import { runBuild } from './builder';
 import type { BuildPlatform } from './stage-platform';
-
-// ─── Get version from package.json ───────────────────────────────────────────
-const PKG_VERSION = getPackageVersion();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -30,6 +27,8 @@ const platform = (platformArg || process.env.TV_PLATFORM || process.env.NEXT_PUB
 if (platform !== 'webos' && platform !== 'tizen') {
   throw new Error(`Unsupported TV platform: ${platform}. Use webos or tizen.`);
 }
+
+const DEFAULT_VERSION = getPlatformVersion(platform);
 
 function ask(rl: readline.Interface, question: string): Promise<string> {
   return new Promise((resolve) => rl.question(question, resolve));
@@ -77,7 +76,7 @@ async function main() {
       }
     }
 
-    version = versionArg || PKG_VERSION;
+    version = versionArg || DEFAULT_VERSION;
   } else {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -103,13 +102,13 @@ async function main() {
     }
 
     // 2. Version Selection with Default from package.json
-    version = (await ask(rl, `  Build version (e.g. 1.2.0) [Default: ${PKG_VERSION}]: `)).trim() || PKG_VERSION;
+    version = (await ask(rl, `  Build version (e.g. 1.2.0) [Default: ${DEFAULT_VERSION}]: `)).trim() || DEFAULT_VERSION;
 
     rl.close();
   }
 
-  // ── Update package.json & package-lock.json version ─────────────────────────
-  updatePackageVersion(version);
+  // Keep LG and Samsung store versions independent.
+  updatePlatformVersion(version, platform);
 
 
   const loggerAllowed = env !== 'prod';

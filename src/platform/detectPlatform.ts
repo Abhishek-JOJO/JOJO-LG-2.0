@@ -10,7 +10,7 @@ export function detectTVPlatform(): TVPlatform {
   if (configured) return configured;
 
   if (typeof window !== "undefined") {
-    if (window.tizen) return "tizen";
+    if (window.tizen || window.webapis) return "tizen";
     if (window.PalmSystem || window.webOS) return "webos";
   }
 
@@ -25,3 +25,13 @@ export function isTizen(): boolean {
   return detectTVPlatform() === "tizen";
 }
 
+export function isTizenWebSimulatorPath(pathname: string): boolean {
+  return /\/appLauncher\/app\/[^/]+(?:\/|$)/i.test(pathname);
+}
+
+export function isTizenWebSimulator(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    isTizenWebSimulatorPath(window.location.pathname)
+  );
+}

@@ -337,6 +337,34 @@ function getImageUrlKey(src: unknown): string | null {
   return null;
 }
 
+/**
+ * Static exports are hosted below an application-specific directory on TV.
+ * A root-relative browser URL such as `/logos/JOJO_LOGO.png` therefore points
+ * outside the installed WGT/IPK after React hydrates the server-rendered HTML.
+ * The staging script injects the real package root before application code
+ * runs; resolve bundled assets against it instead of relying on DOM monkey
+ * patches, which are not consistently supported by older TV Chromium builds.
+ */
+export function resolvePackagedAssetSource(
+  source: JOJOCommonImageProps["src"],
+  appBase: string
+): JOJOCommonImageProps["src"] {
+  if (
+    !appBase ||
+    typeof source !== "string" ||
+    !source.startsWith("/") ||
+    source.startsWith("//")
+  ) {
+    return source;
+  }
+
+  try {
+    return new URL(source.slice(1), appBase).href;
+  } catch {
+    return source;
+  }
+}
+
 export default function JOJOCommonImage({
   src,
   alt,
@@ -454,8 +482,23 @@ export default function JOJOCommonImage({
     });
   }, [rawUrl, src, retriedOriginal, shouldOptimize, targetSize, resolvedContentMode, quality]);
 
+  const [packagedAppBase, setPackagedAppBase] = useState("");
+
+  useEffect(() => {
+    const appBase = window.__WEBOS_APP_BASE__;
+    if (appBase) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPackagedAppBase(appBase);
+    }
+  }, []);
+
+  const renderedSrc = useMemo(
+    () => resolvePackagedAssetSource(activeSrc, packagedAppBase),
+    [activeSrc, packagedAppBase]
+  );
+
   const [isLoaded, setIsLoaded] = useState(() => {
-    const key = getImageUrlKey(activeSrc);
+    const key = getImageUrlKey(renderedSrc);
     return key ? loadedImageUrls.has(key) : false;
   });
 
@@ -465,22 +508,22 @@ export default function JOJOCommonImage({
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setImageState(getInitialState(activeSrc, fallbackType));
-    const key = getImageUrlKey(activeSrc);
+    setImageState(getInitialState(renderedSrc, fallbackType));
+    const key = getImageUrlKey(renderedSrc);
     setIsLoaded(key ? loadedImageUrls.has(key) : false);
-  }, [activeSrc, fallbackType]);
+  }, [renderedSrc, fallbackType]);
 
   // Synchronously catch browser cached image loads where onload doesn't fire
   useEffect(() => {
-    if (imgRef.current?.complete) {
-      const key = getImageUrlKey(activeSrc);
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      const key = getImageUrlKey(renderedSrc);
       if (key) {
         markImageAsLoaded(key);
       }
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsLoaded(true);
     }
-  }, [activeSrc]);
+  }, [renderedSrc]);
 
   const translate = (key?: string, fallbackValue = "") => {
     if (!key) return fallbackValue;
@@ -502,6 +545,8 @@ export default function JOJOCommonImage({
 
   const fallbackAlt =
     translate(fallback?.altKey, fallback?.alt) || resolvedAlt || fallbackTitle;
+
+  const isBuiltInFallbackLogo = rawUrl.endsWith("/logos/JOJO_LOGO.png");
 
   const shouldUseFill = fill || Boolean(normalizedAspectRatio);
 
@@ -584,7 +629,7 @@ export default function JOJOCommonImage({
     return null;
   }
 
-  if (!activeSrc || imageState === JOJOImageRenderState.FallbackText) {
+  if (!renderedSrc || imageState === JOJOImageRenderState.FallbackText) {
     return (
       <div className={wrapperClass} style={computedWrapperStyle}>
         <div
@@ -598,14 +643,16 @@ export default function JOJOCommonImage({
         >
           {fallback?.node ?? (
             <div className="flex flex-col items-center justify-center gap-1.5 w-full h-full p-4">
-              <div className="relative w-16 h-8 opacity-25">
-                <JOJOCommonImage
-                  src="/logos/JOJO_LOGO.png"
-                  alt="JOJO Logo"
-                  fill
-                  className="object-contain"
-                />
-              </div>
+              {!isBuiltInFallbackLogo && (
+                <div className="relative w-16 h-8 opacity-25">
+                  <JOJOCommonImage
+                    src="/logos/JOJO_LOGO.png"
+                    alt="JOJO Logo"
+                    fill
+                    className="object-contain"
+                  />
+                </div>
+              )}
               <span className="text-[10px] uppercase tracking-wider text-theme_1/30 truncate max-w-full">
                 {fallbackTitle}
               </span>
@@ -624,7 +671,7 @@ export default function JOJOCommonImage({
       <Image
         ref={imgRef}
         {...rest}
-        src={activeSrc}
+        src={renderedSrc}
         alt={resolvedAlt || fallbackAlt}
         title={title}
         sizes={shouldUseFill ? sizes ?? JOJO_IMAGE_DEFAULTS.sizes : sizes}
@@ -633,7 +680,7 @@ export default function JOJOCommonImage({
         fill={shouldUseFill}
         onError={handleError}
         onLoad={(e) => {
-          const key = getImageUrlKey(activeSrc);
+          const key = getImageUrlKey(renderedSrc);
           if (key) {
             markImageAsLoaded(key);
           }

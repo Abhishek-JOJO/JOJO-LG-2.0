@@ -71,6 +71,7 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
   private previousVideoVisibility = '';
   private selectedAudioIndex: number | null = null;
   private selectedTextIndex: number | null = null;
+  private originalBackgrounds = new Map<HTMLElement, string>();
   private destroyed = false;
 
   static isAvailable(): boolean {
@@ -104,6 +105,26 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     this.createNativeVideoObject();
     this.previousVideoVisibility = videoEl.style.visibility;
     videoEl.style.visibility = 'hidden';
+
+    // The native AVPlay hardware video plane renders behind the HTML graphics plane.
+    // Make container and ancestor elements transparent so video is not blocked by opaque backgrounds.
+    let el: HTMLElement | null = this.container;
+    while (el) {
+      this.originalBackgrounds.set(el, el.style.backgroundColor);
+      el.style.backgroundColor = 'transparent';
+      el = el.parentElement;
+    }
+    if (typeof document !== 'undefined') {
+      if (document.body) {
+        this.originalBackgrounds.set(document.body, document.body.style.backgroundColor);
+        document.body.style.backgroundColor = 'transparent';
+      }
+      if (document.documentElement) {
+        this.originalBackgrounds.set(document.documentElement, document.documentElement.style.backgroundColor);
+        document.documentElement.style.backgroundColor = 'transparent';
+      }
+    }
+
     window.addEventListener('resize', this.updateDisplayRect);
     document.addEventListener('fullscreenchange', this.updateDisplayRect);
 
@@ -111,13 +132,26 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
       this.safeCloseExistingSession();
       avplay.open(manifestUrl);
       avplay.setListener(this.createListener());
-      avplay.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX');
-      this.updateDisplayRect();
+      try {
+        this.updateDisplayRect();
+      } catch (e) {
+        logger.warn('[TizenAVPlayAdapter] Initial setDisplayRect failed', { error: e });
+      }
+      try {
+        avplay.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX');
+      } catch (e) {
+        logger.warn('[TizenAVPlayAdapter] setDisplayMethod failed', { error: e });
+      }
       this.configureDrm(drmConfig);
 
       await new Promise<void>((resolve, reject) => {
+        const prepareTimeout = setTimeout(() => {
+          reject(new Error('AVPlay prepareAsync timed out after 15s'));
+        }, 15000);
+
         avplay.prepareAsync(
           () => {
+            clearTimeout(prepareTimeout);
             if (this.destroyed) {
               reject(new Error('AVPlay was destroyed while preparing'));
               return;
@@ -131,7 +165,10 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
             if (startTime > 0) this.seek(startTime);
             resolve();
           },
-          (error) => reject(new Error(`AVPlay prepare failed: ${errorMessage(error)}`)),
+          (error) => {
+            clearTimeout(prepareTimeout);
+            reject(new Error(`AVPlay prepare failed: ${errorMessage(error)}`));
+          },
         );
       });
 
@@ -154,6 +191,8 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
         this.ended = false;
         this.avplay.play();
         this.handlers?.onPlay(this.getCurrentTime());
+        // Signal buffering complete so loading spinner dismisses immediately upon playback start
+        this.handlers?.onBufferingEnd(this.getCurrentTime());
       }
     } catch (error) {
       this.reportError('AVPLAY_PLAY_FAILED', error, true);
@@ -340,6 +379,15 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
 
     this.objectEl?.remove();
     if (this.videoEl) this.videoEl.style.visibility = this.previousVideoVisibility;
+
+    // Restore original background colors on ancestors
+    for (const [elem, originalBg] of this.originalBackgrounds.entries()) {
+      try {
+        elem.style.backgroundColor = originalBg;
+      } catch {}
+    }
+    this.originalBackgrounds.clear();
+
     this.avplay = null;
     this.videoEl = null;
     this.container = null;
@@ -352,6 +400,7 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
   private createNativeVideoObject(): void {
     if (!this.container) return;
     const object = document.createElement('object');
+    object.id = 'av-player';
     object.type = 'application/avplayer';
     object.tabIndex = -1;
     Object.assign(object.style, {
@@ -361,6 +410,7 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
       height: '100%',
       zIndex: '0',
       pointerEvents: 'none',
+      backgroundColor: 'transparent',
     });
     this.container.prepend(object);
     this.objectEl = object;
@@ -382,10 +432,20 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     const rect = this.container.getBoundingClientRect();
     const viewportWidth = window.innerWidth || TIZEN_LOGICAL_WIDTH;
     const viewportHeight = window.innerHeight || TIZEN_LOGICAL_HEIGHT;
-    const x = Math.max(0, Math.round((rect.left / viewportWidth) * TIZEN_LOGICAL_WIDTH));
-    const y = Math.max(0, Math.round((rect.top / viewportHeight) * TIZEN_LOGICAL_HEIGHT));
-    const width = Math.max(1, Math.round((rect.width / viewportWidth) * TIZEN_LOGICAL_WIDTH));
-    const height = Math.max(1, Math.round((rect.height / viewportHeight) * TIZEN_LOGICAL_HEIGHT));
+
+    // Fall back to full screen coordinates (1920x1080) if DOM bounding box has not yet computed layout
+    let x = 0;
+    let y = 0;
+    let width = TIZEN_LOGICAL_WIDTH;
+    let height = TIZEN_LOGICAL_HEIGHT;
+
+    if (rect.width > 50 && rect.height > 50 && viewportWidth > 0 && viewportHeight > 0) {
+      x = Math.max(0, Math.round((rect.left / viewportWidth) * TIZEN_LOGICAL_WIDTH));
+      y = Math.max(0, Math.round((rect.top / viewportHeight) * TIZEN_LOGICAL_HEIGHT));
+      width = Math.max(1, Math.round((rect.width / viewportWidth) * TIZEN_LOGICAL_WIDTH));
+      height = Math.max(1, Math.round((rect.height / viewportHeight) * TIZEN_LOGICAL_HEIGHT));
+    }
+
     try {
       this.avplay.setDisplayRect(x, y, width, height);
     } catch (error) {
