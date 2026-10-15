@@ -15,7 +15,6 @@ import { useWatchlistStore } from "@/store/useWatchlistStore";
 import { useContinueWatchingStore } from "@/store/useContinueWatchingStore";
 import {
   Check,
-  ChevronDown,
   Play,
   Plus,
   X,
@@ -1772,7 +1771,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           </div>
         )}
 
-        {/* "More below" hint — only visible when the overlay sheet is CLOSED */}
+        {/* "More below" tab pills — visible when overlay sheet is closed */}
         {isStandalone && hasAnyTab && (
           <div className={`absolute left-4 sm:left-6 lg:left-14 bottom-5 sm:bottom-7 z-20 flex flex-row items-center gap-2.5 sm:gap-3 pointer-events-none transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
             <div className="flex items-center gap-2.5 sm:gap-3">
@@ -1796,9 +1795,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   {t("more_like_this")}
                 </span>
               )}
-            </div>
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-white/80 shrink-0">
-              <ChevronDown size={18} className="animate-bounce" />
             </div>
           </div>
         )}
@@ -1847,9 +1843,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             <div
               ref={watchNowRef as any}
               data-focuskey={`asset-watch-now-${assetId}`}
-              className={`rounded-full inline-flex transition-all duration-200 ${
+              className={`rounded-full inline-flex transition-all duration-200 outline-none ${
                 watchNowFocused
-                  ? 'border-[3px] border-white ring-4 ring-white/50 shadow-2xl scale-105 z-50'
+                  ? 'border-[3px] border-white scale-105 z-50'
                   : 'border-[3px] border-transparent'
               }`}
             >
@@ -1858,9 +1854,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 size={JOJOButton.Size.M}
                 appearance={buttonConfig.appearance}
                 disabled={buttonConfig.disabled || isPreparingPlayback}
-                leftIcon={isPreparingPlayback ? <Loader size="sm" /> : buttonConfig.showIcon ? <Play className="w-4 h-4 sm:w-5" fill="currentColor" /> : undefined}
+                leftIcon={isPreparingPlayback ? <Loader size="sm" /> : buttonConfig.showIcon ? <Play className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" fill="currentColor" /> : undefined}
                 onClick={handleWatchNow}
-                className="text-theme_1 !text-sm sm:!text-base sm:body-sm-medium font-bold gap-1.5 sm:gap-2 h-9 sm:h-11 px-4 sm:px-8 transition-all !rounded-full shrink-0"
+                className="text-theme_1 !text-sm sm:!text-base sm:body-sm-medium font-bold gap-2 sm:gap-2.5 h-9 sm:h-11 px-4 sm:px-8 transition-all !rounded-full shrink-0"
               >
                 {(() => {
                   const text = isPreparingPlayback ? "Loading..." : buttonConfig.text;
@@ -1909,7 +1905,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   description: asset.description,
                 } : undefined);
               }}
-              className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all cursor-pointer shrink-0 ${watchlistFocused ? "bg-white text-black border-white scale-110 shadow-lg ring-4 ring-white/40 z-50" : "bg-white/10 text-white/80 border-white/15 hover:bg-white/20 hover:text-white"}`}
+              className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 outline-none ${watchlistFocused ? "bg-white text-black border-white scale-110 z-50" : "bg-white/10 text-white/80 border-white/15 hover:bg-white/20 hover:text-white"}`}
               title={t("add_to_watchlist")}
             >
               {inWatchlist ? <Check size={20} className="text-theme_13_samecolour" /> : <Plus size={20} />}
@@ -1998,9 +1994,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         hasAnyTab && (
           <div className="flex flex-col h-full w-full overflow-hidden">
             {/* Fixed Tabs Header Bar — stays pinned at the top of the viewport during scrolling */}
-            <div className="w-full shrink-0 z-40 bg-neutral-950/95 backdrop-blur-md border-b border-white/10 px-6 sm:px-10 lg:px-16 pt-8 sm:pt-10 pb-0">
+            <div className="w-full shrink-0 z-40 bg-neutral-950/95 backdrop-blur-md border-b border-white/10 px-6 sm:px-10 lg:px-16 pt-6 sm:pt-8 pb-3 sm:pb-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-6 sm:gap-8 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto py-2 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                   {hasEpisodesTab && (
                     <FocusableTabButton
                       label={t("episodes")}
@@ -2223,7 +2219,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 <div className="pb-16">
                     <div
                       data-cast-grid
-                      className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-x-4 gap-y-8 sm:gap-y-10 w-full pt-4"
+                      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-x-6 sm:gap-x-8 gap-y-8 sm:gap-y-10 w-full pt-4"
                     >
                       {castList.map((castItem, idx) => (
                         <FocusableCastItem
@@ -2452,7 +2448,7 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
               focused ? "scale-110" : ""
             }`}
           >
-            <Play size={20} fill="currentColor" className="ml-0.5" />
+            <Play size={24} fill="currentColor" className="ml-0.5" />
           </div>
         </div>
       </div>
@@ -2585,7 +2581,7 @@ function FocusableCastItem({
       <div
         className={`relative w-[115px] h-[115px] sm:w-[140px] sm:h-[140px] rounded-full overflow-hidden mb-3.5 flex items-center justify-center bg-neutral-900 shrink-0 border-2 transition-all duration-300 ${
           focused
-            ? "border-white ring-4 ring-white ring-offset-4 ring-offset-[#191919] shadow-2xl"
+            ? "border-white scale-105 shadow-xl"
             : "border-white/15 group-hover:border-white/40"
         }`}
       >
@@ -2663,7 +2659,7 @@ function FocusableTrailerItem({ trailer, idx, asset, onWatch }: any) {
         )}
         <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
           <div className="w-12 h-12 rounded-full bg-theme_13_samecolour/90 text-white flex items-center justify-center shadow-lg">
-            <Play size={20} fill="currentColor" className="ml-0.5" />
+            <Play size={24} fill="currentColor" className="ml-0.5" />
           </div>
         </div>
       </div>
@@ -2808,7 +2804,7 @@ function FocusableTabButton({
       data-focuskey={focusKeyPrefix}
       data-focused={focused ? "true" : "false"}
       onClick={handleActivate}
-      className={`relative pt-1 pb-3 text-base sm:text-lg lg:text-xl font-semibold transition-colors outline-none shrink-0 cursor-pointer ${
+      className={`relative flex flex-col items-center justify-center pt-1.5 pb-4 px-2 text-base sm:text-lg lg:text-xl font-semibold transition-all outline-none shrink-0 cursor-pointer select-none ${
         isActive
           ? "text-theme_13_samecolour"
           : focused
@@ -2816,14 +2812,24 @@ function FocusableTabButton({
             : "text-neutral-400 hover:text-white"
       }`}
     >
-      <span className={`inline-block px-2.5 py-1 rounded transition-all ${
-        focused ? "bg-white/15 ring-2 ring-white text-white" : ""
-      }`}>
+      <span
+        className={`inline-flex items-center justify-center px-4 py-1.5 rounded-xl transition-all duration-150 ${
+          focused
+            ? "bg-white/20 text-white font-bold ring-2 ring-white shadow-md scale-105"
+            : isActive
+              ? "text-theme_13_samecolour font-bold"
+              : "text-neutral-400 hover:text-white"
+        }`}
+      >
         {label}
       </span>
       {isActive && (
         <span
-          className="absolute bottom-0 left-0 right-0 h-[3px] bg-theme_13_samecolour rounded-full shadow-[0_0_10px_rgba(255,102,0,0.6)]"
+          className={`absolute bottom-0 left-2 right-2 h-[3px] bg-theme_13_samecolour rounded-full transition-all duration-200 ${
+            focused
+              ? "shadow-[0_0_12px_rgba(255,102,0,0.8)]"
+              : "shadow-[0_0_6px_rgba(255,102,0,0.4)]"
+          }`}
         />
       )}
     </button>

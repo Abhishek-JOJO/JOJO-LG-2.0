@@ -283,8 +283,8 @@ async function decryptConfig(encrypted: string): Promise<RuntimeConfig> {
 
         // Map to RuntimeConfig structure
         const config: RuntimeConfig = {
-            apiBaseUrl: envType === "prod" ? api.prodBaseUrl : api.stageBaseUrl,
-            socketUrl: formatSocketUrl(envType === "prod" ? api.socketProdUrl : api.socketBaseUrl),
+            apiBaseUrl: (envType === "prod" ? api.prodBaseUrl : api.stageBaseUrl) || env.fallbackApiBaseUrl || "https://api.superott.in",
+            socketUrl: formatSocketUrl((envType === "prod" ? api.socketProdUrl : api.socketBaseUrl) || env.fallbackSocketUrl),
             envType: envType,
             publicIp: data.publicIp,
             apiUpdates: apiUpdates,
