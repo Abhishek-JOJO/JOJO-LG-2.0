@@ -1,12 +1,8 @@
-import { PageBackground } from "@/components/common/PageBackground";
 import { JOJOSkeleton } from "@/components/ui/JOJOSkeleton";
 
 export default function OTPLoading() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-theme_12">
-      {/* Background */}
-      <PageBackground />
-
+    <div className="relative min-h-screen w-full overflow-hidden bg-[radial-gradient(circle_at_25%_25%,_#3d1a08_0%,_#140a04_50%,_#050201_100%)] text-white">
       {/* Main Wrapper */}
       <div className="relative z-10 flex min-h-screen items-start justify-center pt-40 m-2">
         {/* Card */}
@@ -59,4 +55,4 @@ export default function OTPLoading() {
       </div>
     </div>
   );
-} 
+}

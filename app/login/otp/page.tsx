@@ -1,6 +1,5 @@
 "use client";
 
-import { PageBackground } from "@/components/common/PageBackground";
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
 import JOJOCommonImage, { JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import { JOJOCustomInput } from "@/components/ui/JOJOInput";
@@ -487,8 +486,7 @@ function OtpPageContent() {
   });
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <PageBackground />
+    <div className="relative min-h-screen w-full overflow-hidden bg-[radial-gradient(circle_at_25%_25%,_#3d1a08_0%,_#140a04_50%,_#050201_100%)] text-white">
       <div className="relative z-10 flex min-h-screen flex-col px-6 py-8 sm:px-10">
         {/* Top bar: logo */}
         <div className="flex items-center">
