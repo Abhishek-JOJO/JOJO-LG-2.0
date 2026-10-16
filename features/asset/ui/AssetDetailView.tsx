@@ -222,6 +222,25 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const storeUser = useAuthStore((state) => state.user);
 
   const [activeTab, setActiveTab] = useState<"episodes" | "trailers" | "cast" | "more_like_this">("episodes");
+  const [contentOverlayArmed, setContentOverlayArmed] = useState(false);
+  // Keep the card's already-visible wide artwork for the first hero slide.
+  // Replacing it as soon as the detail API resolves is visually disruptive,
+  // even when both URLs belong to the same asset, because their source crops
+  // can differ. AssetDetailView is keyed by assetId, so this value naturally
+  // resets for each newly opened detail.
+  const initialHeroPosterUrl = useMemo(() => (
+    initialAsset?.heroImage ||
+    initialAsset?.landscapeImage ||
+    initialAsset?.landscapeFallbackImages?.[0] ||
+    initialAsset?.landscape?.url ||
+    (typeof initialAsset?.landscape === "string" ? initialAsset.landscape : "") ||
+    initialAsset?.posterImage ||
+    initialAsset?.poster?.url ||
+    (typeof initialAsset?.poster === "string" ? initialAsset.poster : "") ||
+    initialAsset?.image ||
+    initialAsset?.thumbnailUrl ||
+    ""
+  ), [initialAsset]);
 
   // The hero (backdrop + title + action buttons) used to sit in normal
   // document flow, so reaching the tabs/episodes/cast content meant
@@ -235,12 +254,18 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // the action row, wrapping back around, etc.), the sheet opens; the moment
   // focus leaves back to the action row, it closes. No new scroll/wheel
   // listener needed since this app's navigation is D-pad/focus-driven.
-  const { ref: contentOverlayRef, focusKey: contentOverlayFocusKey, hasFocusedChild: contentOverlayOpen } = useFocusable({
+  const { ref: contentOverlayRef, focusKey: contentOverlayFocusKey, hasFocusedChild: contentOverlayHasFocus } = useFocusable({
     focusable: false,
     trackChildren: true,
     isFocusBoundary: true,
     focusKey: "asset-detail-content-overlay",
+    saveLastFocusedChild: false,
+    autoRestoreFocus: false,
   });
+  // The sheet may only open after an explicit Down action from the hero. This
+  // prevents spatial-navigation focus restoration during mount from treating a
+  // stale tab as user intent and animating the sheet over the poster.
+  const contentOverlayOpen = contentOverlayArmed && contentOverlayHasFocus;
   const contentOverlayOpenRef = useRef(contentOverlayOpen);
   useEffect(() => {
     contentOverlayOpenRef.current = contentOverlayOpen;
@@ -473,7 +498,10 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         id: "main-preview",
         type: "video",
         videoUrl: asset.previewUrl,
-        poster: asset.poster?.url || asset.landscape?.url || "",
+        // The hero is landscape. Prefer the landscape artwork so the loaded
+        // asset does not replace the rail's wide hero image with a portrait
+        // poster and visibly recalculate the crop.
+        poster: asset.landscape?.url || asset.heroImage || asset.landscapeImage || asset.poster?.url || asset.posterImage || "",
         title: asset.title,
       });
     }
@@ -522,12 +550,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     // 4. Last resort: static poster image
     if (list.length === 0) {
       const fallbackPoster =
-        asset?.poster?.url ||
-        (typeof asset?.poster === "string" ? asset.poster : "") ||
         asset?.landscape?.url ||
         (typeof asset?.landscape === "string" ? asset.landscape : "") ||
         asset?.heroImage ||
         asset?.landscapeImage ||
+        asset?.poster?.url ||
+        (typeof asset?.poster === "string" ? asset.poster : "") ||
         asset?.posterImage ||
         asset?.image ||
         asset?.thumbnailUrl ||
@@ -570,12 +598,15 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     setCurrentSlideIndex(idx);
   };
 
-  // Scroll window to top when assetId changes (only on standalone details page views)
+  // A modal also uses the standalone layout, but it sits over a scrolled browse
+  // page. Smooth-scrolling the window here made the fixed hero appear to rise
+  // from the bottom and also moved the page that must be restored on close.
+  // Only a real route-level detail page owns the window scroll position.
   useEffect(() => {
-    if (isStandalone) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    if (isStandalone && !onClose) {
+      window.scrollTo({ top: 0, behavior: "auto" });
     }
-  }, [assetId, isStandalone]);
+  }, [assetId, isStandalone, onClose]);
 
   const { data: navItems } = useAppNavigation(isAppReady);
   const openAssetDetail = useAssetDetailStore((s) => s.openAssetDetail);
@@ -1067,6 +1098,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   }, [isShowAsset, castList, displayRelated]);
 
   const navigateDownFromActions = () => {
+    setContentOverlayArmed(true);
     const tabs = availableTabsRef.current;
     if (tabs.length > 0) {
       const targetTab = tabs[0];
@@ -1112,9 +1144,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       return true;
     },
     onEnterPress: () => handleWatchNow(),
-    onFocus: () => {
-      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
   });
 
   const { ref: watchlistRef, focused: watchlistFocused } = useFocusable({
@@ -1151,9 +1180,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         description: asset.description,
       } : undefined);
     },
-    onFocus: () => {
-      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
   });
 
   // 1. Initial Focus Trigger: Set focus to primary Watch Now button as soon as skeleton finishes loading
@@ -1245,6 +1271,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // primary Hero CTA (Watch Now / Play / Rent or Add to Watchlist).
   const closeContentOverlay = useCallback(() => {
     isEpisodeFocusedRef.current = false;
+    setContentOverlayArmed(false);
     const watchNowKey = `asset-watch-now-${assetId}`;
     const watchlistKey = `asset-watchlist-${assetId}`;
     const targetKey =
@@ -1257,11 +1284,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     retrySetFocus(targetKey, 6, 60);
 
     if (contentOverlayRef.current) {
-      contentOverlayRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      contentOverlayRef.current.scrollTo({ top: 0, behavior: "auto" });
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [assetId, contentOverlayRef]);
+    if (!onClose) {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [assetId, contentOverlayRef, onClose]);
 
   // Browser, LG and Samsung Back handling.
   // Registered in the CAPTURE phase so it runs before any bubble-phase listeners
@@ -1350,17 +1378,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     // the card the user just clicked, painted instantly behind the shimmer
     // placeholders instead of a flat gray box, while the real fetch is still
     // in flight. Never used for anything but this background/heading.
-    const previewImage =
-      initialAsset?.heroImage ||
-      initialAsset?.landscapeImage ||
-      initialAsset?.posterImage ||
-      initialAsset?.image ||
-      initialAsset?.poster?.url ||
-      initialAsset?.landscape?.url ||
-      initialAsset?.thumbnailUrl ||
-      (typeof initialAsset?.poster === "string" ? initialAsset.poster : "") ||
-      (typeof initialAsset?.landscape === "string" ? initialAsset.landscape : "") ||
-      "";
+    const previewImage = initialHeroPosterUrl;
     const previewTitle = initialAsset?.title || initialAsset?.asset_title || "";
     const previewTitleImage =
       initialAsset?.titleImage ||
@@ -1373,7 +1391,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       <div
         className={
           isStandalone
-            ? "relative w-full min-h-screen bg-theme_10 text-theme_1 overflow-x-hidden pb-16 animate-pulse"
+            ? "relative h-screen w-full overflow-hidden bg-theme_10 text-theme_1 animate-pulse"
             : "relative w-full max-w-[850px] mx-auto bg-theme_10 text-theme_1 rounded-[12px] overflow-hidden animate-pulse"
         }
       >
@@ -1381,25 +1399,16 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         <div
           className={
             isStandalone
-              ? "relative w-full h-[350px] sm:h-[500px] md:h-[600px] lg:h-[70vh] bg-neutral-900 flex flex-col justify-end p-6 gap-4"
+              ? "fixed inset-0 h-screen w-full bg-neutral-900 flex flex-col justify-end p-6 gap-4"
               : "relative w-full h-[280px] sm:h-[450px] bg-neutral-900 flex flex-col justify-end p-6 gap-4"
           }
           style={{
             backgroundImage: previewImage ? `url("${previewImage}")` : undefined,
             backgroundSize: "cover",
-            backgroundPosition: "top",
+            backgroundPosition: "center top",
+            backgroundRepeat: "no-repeat",
           }}
         >
-          {previewImage && (
-            <img
-              src={previewImage}
-              alt=""
-              className="absolute inset-0 w-full h-full object-cover object-top pointer-events-none select-none"
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              loading="eager"
-            />
-          )}
-
           {/* Logo/Title block — real title image if already known, otherwise title text or shimmer */}
           {previewTitleImage ? (
             <div className={
@@ -1574,13 +1583,14 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     asset.asset_tags.some((tag: any) => typeof tag === "string" && tag.toLowerCase().includes("coming soon"));
 
   const bgPosterUrl =
+    (currentSlideIndex === 0 ? initialHeroPosterUrl : "") ||
     activePreview?.poster ||
-    asset.poster?.url ||
-    (typeof asset.poster === "string" ? asset.poster : "") ||
     asset.landscape?.url ||
     (typeof asset.landscape === "string" ? asset.landscape : "") ||
     asset.heroImage ||
     asset.landscapeImage ||
+    asset.poster?.url ||
+    (typeof asset.poster === "string" ? asset.poster : "") ||
     asset.posterImage ||
     asset.image ||
     asset.thumbnailUrl ||
@@ -1660,7 +1670,8 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         style={{
           backgroundImage: bgPosterUrl ? `url("${bgPosterUrl}")` : undefined,
           backgroundSize: "cover",
-          backgroundPosition: "top",
+          backgroundPosition: "center top",
+          backgroundRepeat: "no-repeat",
         }}
       >
         {/* Background preview video playing after static poster delay.
@@ -1683,21 +1694,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           />
         ) : null}
 
-        {/* Background Image (Static Poster) shown initially, as fallback, or while the content sheet is open */}
-        {(!videoStarted || !videoReady || videoError || contentOverlayOpen) && (
-          bgPosterUrl ? (
-            <JOJOCommonImage
-              src={bgPosterUrl}
-              alt={asset.title}
-              fill
-              priority
-              className="object-cover object-top"
-              wrapperClassName="w-full h-full"
-            />
-          ) : (
-            <div className="w-full h-full bg-neutral-900" />
-          )
-        )}
+        {/* The poster is the banner's single CSS background layer. Keeping one
+            renderer avoids the original image being replaced after load by a
+            separately optimized <Image> with a slightly different crop. */}
         {/* Figma Left Horizontal Vignette: matches Rectangle 1439 (924px width on 1920px screen = ~52% width) */}
         <div
           className="absolute inset-y-0 left-0 w-full sm:w-[65%] lg:w-[55%] z-10 pointer-events-none"

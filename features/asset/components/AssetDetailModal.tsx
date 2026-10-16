@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useAssetDetailStore } from "../store/useAssetDetailStore";
 import { AssetDetailView } from "../ui/AssetDetailView";
 import { AnimatePresence, motion } from "framer-motion";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { usePathname } from "next/navigation";
-import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { doesFocusableExist, useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 
 import { restorePageFocus } from "@/src/navigation/focusUtils";
 import { isBackEvent } from "@/src/platform";
@@ -22,11 +22,15 @@ export function AssetDetailModal() {
       if (el) el.remove();
       const st = document.getElementById("early-asset-restore-style");
       if (st) st.remove();
-      setTimeout(() => setFocus('MODAL_ASSET_DETAIL'), 100);
+      const timer = setTimeout(() => {
+        const heroFocusKey = `asset-watch-now-${activeAssetId}`;
+        setFocus(doesFocusableExist(heroFocusKey) ? heroFocusKey : 'MODAL_ASSET_DETAIL');
+      }, 100);
+      return () => clearTimeout(timer);
     } else {
       restorePageFocus(useAssetDetailStore.getState().returnFocusKey);
     }
-  }, [isOpen]);
+  }, [activeAssetId, isOpen]);
 
   // 0. Automatically reset the modal when navigation to the watch page completes.
   // This prevents the underlying layout from flashing during client-side navigation.
@@ -89,7 +93,7 @@ export function AssetDetailModal() {
   };
 
   // Scroll modal container when activeAssetId changes (e.g. clicking related content or going back)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (scrollContainerRef.current) {
       const state = useAssetDetailStore.getState();
       if (state.shouldScrollToBottom) {
@@ -103,7 +107,9 @@ export function AssetDetailModal() {
         }, 120);
         state.resetScrollFlag();
       } else {
-        scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+        // Reset before the new hero paints. A smooth reset is visible as the
+        // backdrop travelling bottom-to-top when opening/switching assets.
+        scrollContainerRef.current.scrollTo({ top: 0, behavior: "auto" });
       }
     }
   }, [activeAssetId]);
@@ -158,6 +164,8 @@ function AssetDetailModalBoundary({
   const { ref: focusRef, focusKey } = useFocusable({
     focusKey: 'MODAL_ASSET_DETAIL',
     isFocusBoundary: true,
+    saveLastFocusedChild: false,
+    preferredChildFocusKey: `asset-watch-now-${activeAssetId}`,
   });
 
   return (

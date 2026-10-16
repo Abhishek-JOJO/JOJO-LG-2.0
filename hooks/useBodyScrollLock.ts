@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 
 // Track scroll locks globally (to support multiple nested overlays correctly)
 let lockCount = 0;
@@ -22,7 +22,10 @@ let savedBodyStyles = {
  * @param lock Whether the scroll lock is active.
  */
 export function useBodyScrollLock(lock: boolean) {
-  useEffect(() => {
+  // Scroll-lock styles affect the coordinate system used by full-screen fixed
+  // overlays. Apply them before paint so the overlay never renders for one
+  // frame at the unlocked body's position and then jumps upward.
+  useLayoutEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return;
     if (!lock) return;
 
