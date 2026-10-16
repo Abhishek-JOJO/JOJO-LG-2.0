@@ -1698,13 +1698,33 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             <div className="w-full h-full bg-neutral-900" />
           )
         )}
+        {/* Figma Left Horizontal Vignette: matches Rectangle 1439 (924px width on 1920px screen = ~52% width) */}
+        <div
+          className="absolute inset-y-0 left-0 w-full sm:w-[65%] lg:w-[55%] z-10 pointer-events-none"
+          style={{
+            background: "linear-gradient(to right, #050505 0%, #050505 32%, rgba(5, 5, 5, 0.92) 55%, rgba(5, 5, 5, 0.45) 80%, transparent 100%)",
+          }}
+        />
+        {/* Soft full-width horizontal gradient to soften highlights on wide viewports */}
         <div
           className="absolute inset-0 z-10 pointer-events-none"
-          style={{ background: "linear-gradient(to right, var(--theme_10, #191919) 0%, var(--theme_10_50, rgba(25, 25, 25, 0.5)) 40%, transparent 100%)" }}
+          style={{
+            background: "linear-gradient(to right, rgba(5, 5, 5, 0.95) 0%, rgba(5, 5, 5, 0.6) 40%, transparent 75%)",
+          }}
         />
+        {/* Figma Bottom Fade: deep black foundation for bottom tabs and smooth fade upwards */}
         <div
-          className="absolute inset-x-0 -bottom-px h-[50%] z-10 pointer-events-none"
-          style={{ background: "linear-gradient(to top, var(--theme_10, #191919) 0%, var(--theme_10_50, rgba(25, 25, 25, 0.5)) 20%, transparent 100%)" }}
+          className="absolute inset-x-0 bottom-0 h-[48%] z-10 pointer-events-none"
+          style={{
+            background: "linear-gradient(to top, #050505 0%, #050505 20%, rgba(5, 5, 5, 0.85) 50%, rgba(5, 5, 5, 0.25) 80%, transparent 100%)",
+          }}
+        />
+        {/* Top subtle vignette for header integration */}
+        <div
+          className="absolute inset-x-0 top-0 h-28 sm:h-36 z-10 pointer-events-none"
+          style={{
+            background: "linear-gradient(to bottom, rgba(5, 5, 5, 0.75) 0%, rgba(5, 5, 5, 0.2) 60%, transparent 100%)",
+          }}
         />
         {!isStandalone && (
           <div className="absolute bottom-8 sm:bottom-10 left-6 z-20 max-w-[70%]">
@@ -1771,43 +1791,103 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           </div>
         )}
 
-        {/* "More below" tab pills — visible when overlay sheet is closed */}
+        {/* Figma Bottom Tabs — visible on hero when overlay sheet is closed */}
         {isStandalone && hasAnyTab && (
-          <div className={`absolute left-4 sm:left-6 lg:left-14 bottom-5 sm:bottom-7 z-20 flex flex-row items-center gap-2.5 sm:gap-3 pointer-events-none transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
-            <div className="flex items-center gap-2.5 sm:gap-3">
-              {hasEpisodesTab && (
-                <span className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wide">
-                  {t("episodes")}
-                </span>
-              )}
-              {hasTrailersTab && (
-                <span className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wide">
-                  {t("trailers")}
-                </span>
-              )}
-              {hasCastTab && (
-                <span className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wide">
-                  {t("cast_crew")}
-                </span>
-              )}
-              {hasMoreLikeThisTab && (
-                <span className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-xs sm:text-sm font-bold text-white/90 uppercase tracking-wide">
-                  {t("more_like_this")}
-                </span>
-              )}
-            </div>
+          <div className={`absolute left-6 sm:left-10 lg:left-16 bottom-8 sm:bottom-10 z-20 flex flex-row items-center gap-8 sm:gap-12 pointer-events-none transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+            {hasEpisodesTab && (
+              <span className="text-base sm:text-lg lg:text-xl font-medium text-white/70 tracking-wide">
+                {t("episodes")}
+              </span>
+            )}
+            {hasTrailersTab && (
+              <span className="text-base sm:text-lg lg:text-xl font-medium text-white/70 tracking-wide">
+                {t("trailers")}
+              </span>
+            )}
+            {hasCastTab && (
+              <span className="text-base sm:text-lg lg:text-xl font-medium text-white/70 tracking-wide">
+                {t("cast_crew")}
+              </span>
+            )}
+            {hasMoreLikeThisTab && (
+              <span className="text-base sm:text-lg lg:text-xl font-medium text-white/70 tracking-wide">
+                {t("more_like_this")}
+              </span>
+            )}
           </div>
         )}
       </div>
 
-      <div className={isStandalone ? `absolute inset-x-0 top-[50vh] -translate-y-1/2 z-20 px-4 sm:px-6 lg:px-14 flex flex-col gap-4 sm:gap-5 max-w-[900px] transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}` : "relative z-20 -mt-px px-6 pt-5 sm:pt-6 pb-10 sm:pb-12 bg-theme_10 flex flex-col gap-5"}>
-        {isStandalone && (
-          <div className="max-w-[85%] sm:max-w-[80%] lg:max-w-[700px] mb-1">
-            {titleBlock}
+      <div className={isStandalone ? `absolute inset-x-0 top-[46vh] -translate-y-1/2 z-20 px-6 sm:px-10 lg:px-16 flex flex-col gap-3.5 sm:gap-4 max-w-[820px] transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}` : "relative z-20 -mt-px px-6 pt-5 sm:pt-6 pb-10 sm:pb-12 bg-theme_10 flex flex-col gap-5"}>
+        {/* Title or Logo */}
+        <div className="max-w-[85%] sm:max-w-[80%] lg:max-w-[700px] mb-0.5">
+          {titleBlock}
+        </div>
+
+        {/* Metadata Details Block: Badges, Rank, Genre, Description */}
+        <div className="flex flex-col items-start gap-2.5">
+          {/* Rank & Metadata Badges Row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Show the "New" tag only when this is NOT a Coming Soon asset */}
+            {!isComingSoon && asset.asset_tags_badgeText && asset.asset_tags_badgeText.toLowerCase().includes("new") && (
+              <span className="px-3 py-1 rounded-full bg-white/15 text-white text-xs font-bold uppercase tracking-wider">
+                {asset.asset_tags_badgeText}
+              </span>
+            )}
+            {isHomePage && asset.isInTop10 && (
+              <span className="px-3.5 py-1 rounded-full bg-[#FF8800]/15 border border-[#FF8800]/40 text-[#FF8800] text-xs font-bold uppercase tracking-wider">
+                {t("top", { rank: asset?.numberintop10 || 10 })}
+              </span>
+            )}
+            {asset.certification && (
+              <span className="px-3.5 py-1 rounded-full bg-white/10 text-white/90 border border-white/15 text-xs font-semibold uppercase tracking-wide">
+                {asset.certification}
+              </span>
+            )}
+            {(asset.releaseDate || asset.release_date || asset.asset_release_date) && (
+              <span className="px-3.5 py-1 rounded-full bg-white/10 text-white/90 border border-white/15 text-xs font-semibold uppercase tracking-wide">
+                {(asset.releaseDate || asset.release_date || asset.asset_release_date).split('-')[0]}
+              </span>
+            )}
+            {(isShow ? (asset.seasons?.length || 0) > 0 : !!asset.durationSeconds) && (
+              <span className="px-3.5 py-1 rounded-full bg-white/10 text-white/90 border border-white/15 text-xs font-semibold uppercase tracking-wide">
+                {isShow
+                  ? `${asset.seasons?.length || 1} Season${(asset.seasons?.length || 1) > 1 ? "s" : ""}`
+                  : asset.durationSeconds
+                    ? `${Math.floor(asset.durationSeconds / 3600) > 0 ? `${Math.floor(asset.durationSeconds / 3600)}h ` : ""}${Math.floor((asset.durationSeconds % 3600) / 60)}m`
+                    : ""}
+              </span>
+            )}
           </div>
-        )}
+
+          {/* Genre Line */}
+          {asset.genres && asset.genres.length > 0 && (
+            <div className="flex flex-wrap items-center text-sm sm:text-base font-bold text-white tracking-wide mt-0.5">
+              {asset.genres.map((genre: string, i: number) => (
+                <span key={i} className="flex items-center">
+                  {i > 0 && <span className="mx-2 text-white/40 font-normal">•</span>}
+                  {genre}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Description Paragraph */}
+          <div className="text-sm sm:text-base leading-relaxed text-white/80 max-w-[640px] font-normal line-clamp-3 sm:line-clamp-4 mt-0.5">
+            {asset.description ? (
+              <div
+                className="[&>p]:mb-2 [&>p:last-child]:mb-0 [&_*]:!text-white/80"
+                dangerouslySetInnerHTML={{ __html: asset.description }}
+              />
+            ) : (
+              <p>{t("no_description_available")}</p>
+            )}
+          </div>
+        </div>
+
+        {/* TVOD Rental indicator if applicable */}
         {asset?.assetCategoryCode === ASSET_CATEGORY_CODE.TVOD && (
-          <div className="flex items-center gap-2 px-1 overflow-hidden">
+          <div className="flex items-center gap-2 px-1 overflow-hidden mt-0.5">
             <TvodIcon
               size={15}
               className="shrink-0"
@@ -1831,14 +1911,16 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             </span>
           </div>
         )}
-        <div className="flex items-center justify-start gap-4 sm:gap-6 w-full">
-          {/* Primary Play/Rent CTA — replaced with plain Coming Soon text when applicable */}
+
+        {/* Action Buttons Row — positioned cleanly below the description as in Figma */}
+        <div className="flex items-center justify-start gap-4 sm:gap-5 w-full mt-2">
+          {/* Primary Play/Rent CTA */}
           {isComingSoon ? (
             <span className="text-sm sm:text-base font-bold text-white select-none">
               Coming Soon
             </span>
           ) : isAuthLoading ? (
-            <div className="h-9 sm:h-11 w-32 sm:w-40 bg-neutral-800 rounded-full animate-pulse shrink-0" />
+            <div className="h-10 sm:h-12 w-32 sm:w-44 bg-neutral-800 rounded-full animate-pulse shrink-0" />
           ) : (
             <div
               ref={watchNowRef as any}
@@ -1856,7 +1938,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 disabled={buttonConfig.disabled || isPreparingPlayback}
                 leftIcon={isPreparingPlayback ? <Loader size="sm" /> : buttonConfig.showIcon ? <Play className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" fill="currentColor" /> : undefined}
                 onClick={handleWatchNow}
-                className="text-theme_1 !text-sm sm:!text-base sm:body-sm-medium font-bold gap-2 sm:gap-2.5 h-9 sm:h-11 px-4 sm:px-8 transition-all !rounded-full shrink-0"
+                className="text-theme_1 !text-sm sm:!text-base sm:body-sm-medium font-bold gap-2 sm:gap-2.5 h-10 sm:h-12 px-5 sm:px-8 transition-all !rounded-full shrink-0"
               >
                 {(() => {
                   const text = isPreparingPlayback ? "Loading..." : buttonConfig.text;
@@ -1880,7 +1962,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
           <div className="flex items-center gap-3 sm:gap-4">
             {isAuthLoading ? (
-              <div className="h-9 w-9 sm:h-11 sm:w-11 bg-neutral-800 rounded-full animate-pulse shrink-0" />
+              <div className="h-10 w-10 sm:h-12 sm:w-12 bg-neutral-800 rounded-full animate-pulse shrink-0" />
             ) : (
               <>
                 {/* Add to list */}
@@ -1888,89 +1970,33 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                   ref={watchlistRef as any}
                   data-focuskey={`asset-watchlist-${assetId}`}
                   onClick={() => {
-                if (isGuest) {
-                  useGuestPopupStore.getState().openGuestPopup();
-                  return;
-                }
-                const targetId = Number(asset?.assetId ?? assetId);
-                toggleWatchlist(targetId, !inWatchlist, asset ? {
-                  title: asset.title,
-                  asset_title: asset.title,
-                  poster: asset.poster,
-                  landscape: asset.landscape,
-                  posterImage: asset.poster?.url,
-                  landscapeImage: asset.landscape?.url,
-                  image: asset.landscape?.url || asset.poster?.url || "",
-                  assetTypeCode: asset.assetTypeCode,
-                  description: asset.description,
-                } : undefined);
-              }}
-              className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 outline-none ${watchlistFocused ? "bg-white text-black border-white scale-110 z-50" : "bg-white/10 text-white/80 border-white/15 hover:bg-white/20 hover:text-white"}`}
-              title={t("add_to_watchlist")}
-            >
-              {inWatchlist ? <Check size={20} className="text-theme_13_samecolour" /> : <Plus size={20} />}
-            </button>
-
+                    if (isGuest) {
+                      useGuestPopupStore.getState().openGuestPopup();
+                      return;
+                    }
+                    const targetId = Number(asset?.assetId ?? assetId);
+                    toggleWatchlist(targetId, !inWatchlist, asset ? {
+                      title: asset.title,
+                      asset_title: asset.title,
+                      poster: asset.poster,
+                      landscape: asset.landscape,
+                      posterImage: asset.poster?.url,
+                      landscapeImage: asset.landscape?.url,
+                      image: asset.landscape?.url || asset.poster?.url || "",
+                      assetTypeCode: asset.assetTypeCode,
+                      description: asset.description,
+                    } : undefined);
+                  }}
+                  className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 outline-none ${
+                    watchlistFocused
+                      ? "bg-white text-black border-white scale-105 z-50"
+                      : "bg-white/10 text-white/90 border-white/20 hover:bg-white/20 hover:text-white"
+                  }`}
+                  title={t("add_to_watchlist")}
+                >
+                  {inWatchlist ? <Check size={20} className="text-theme_13_samecolour" /> : <Plus size={20} />}
+                </button>
               </>
-            )}
-          </div>
-        </div>
-
-        {/* Metadata Details Block */}
-        <div className="flex flex-col items-start gap-3 mt-1">
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-
-            {/* Show the "New" tag only when this is NOT a Coming Soon asset */}
-            {!isComingSoon && asset.asset_tags_badgeText && asset.asset_tags_badgeText.toLowerCase().includes("new") && (
-              <span className="px-3 py-1 rounded-md bg-theme_9 text-theme_1 text-xs font-bold uppercase">
-                {asset.asset_tags_badgeText}
-              </span>
-            )}
-            {isHomePage && asset.isInTop10 && (
-              <span className="px-3 py-1 rounded-md bg-theme_9 text-theme_1 text-xs font-bold uppercase">
-                {t("top", { rank: asset?.numberintop10 || 10 })}
-              </span>
-            )}
-            {asset.certification && (
-              <span className="px-3 py-1 rounded-md bg-theme_9 text-theme_5 text-xs font-medium uppercase">
-                {asset.certification}
-              </span>
-            )}
-            {(asset.releaseDate || asset.release_date || asset.asset_release_date) && (
-              <span className="px-3 py-1 rounded-md bg-theme_9 text-theme_5 text-xs font-medium uppercase">
-                {(asset.releaseDate || asset.release_date || asset.asset_release_date).split('-')[0]}
-              </span>
-            )}
-            {(isShow ? (asset.seasons?.length || 0) > 0 : !!asset.durationSeconds) && (
-              <span className="px-3 py-1 rounded-md bg-theme_9 text-theme_5 text-xs font-medium uppercase">
-                {isShow
-                  ? `${asset.seasons?.length || 1} Season${(asset.seasons?.length || 1) > 1 ? "s" : ""}`
-                  : asset.durationSeconds
-                    ? `${Math.floor(asset.durationSeconds / 3600) > 0 ? `${Math.floor(asset.durationSeconds / 3600)}h ` : ""}${Math.floor((asset.durationSeconds % 3600) / 60)}m`
-                    : ""}
-              </span>
-            )}
-          </div>
-
-          {asset.genres && asset.genres.length > 0 && (
-            <div className="flex flex-wrap items-center text-sm font-bold text-theme_1 mt-1">
-              {asset.genres.map((genre: string, i: number) => (
-                <span key={i} className="flex items-center">
-                  {i > 0 && <span className="mx-2 text-neutral-500 font-normal">•</span>}
-                  {genre}
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-2 text-sm sm:text-base leading-relaxed text-theme_4">
-            {asset.description ? (
-              <div
-                className="[&>p]:mb-3 [&>p:last-child]:mb-0 [&_*]:!text-theme_4"
-                dangerouslySetInnerHTML={{ __html: asset.description }}
-              />
-            ) : (
-              <p>{t("no_description_available")}</p>
             )}
           </div>
         </div>
@@ -1994,9 +2020,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         hasAnyTab && (
           <div className="flex flex-col h-full w-full overflow-hidden">
             {/* Fixed Tabs Header Bar — stays pinned at the top of the viewport during scrolling */}
-            <div className="w-full shrink-0 z-40 bg-neutral-950/95 backdrop-blur-md border-b border-white/10 px-6 sm:px-10 lg:px-16 pt-6 sm:pt-8 pb-3 sm:pb-4">
+            <div className="w-full shrink-0 z-40 bg-neutral-950/95 backdrop-blur-md border-b border-white/10 px-6 sm:px-10 lg:px-16 pt-5 sm:pt-7 pb-2 sm:pb-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto py-2 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="flex items-center gap-6 sm:gap-8 overflow-visible py-3">
                   {hasEpisodesTab && (
                     <FocusableTabButton
                       label={t("episodes")}
@@ -2804,7 +2830,7 @@ function FocusableTabButton({
       data-focuskey={focusKeyPrefix}
       data-focused={focused ? "true" : "false"}
       onClick={handleActivate}
-      className={`relative flex flex-col items-center justify-center pt-1.5 pb-4 px-2 text-base sm:text-lg lg:text-xl font-semibold transition-all outline-none shrink-0 cursor-pointer select-none ${
+      className={`relative flex flex-col items-center justify-center py-2 px-3 text-base sm:text-lg lg:text-xl font-semibold transition-all outline-none shrink-0 cursor-pointer select-none ${
         isActive
           ? "text-theme_13_samecolour"
           : focused
@@ -2813,23 +2839,19 @@ function FocusableTabButton({
       }`}
     >
       <span
-        className={`inline-flex items-center justify-center px-4 py-1.5 rounded-xl transition-all duration-150 ${
-          focused
-            ? "bg-white/20 text-white font-bold ring-2 ring-white shadow-md scale-105"
-            : isActive
-              ? "text-theme_13_samecolour font-bold"
-              : "text-neutral-400 hover:text-white"
+        className={`inline-flex items-center justify-center px-4 py-1.5 rounded-lg transition-all duration-150 ${
+          isActive
+            ? "border-2 border-transparent text-theme_13_samecolour font-bold bg-transparent"
+            : focused
+              ? "border-2 border-white text-white font-bold bg-transparent"
+              : "border-2 border-transparent text-neutral-400 hover:text-white"
         }`}
       >
         {label}
       </span>
       {isActive && (
         <span
-          className={`absolute bottom-0 left-2 right-2 h-[3px] bg-theme_13_samecolour rounded-full transition-all duration-200 ${
-            focused
-              ? "shadow-[0_0_12px_rgba(255,102,0,0.8)]"
-              : "shadow-[0_0_6px_rgba(255,102,0,0.4)]"
-          }`}
+          className="absolute -bottom-1 left-3 right-3 h-[3px] bg-theme_13_samecolour rounded-full transition-all duration-200"
         />
       )}
     </button>
