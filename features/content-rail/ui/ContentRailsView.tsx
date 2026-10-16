@@ -18,6 +18,8 @@ import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { useContentRails } from "../hooks/useContentRails";
 import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 import { useWatchlistStore } from "@/store/useWatchlistStore";
+import { useNavStore } from "@/store/useNavStore";
+import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 import { useAuthStore } from "@store/useAuthStore";
 import { useLocaleStore } from "@store/useLocaleStore";
 import { useContinueWatchingStore } from "@store/useContinueWatchingStore";
@@ -206,7 +208,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     isFetchingNextPage,
   } = useContentRails(subnavId, isAppReady && isNavReady, 20);
 
-
+  const showSkeleton = Boolean(isLoading || (isFetching && !data));
 
   const statusRef = useRef({ hasNextPage, isFetchingNextPage, fetchNextPage });
   useEffect(() => {
@@ -585,11 +587,24 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     return () => clearTimeout(timer);
   }, [safeActiveRailIndex, contentRails, isTvFileRuntime]);
 
-  // ── Initial load: TV Hero Slider skeleton matching 75vh layout ──
-  const showSkeleton = isLoading || (isFetching && !data);
+  // Sync whether hero is fully loaded and ready so header and ambient glow stay transparent until then
+  useEffect(() => {
+    if (!showSkeleton && heroRail && heroRail.items && heroRail.items.length > 0) {
+      useNavStore.getState().setIsHeroLoaded(true);
+    } else {
+      useNavStore.getState().setIsHeroLoaded(false);
+    }
+  }, [showSkeleton, heroRail]);
+
+  useEffect(() => {
+    return () => {
+      useNavStore.getState().setIsHeroLoaded(false);
+      useAmbientTintStore.getState().resetAmbientColor();
+    };
+  }, []);
   if (showSkeleton) {
     return (
-      <div className="min-h-screen overflow-x-hidden pt-0" style={{ background: "var(--theme_12)" }}>
+      <div className="min-h-screen overflow-x-hidden pt-0" style={{ background: "transparent" }}>
         <HeroSliderSkeleton />
         <div className="mt-8 px-4 sm:px-6 lg:px-8 space-y-4">
           <div className="w-48 h-6 rounded-md bg-white/10" />

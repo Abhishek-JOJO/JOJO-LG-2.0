@@ -14,6 +14,7 @@ import { appConfig } from "@/lib/config/app.config";
 import { analyticsService, EVENT_NAMES, buildUserSpecificPropertiesPayload } from "@/shared/analytics";
 import { useActivePathname, BROWSE_ROUTES } from "@/hooks/useActivePathname";
 import { useNavStore } from "@/store/useNavStore";
+import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 import { normalizePathname } from "@/lib/utils/pathname";
 import { getQueryClient } from "@/lib/react-query/queryClient";
 import { getContentRails } from "@/features/content-rail/api/getContentRails";
@@ -44,6 +45,12 @@ export default function ParentPage({ initialRoute }: ParentPageProps = {}) {
             useNavStore.getState().setActiveBrowseTab(initialRoute);
         }
     }, [initialRoute]);
+
+    // When navigating or switching browse tabs, reset hero loaded and ambient tint so the header is clean and transparent
+    useEffect(() => {
+        useNavStore.getState().setIsHeroLoaded(false);
+        useAmbientTintStore.getState().resetAmbientColor();
+    }, [pathname]);
 
     const { isAppReady } = useBootstrap();
     const sessionId = useAuthStore(state => state.token);

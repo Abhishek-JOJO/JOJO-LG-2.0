@@ -8,6 +8,7 @@ export function AmbientBackground() {
   const layerA = useAmbientTintStore((s) => s.layerA);
   const layerB = useAmbientTintStore((s) => s.layerB);
   const activeLayer = useAmbientTintStore((s) => s.activeLayer);
+  const hasActiveColor = useAmbientTintStore((s) => s.hasActiveColor);
 
   useEffect(() => {
     setMounted(true);
@@ -23,13 +24,15 @@ export function AmbientBackground() {
   return (
     <div
       aria-hidden="true"
-      className="absolute top-0 left-0 right-0 h-[100vh] w-full pointer-events-none z-0 overflow-hidden"
+      className={`absolute top-0 left-0 right-0 h-[100vh] w-full pointer-events-none z-0 overflow-hidden transition-opacity duration-1000 ease-out ${
+        hasActiveColor ? "opacity-100" : "opacity-0"
+      }`}
     >
       {/* Ambient Layer A */}
       <div
         className="absolute inset-0 w-full h-full transition-opacity duration-1000 ease-out"
         style={{
-          opacity: activeLayer === "A" ? 1 : 0,
+          opacity: activeLayer === "A" && hasActiveColor ? 1 : 0,
           background: getGradient(layerA),
           willChange: "opacity",
         }}
@@ -39,7 +42,7 @@ export function AmbientBackground() {
       <div
         className="absolute inset-0 w-full h-full transition-opacity duration-1000 ease-out"
         style={{
-          opacity: activeLayer === "B" ? 1 : 0,
+          opacity: activeLayer === "B" && hasActiveColor ? 1 : 0,
           background: getGradient(layerB),
           willChange: "opacity",
         }}

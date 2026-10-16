@@ -75,6 +75,8 @@ export function useNavbar() {
     });
   }, [navItems]);
 
+  const activeBrowseTab = useNavStore((s) => s.activeBrowseTab);
+
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 30);
     handleScroll();
@@ -84,7 +86,11 @@ export function useNavbar() {
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
-  }, [pathname]);
+    setIsScrolled(false);
+    if (typeof window !== "undefined" && window.scrollY > 0) {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [pathname, activeBrowseTab]);
 
   const normalizedPath = pathname ? normalizePathname(pathname) : "/";
   const isWatch =

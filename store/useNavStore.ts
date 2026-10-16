@@ -7,6 +7,8 @@ interface NavState {
   setPersistedNavItems: (items: any[]) => void;
   activeBrowseTab: string | null;
   setActiveBrowseTab: (tab: string | null) => void;
+  isHeroLoaded: boolean;
+  setIsHeroLoaded: (loaded: boolean) => void;
 }
 
 export const useNavStore = create<NavState>((set) => ({
@@ -15,6 +17,8 @@ export const useNavStore = create<NavState>((set) => ({
   persistedNavItems: [],
   setPersistedNavItems: (items) => set({ persistedNavItems: items }),
   activeBrowseTab: null,
+  isHeroLoaded: false,
+  setIsHeroLoaded: (loaded) => set({ isHeroLoaded: loaded }),
   // Synchronous update — on webOS ARM the React concurrent scheduler (startTransition)
   // adds 700-1000ms overhead before processing the update. Switching tabs must feel
   // instant, not low-priority.

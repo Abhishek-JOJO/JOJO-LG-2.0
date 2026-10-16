@@ -24,6 +24,7 @@ import { useEffect } from "react";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 import { useLocaleStore } from "@/store/useLocaleStore";
+import { useNavStore } from "@/store/useNavStore";
 import { normalizePathname } from "@/lib/utils/pathname";
 
 function LogoSkeleton({ isGoldSlot = false }: { isGoldSlot?: boolean }) {
@@ -305,16 +306,20 @@ export function Navbar() {
 
   const isSearchPage = normalizedPath === ROUTES.SEARCH || normalizedPath.startsWith(ROUTES.SEARCH);
   const isSearchActive = !isTvOverlayOpen && (isSearchOpen || isSearchPage);
+  const isHeroLoaded = useNavStore((s) => s.isHeroLoaded);
+  const isHomeRoute = isHome || isLanding || normalizedPath === "/" || normalizedPath === ROUTES.HOME || normalizedPath === ROUTES.HOMEPAGE;
+  // While hero content is loading on Home / browse page, the header MUST remain transparent.
+  const isHeaderTransparent = (!isHeroLoaded && isHomeRoute) || !isScrolled || isSearchActive;
 
   return (
     <header
       className={`z-[999] overflow-visible transition-colors duration-300 sticky top-0 left-0 right-0 w-full ${
-        isScrolled && !isSearchActive
+        !isHeaderTransparent
           ? "bg-[#050505]/95 backdrop-blur-md"
           : "bg-transparent shadow-none"
       }`}
       style={{
-        background: isScrolled && !isSearchActive ? "rgba(5, 5, 5, 0.95)" : "transparent",
+        background: !isHeaderTransparent ? "rgba(5, 5, 5, 0.95)" : "transparent",
         boxShadow: "none",
         borderBottom: "none",
       }}

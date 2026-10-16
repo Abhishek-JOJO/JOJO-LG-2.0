@@ -14,6 +14,7 @@ import { useLocaleStore } from "@/store/useLocaleStore";
 import { appConfig } from "@/lib/config/app.config";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 import { usePlayerStore } from "@/store/usePlayerStore";
+import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 import { ROUTES } from "@/lib/constants/routes";
 
 interface FocusableNavLinkProps {
@@ -54,6 +55,8 @@ export const FocusableNavLink = React.memo(({
     if (isTargetBrowse && (isCurrentBrowse || isTvOverlayOpen || normCurrent === ROUTES.SEARCH || isSearchOpen)) {
       const navStore = useNavStore.getState();
       if (navStore.activeBrowseTab !== normTarget) {
+        navStore.setIsHeroLoaded(false);
+        useAmbientTintStore.getState().resetAmbientColor();
         navStore.setActiveBrowseTab(normTarget);
       }
       if (isTvOverlayOpen) {

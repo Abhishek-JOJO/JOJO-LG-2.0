@@ -262,6 +262,7 @@ export function ContentRailList({
 
   useEffect(() => {
     if (!isHeroVariant || !items?.length) return;
+    useNavStore.getState().setIsHeroLoaded(true);
     const activeItem = items[activeIndex];
     const heroImageUrl =
       activeItem?.heroImage ||

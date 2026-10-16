@@ -12,7 +12,9 @@ interface AmbientTintStore {
   layerB: AmbientRGB;
   activeLayer: "A" | "B";
   currentColor: AmbientRGB;
+  hasActiveColor: boolean;
   setAmbientColor: (color: AmbientRGB) => void;
+  resetAmbientColor: () => void;
 }
 
 export const useAmbientTintStore = create<AmbientTintStore>((set, get) => ({
@@ -20,10 +22,12 @@ export const useAmbientTintStore = create<AmbientTintStore>((set, get) => ({
   layerB: DEFAULT_AMBIENT_RGB,
   activeLayer: "A",
   currentColor: DEFAULT_AMBIENT_RGB,
+  hasActiveColor: false,
 
   setAmbientColor: (color: AmbientRGB) => {
     const current = get().currentColor;
     if (
+      get().hasActiveColor &&
       current.r === color.r &&
       current.g === color.g &&
       current.b === color.b
@@ -37,13 +41,21 @@ export const useAmbientTintStore = create<AmbientTintStore>((set, get) => ({
         layerB: color,
         activeLayer: "B",
         currentColor: color,
+        hasActiveColor: true,
       });
     } else {
       set({
         layerA: color,
         activeLayer: "A",
         currentColor: color,
+        hasActiveColor: true,
       });
     }
+  },
+
+  resetAmbientColor: () => {
+    set({
+      hasActiveColor: false,
+    });
   },
 }));
