@@ -7,7 +7,7 @@ import { appConfig } from "@/lib/config/app.config";
 import { minSwipeDistance, THUMB_CONFIG } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import React, { memo, useEffect, useState, useCallback, useId, useRef } from "react";
+import React, { memo, useEffect, useState, useCallback, useId, useMemo, useRef } from "react";
 import { FocusContext, useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { HeroCarouselCard } from "./cards/HeroCarouselCard";
 import { LandscapeCard } from "./cards/LandscapeCard";
@@ -212,6 +212,32 @@ export function ContentRailList({
   const isAnyCardHovered = usePlayerStore((s) => s.isAnyCardHovered);
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
+
+  // Hoisted above the isHeroVariant/isExpanded early-returns below (a hook
+  // can't be called conditionally) and memoized so every card downstream
+  // that's wrapped in React.memo (BaseContentCard, PortraitCard, etc.) can
+  // actually skip re-rendering when this rail re-renders for an unrelated
+  // reason (isAnyCardHovered, isSearchOpen, pagination...). This used to be a
+  // fresh object literal built inline in the render body — a new reference
+  // every render defeats React.memo's shallow prop comparison outright, so
+  // every card in every standard (non-spotlight) rail was re-rendering on
+  // every unrelated re-render of this component, which is most of the cards
+  // on the home page.
+  const activeNavTab = typeof window !== "undefined" ? useNavStore.getState().activeBrowseTab : null;
+  const isHomeNav = !activeNavTab || activeNavTab === "/" || activeNavTab === "/home" || activeNavTab === ROUTES.HOME || activeNavTab === ROUTES.HOMEPAGE;
+  const standardCardConfig: RailCardDesignConfig = useMemo(() => ({
+    ...config,
+    variant: (isHomeNav && config.variant === RailCardVariant.TOP_TEN) ? RailCardVariant.TOP_TEN : RailCardVariant.PORTRAIT,
+    width: 325.77 as any,
+    height: 490 as any,
+    aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,
+    borderRadius: 16,
+    hover: {
+      ...config.hover,
+      enabled: false,
+      type: "simple",
+    },
+  }), [config, isHomeNav]);
 
   const isHeroVariant = config?.variant === RailCardVariant.HERO || type === ContentRailType.HERO_CAROUSEL;
 
@@ -689,22 +715,8 @@ export function ContentRailList({
     );
   }
 
-  const activeNavTab = typeof window !== "undefined" ? useNavStore.getState().activeBrowseTab : null;
-  const isHomeNav = !activeNavTab || activeNavTab === "/" || activeNavTab === "/home" || activeNavTab === ROUTES.HOME || activeNavTab === ROUTES.HOMEPAGE;
-
-  const standardCardConfig: RailCardDesignConfig = {
-    ...config,
-    variant: (isHomeNav && config.variant === RailCardVariant.TOP_TEN) ? RailCardVariant.TOP_TEN : RailCardVariant.PORTRAIT,
-    width: 325.77 as any,
-    height: 490 as any,
-    aspectRatio: RailCardAspectRatio.PORTRAIT_2_3,
-    borderRadius: 16,
-    hover: {
-      ...config.hover,
-      enabled: false,
-      type: "simple",
-    },
-  };
+  // standardCardConfig is computed once, up top, as a memoized value — see
+  // its definition near the other early hooks for why.
 
   // For spotlight rail, only render the 6 visible slots that fit on a 1920px TV screen.
   // Offscreen slots (items 6+) never scroll into view and re-rendering 20 cards on every keypress causes TV CPU lag.

@@ -216,6 +216,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   });
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
 
+  // Hoisted above cardInner's definition (below) so it can gate transform-gpu
+  // there too — moved up, not duplicated or recomputed differently.
+  const showFocusRing = focused || forceFocusRing || isDomFocused;
+
   // Debounce expansion on focus (80ms)
   // Keeps fast remote navigation at 60fps while still feeling responsive
   useEffect(() => {
@@ -315,7 +319,15 @@ export const BaseContentCard = React.memo(function BaseContentCard({
 
   const cardInner = (
     <div
-      className="relative h-full w-full overflow-hidden bg-neutral-900 transition-colors transform-gpu isolation-isolate"
+      // transform-gpu only while this card is actually focused/transitioning
+      // (showFocusRing), not on every card unconditionally — a rail can have
+      // 15-20+ of these mounted at once, and each was being permanently
+      // promoted to its own GPU-composited layer regardless of whether it
+      // was ever interacted with. Same visual result for the card that's
+      // actually animating; the rest just don't carry the idle compositing
+      // cost. (A card's layer doesn't need to already be promoted before
+      // focus arrives — the browser promotes it the same render it needs to.)
+      className={`relative h-full w-full overflow-hidden bg-neutral-900 transition-colors isolation-isolate ${showFocusRing ? "transform-gpu" : ""}`}
       style={{
         WebkitMaskImage: "-webkit-radial-gradient(white, black)",
         borderRadius: item.isPremium
@@ -462,8 +474,6 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     ? "w-full h-full"
     : "w-[var(--desktop-width)] h-[var(--desktop-height)] max-sm:w-[var(--mobile-width)] max-sm:h-[var(--mobile-height)]";
 
-  const showFocusRing = focused || forceFocusRing || isDomFocused;
-
   const categorySlug = getContentTypeSlug(item.assetType, item.assetTypeCode);
   const slug = item.title ? slugify(item.title) : "watch";
   let itemUrl = `/${categorySlug}/${slug}/${item.id}`;
@@ -512,10 +522,25 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-all duration-300 ease-out ${sizingClassName} ${className} ${showFocusRing ? "z-30 shadow-2xl" : "scale-100"}`}
+      // Explicit property list instead of transition-all: the only things
+      // that actually animate here are width/height (the focus-expand
+      // effect) and box-shadow (the focus ring's shadow-2xl) — transition-all
+      // made the browser watch every animatable property on this element for
+      // changes on every style recalculation, not just the two that move.
+      // Same visual result, less work per frame.
+      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-[width,height,box-shadow] duration-300 ease-out ${sizingClassName} ${className} ${showFocusRing ? "z-30 shadow-2xl" : "scale-100"}`}
       style={{
         ...cardStyle,
         zIndex: showFocusRing ? 30 : undefined,
+        // Scopes this card's own layout recalculation to itself — when the
+        // focus-expand effect below resizes this card's width/height, the
+        // browser doesn't also need to check whether that affects anything
+        // outside this element (it can't: every absolutely-positioned child
+        // inside already resolves against this same element via the
+        // `relative` class above, so containment changes nothing about where
+        // they sit). Pure scoping hint, zero visual effect — reduces the
+        // reflow cost without changing the animation itself.
+        contain: "layout",
       }}
     >
       {cardInner}

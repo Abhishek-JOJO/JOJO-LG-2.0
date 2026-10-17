@@ -2668,7 +2668,7 @@ function FocusableTrailerItem({ trailer, idx, asset, onWatch }: any) {
     <div
       ref={ref as any}
       onClick={() => onWatch(trailerId)}
-      className={`group flex flex-col gap-3 p-3 rounded-2xl cursor-pointer transition-all duration-300 w-[260px] sm:w-[300px] shrink-0 ${focused ? "bg-neutral-900/80 border border-white ring-2 ring-white/60 scale-105 shadow-2xl" : "bg-neutral-900/20 hover:bg-neutral-900/60 border border-transparent"}`}
+      className={`group flex flex-col gap-3 p-3 rounded-2xl cursor-pointer transition-[background-color,border-color,box-shadow,transform] duration-300 w-[260px] sm:w-[300px] shrink-0 ${focused ? "bg-neutral-900/80 border border-white ring-2 ring-white/60 scale-105 shadow-2xl" : "bg-neutral-900/20 hover:bg-neutral-900/60 border border-transparent"}`}
     >
       <div className="relative aspect-video rounded-xl overflow-hidden bg-neutral-900 w-full">
         {trailerPoster ? (
@@ -2976,7 +2976,7 @@ function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback
     <div
       ref={ref as any}
       onClick={handleClick}
-      className={`relative w-full aspect-[2/3] rounded-2xl overflow-hidden group cursor-pointer bg-neutral-900 transition-all duration-300 ${focused ? "z-30 shadow-2xl scale-105" : "hover:scale-105"}`}
+      className={`relative w-full aspect-[2/3] rounded-2xl overflow-hidden group cursor-pointer bg-neutral-900 transition-[box-shadow,transform] duration-300 ${focused ? "z-30 shadow-2xl scale-105" : "hover:scale-105"}`}
       style={{
         zIndex: focused ? 30 : undefined,
       }}
