@@ -17,6 +17,7 @@ import { TvodIcon } from "@/public/svg/TVODIcon";
 import { useAuthStore } from "@/store/useAuthStore";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useSessionExpiredStore } from "@/store/useSessionExpiredStore";
+import { isTizen } from "@/src/platform/detectPlatform";
 import { Check, Play, Plus, Share2, Volume2, VolumeX } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -60,12 +61,14 @@ interface Props {
 // (correct readyState/dimensions/currentTime throughout) — it simply never
 // paints anything but white to the physical screen in this context, on this
 // device. That's a hardware/display-pipeline limitation below the DOM, not
-// something any CSS/JS/HLS-path change from here can reach. Left disabled;
-// the static poster crossfade (unaffected, glitch-free) carries the feature.
+// something any CSS/JS/HLS-path change from here can reach. The runtime gate
+// below therefore disables it on Tizen while preserving it elsewhere.
 const ENABLE_HERO_BACKGROUND_VIDEO = true;
 
 export function HeroCarouselCard({ item, config, index, isActive, isFocused = false, onClick, onHoverChange, onVideoPlayChange, batchPricing }: Props) {
   const t = useTranslations("contentRails");
+  const isTizenRuntime = isTizen();
+  const heroVideoEnabled = ENABLE_HERO_BACKGROUND_VIDEO && !isTizenRuntime;
   const heroImageUrl = item?.heroImage || item?.landscapeImage || item?.posterImage || item?.image;
   const hasImage = !!heroImageUrl;
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
@@ -225,6 +228,8 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
   const [isSlideSettled, setIsSlideSettled] = useState(isActive);
   const settleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
+    if (!heroVideoEnabled) return;
+
     if (settleTimeoutRef.current) {
       clearTimeout(settleTimeoutRef.current);
       settleTimeoutRef.current = null;
@@ -240,10 +245,12 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
         settleTimeoutRef.current = null;
       }
     };
-  }, [isActive]);
+  }, [heroVideoEnabled, isActive]);
 
 
   useEffect(() => {
+    if (!heroVideoEnabled) return;
+
     const container = containerRef.current;
     if (!container) return;
 
@@ -260,15 +267,19 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
     return () => {
       observer.unobserve(container);
     };
-  }, []);
+  }, [heroVideoEnabled]);
 
-  const shouldPlay = ENABLE_HERO_BACKGROUND_VIDEO && isFocused && heavyActive && isSlideSettled && isIntersecting && !isAnyCardHovered && !isSearchOpen && !isAssetDetailOpen && !isSessionExpiredVisible;
+  // Samsung's Tizen web runtime has a much smaller decode/compositor budget.
+  // Keeping an HLS decoder alive behind a full-screen image starves image
+  // decoding and produces white/late frames on physical TVs, so use the
+  // poster-only hero there. Browser and webOS behavior remains unchanged.
+  const shouldPlay = heroVideoEnabled && isFocused && heavyActive && isSlideSettled && isIntersecting && !isAnyCardHovered && !isSearchOpen && !isAssetDetailOpen && !isSessionExpiredVisible;
   const showVideo = Boolean(shouldPlay && isVideoLoaded);
 
   // Unmute hero carousel by default when mounting and focused
   useEffect(() => {
-    if (heavyActive && isFocused) setMuted(false);
-  }, [heavyActive, isFocused, setMuted]);
+    if (heroVideoEnabled && heavyActive && isFocused) setMuted(false);
+  }, [heroVideoEnabled, heavyActive, isFocused, setMuted]);
 
   useEffect(() => {
     if (!shouldPlay) {
@@ -373,7 +384,7 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
         className="absolute inset-0 w-full h-full z-0 pointer-events-none"
       >
         {/* Background preview video — right-aligned, 80% visible, never cropped at any breakpoint */}
-        {ENABLE_HERO_BACKGROUND_VIDEO && heroPreviewUrl && (
+        {heroVideoEnabled && heroPreviewUrl && (
           <div
             className={`absolute inset-0 w-full h-full z-0 transition-none ${showVideo ? "translate-x-0" : "translate-x-[200%]"}`}
           >
@@ -434,15 +445,16 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
             <JOJOCommonImage
               src={heroImageUrl}
               alt={item?.title}
-              width={1600}
-              height={900}
+              width={isTizenRuntime ? 1280 : 1600}
+              height={isTizenRuntime ? 720 : 900}
               preset={JOJOImagePreset.Banner}
               position={JOJOImagePosition.Top}
               style={{ objectPosition: "top" }}
               fill
               priority={true}
               sizes="100vw"
-              quality={100}
+              quality={isTizenRuntime ? 78 : 100}
+              fadeInOnLoad={!isTizenRuntime}
               className="object-cover object-top"
               wrapperClassName="w-full h-full"
             />

@@ -6,6 +6,7 @@ import { isHlsUrl, VIDEO_CONSTANTS } from "@/lib/constants/video";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { jojoResizedImageURL } from "@/lib/config/imageRequest.config";
 import { ContentRailItem } from "../config/contentRail.types";
+import { isTizen } from "@/src/platform/detectPlatform";
 
 interface InlineHoverTrailerProps {
   item: ContentRailItem;
@@ -15,6 +16,7 @@ interface InlineHoverTrailerProps {
 }
 
 export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: InlineHoverTrailerProps) {
+  const videoEnabled = !isTizen();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [videoError, setVideoError] = useState(false);
@@ -33,6 +35,8 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
   const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
 
   useEffect(() => {
+    if (!videoEnabled) return;
+
     setVideoReady(false);
     setVideoError(false);
     setShouldLoadVideo(false);
@@ -45,7 +49,7 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [previewUrl, item?.id, isExpanded]);
+  }, [videoEnabled, previewUrl, item?.id, isExpanded]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -128,7 +132,7 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
     <div className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-hidden">
 
       {/* Video Player - Only mounted when card is active/expanded, debounced, and hidden until first frame is ready */}
-      {shouldLoadVideo && previewUrl && !videoError && (
+      {videoEnabled && shouldLoadVideo && previewUrl && !videoError && (
         <video
           ref={videoRef}
           muted={isMuted}
@@ -149,7 +153,7 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
       
       {/* Meta details at bottom left with seamless transition */}
       <div
-        className={`absolute flex flex-col justify-end items-start text-left z-20 pointer-events-none transition-all duration-200 ${
+        className={`absolute flex flex-col justify-end items-start text-left z-20 pointer-events-none ${videoEnabled ? "transition-all duration-200" : "transition-none"} ${
         isLandscape
           ? "bottom-8 left-8 right-8"
           : "bottom-6 left-6 right-6 sm:bottom-8 sm:left-8 sm:right-8"
@@ -163,7 +167,7 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
             <img
               src={jojoResizedImageURL(item.title_image, { targetSize: { width: 560, height: 160 } })}
               alt={item?.title || ""}
-              className="w-full h-full object-contain object-left-bottom drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+              className={`w-full h-full object-contain object-left-bottom ${videoEnabled ? "drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]" : ""}`}
               loading="eager"
               // @ts-ignore
               fetchPriority="high"

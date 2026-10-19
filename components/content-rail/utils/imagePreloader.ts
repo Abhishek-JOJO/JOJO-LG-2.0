@@ -24,11 +24,12 @@ const activePreloadMap = new Map<string, HTMLImageElement>();
 
 export function preloadImageUrl(
   url?: string | null,
-  targetSize?: { width: number; height: number }
+  targetSize?: { width: number; height: number },
+  quality?: number
 ): void {
   if (!url || typeof window === "undefined") return;
   const resolvedUrl = targetSize
-    ? jojoResizedImageURL(url, { targetSize, fit: JOJOImageFit.Cover })
+    ? jojoResizedImageURL(url, { targetSize, fit: JOJOImageFit.Cover, quality })
     : url;
   if (preloadedUrls.has(resolvedUrl)) return;
   preloadedUrls.add(resolvedUrl);

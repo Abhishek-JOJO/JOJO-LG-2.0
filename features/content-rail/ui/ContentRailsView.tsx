@@ -30,6 +30,7 @@ import { getQueryClient } from "@/lib/react-query/queryClient";
 import { getAssetPricing } from "@/features/content/api/getAssetPricing";
 import { restorePageFocus } from "@/src/navigation/focusUtils";
 import { preloadRailItems } from "@/components/content-rail/utils/imagePreloader";
+import { isTizen } from "@/src/platform/detectPlatform";
 
 // Global module-level cache to track route-to-subnav_id mapping for instant frame 1 loads on popstate / routing
 const routeSubnavMap: Record<string, number> = {
@@ -163,6 +164,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   const user = useAuthStore((s) => s.user);
   const isGuest = user?.isGuest ?? false;
   const isTvFileRuntime = typeof window !== "undefined" && window.location.protocol === "file:";
+  const isTizenRuntime = isTizen();
 
   // Synchronously check if navigation items are already in the TanStack cache
   // We can do this safely on both Client and Server because getQueryClient gives us the correct instance.
@@ -276,13 +278,13 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     enabled: isAppReady,
   });
 
-  const handleRailItemClick = (item: ContentRailItem) => {
+  const handleRailItemClick = useCallback((item: ContentRailItem) => {
     if (item?.redirectUrl) {
       router.push(item?.redirectUrl);
     } else if (item?.id) {
       openAssetDetail(item.id, item.assetTypeCode || item.assetType || "movies", item.title, item);
     }
-  };
+  }, [openAssetDetail, router]);
 
   const handleContinueWatchingClick = (item: ContentRailItem) => {
     logger.info("[ContentRailsView] Continue watching item clicked, running gating checks", { item_id: item.id, progressSeconds: item.progressSeconds });
@@ -464,48 +466,63 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     Math.max(0, contentRails.length - 1)
   );
   const activeRail = contentRails[safeActiveRailIndex];
+
+  // During a held Up/Down key, only the active spotlight rail is useful. Delay
+  // mounting the next preview rail until navigation settles so Tizen does not
+  // repeatedly construct and discard a full row of cards between key repeats.
+  const [settledPreviewRailIndex, setSettledPreviewRailIndex] = useState(safeActiveRailIndex);
+  useEffect(() => {
+    if (!isTizenRuntime) return;
+    const timer = window.setTimeout(() => {
+      setSettledPreviewRailIndex(safeActiveRailIndex);
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [isTizenRuntime, safeActiveRailIndex]);
+
+  const previewRailIndex = isTizenRuntime
+    ? Math.min(settledPreviewRailIndex, Math.max(0, contentRails.length - 1))
+    : safeActiveRailIndex;
+  const isPreviewRailSettled = !isTizenRuntime || previewRailIndex === safeActiveRailIndex;
   const upcomingRails = useMemo(
-    () => contentRails.slice(safeActiveRailIndex + 1, safeActiveRailIndex + (isTvFileRuntime ? 2 : 4)),
-    [contentRails, safeActiveRailIndex, isTvFileRuntime]
+    () => isPreviewRailSettled
+      ? contentRails.slice(previewRailIndex + 1, previewRailIndex + (isTvFileRuntime ? 2 : 4))
+      : [],
+    [contentRails, previewRailIndex, isPreviewRailSettled, isTvFileRuntime]
   );
   const showPreviewRails = true;
 
   // TV remote vertical navigation: ArrowDown / ArrowUp updates the active rail in place instantly
   const handleArrowUpDown = useCallback((direction: "up" | "down") => {
-    if (direction === "down") {
-      setActiveRailIndex((prev) => {
-        if (prev < contentRails.length - 1) {
-          return prev + 1;
-        }
-        return prev;
-      });
+    const preserveLegacyRailPosition = () => {
+      if (isTizenRuntime) return;
       try { setFocus("spotlight-lead-fixed"); } catch {}
       const leadCard = document.querySelector<HTMLElement>('[data-focuskey="spotlight-lead-fixed"]');
       leadCard?.focus({ preventScroll: true });
-      const section1 = document.querySelector<HTMLElement>('section[data-section-index="1"]');
-      if (section1) {
-        const rect = section1.getBoundingClientRect();
-        if (Math.abs(rect.top - 105) > 10) {
-          const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + rect.top - 105);
-          window.scrollTo({ top: targetTop, behavior: "auto" });
-        }
+      const section = document.querySelector<HTMLElement>('section[data-section-index="1"]');
+      if (!section) return;
+      const rect = section.getBoundingClientRect();
+      if (Math.abs(rect.top - 105) <= 10) return;
+      const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + rect.top - 105);
+      window.scrollTo({ top: targetTop, behavior: "auto" });
+    };
+
+    if (direction === "down") {
+      const nextIndex = Math.min(activeRailIndexRef.current + 1, contentRails.length - 1);
+      if (nextIndex !== activeRailIndexRef.current) {
+        // Update the ref synchronously so repeat events received before React's
+        // next commit continue from the latest requested rail.
+        activeRailIndexRef.current = nextIndex;
+        setActiveRailIndex(nextIndex);
+        preserveLegacyRailPosition();
       }
       return true;
     }
     if (direction === "up") {
       if (activeRailIndexRef.current > 0) {
-        setActiveRailIndex((prev) => Math.max(0, prev - 1));
-        try { setFocus("spotlight-lead-fixed"); } catch {}
-        const leadCard = document.querySelector<HTMLElement>('[data-focuskey="spotlight-lead-fixed"]');
-        leadCard?.focus({ preventScroll: true });
-        const section1 = document.querySelector<HTMLElement>('section[data-section-index="1"]');
-        if (section1) {
-          const rect = section1.getBoundingClientRect();
-          if (Math.abs(rect.top - 105) > 10) {
-            const targetTop = Math.max(0, (window.scrollY || window.pageYOffset) + rect.top - 105);
-            window.scrollTo({ top: targetTop, behavior: "auto" });
-          }
-        }
+        const nextIndex = activeRailIndexRef.current - 1;
+        activeRailIndexRef.current = nextIndex;
+        setActiveRailIndex(nextIndex);
+        preserveLegacyRailPosition();
         return true;
       }
       if (isFirstHero) {
@@ -532,7 +549,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
       return true;
     }
     return true;
-  }, [contentRails.length, isFirstHero]);
+  }, [contentRails.length, isFirstHero, isTizenRuntime]);
 
   // Listen for tv-rail-step events triggered by remote slider or channel/page keys
   useEffect(() => {

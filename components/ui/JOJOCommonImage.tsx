@@ -17,6 +17,7 @@ import {
   jojoResizedImageURL,
   type JOJOCGSize,
 } from "@/lib/config/imageRequest.config";
+import { isTizen } from "@/src/platform/detectPlatform";
 
 export {
   JOJOImageFit,
@@ -288,6 +289,9 @@ export type JOJOCommonImageProps = Omit<
    */
   quality?: number;
 
+  /** Disable the opacity reveal on constrained TV compositors. */
+  fadeInOnLoad?: boolean;
+
   onError?: ReactEventHandler<HTMLImageElement>;
   onLoad?: ReactEventHandler<HTMLImageElement>;
 };
@@ -395,12 +399,14 @@ export default function JOJOCommonImage({
   title,
   optimizeRequestURL = true,
   quality,
+  fadeInOnLoad,
   onError,
   onLoad,
 
   ...rest
 }: JOJOCommonImageProps) {
   const t = useTranslations("image-alt-name");
+  const shouldFadeInOnLoad = fadeInOnLoad ?? !isTizen();
 
   const resolvedPreset = String(preset) as JOJOImagePresetToken;
 
@@ -688,7 +694,12 @@ export default function JOJOCommonImage({
           onLoad?.(e);
         }}
         loading={isLoaded ? "eager" : rest.loading}
-        className={cn("block transition-opacity duration-300", isLoaded ? "opacity-100" : "opacity-0", className)}
+        className={cn(
+          "block",
+          shouldFadeInOnLoad && "transition-opacity duration-300",
+          isLoaded ? "opacity-100" : "opacity-0",
+          className
+        )}
         style={imageStyle}
       />
     </div>

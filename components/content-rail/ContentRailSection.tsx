@@ -4,7 +4,7 @@ import { analyticsService, buildContentClickedProperties } from "@/shared/analyt
 import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 // removed norigin imports from this line
 import { JOJOCustomButton } from "../ui/JOJOButton";
 import { CONTENT_RAIL_DESIGN_CONFIG } from "./config/contentRail.config";
@@ -41,7 +41,7 @@ interface ContentRailSectionProps {
   forceFocusable?: boolean;
 }
 
-export function ContentRailSection({
+export const ContentRailSection = memo(function ContentRailSection({
   cr_title,
   type,
   items: initialItems,
@@ -244,4 +244,4 @@ export function ContentRailSection({
       </div>
     </section>
   );
-}
+});

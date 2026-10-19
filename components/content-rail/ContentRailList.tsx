@@ -26,6 +26,7 @@ import { preloadImageUrl, preloadRailItems } from "./utils/imagePreloader";
 import { tvSoundManager } from "@/src/platform/audio/tvSoundManager";
 import { useNavStore } from "@/store/useNavStore";
 import { ROUTES } from "@/lib/constants/routes";
+import { isTizen } from "@/src/platform/detectPlatform";
 
 interface ContentRailListProps {
   items: ContentRailItem[];
@@ -240,6 +241,7 @@ export function ContentRailList({
   }), [config, isHomeNav]);
 
   const isHeroVariant = config?.variant === RailCardVariant.HERO || type === ContentRailType.HERO_CAROUSEL;
+  const isTizenRuntime = isTizen();
 
   // Only the active hero slide and, briefly while crossfading, the previously
   // active one are ever mounted — not every slide at once. All slides sit at
@@ -266,6 +268,18 @@ export function ContentRailList({
   useEffect(() => {
     if (!isHeroVariant) return;
     if (prevHeroIndexRef.current === activeIndex) return;
+
+    // Avoid compositing two full-screen 4K-ish image layers on Tizen. Its
+    // embedded Chromium frequently drops frames (or briefly paints a blank
+    // layer) during opacity crossfades, while an immediate poster swap is
+    // stable and keeps remote input responsive.
+    if (isTizenRuntime) {
+      prevHeroIndexRef.current = activeIndex;
+      setRenderedHeroIndices(new Set([activeIndex]));
+      setRevealedHeroIndex(activeIndex);
+      return;
+    }
+
     const prev = prevHeroIndexRef.current;
     prevHeroIndexRef.current = activeIndex;
     setRenderedHeroIndices(new Set([prev, activeIndex]));
@@ -284,7 +298,7 @@ export function ContentRailList({
       cancelAnimationFrame(raf);
       clearTimeout(timer);
     };
-  }, [activeIndex, isHeroVariant]);
+  }, [activeIndex, isHeroVariant, isTizenRuntime]);
 
   useEffect(() => {
     if (!isHeroVariant || !items?.length) return;
@@ -296,12 +310,29 @@ export function ContentRailList({
       activeItem?.posterImage ||
       activeItem?.image;
 
-    if (heroImageUrl) {
+    // Canvas sampling forces another image decode and a synchronous pixel read.
+    // Skip that decorative work on Tizen so the visible poster wins the race.
+    if (heroImageUrl && !isTizenRuntime) {
       extractDominantAmbientColor(heroImageUrl).then((color) => {
         useAmbientTintStore.getState().setAmbientColor(color);
       });
     }
-  }, [isHeroVariant, items, activeIndex]);
+  }, [isHeroVariant, items, activeIndex, isTizenRuntime]);
+
+  // Tizen swaps hero posters without a two-layer crossfade, so warm only the
+  // next poster using the exact rendered URL. One low-priority request during
+  // the autoplay interval prevents a dark frame without flooding the TV's
+  // limited connection/decode pool.
+  useEffect(() => {
+    if (!isTizenRuntime || !isHeroVariant || items.length < 2) return;
+    const nextItem = items[(activeIndex + 1) % items.length];
+    const nextHeroUrl =
+      nextItem?.heroImage ||
+      nextItem?.landscapeImage ||
+      nextItem?.posterImage ||
+      nextItem?.image;
+    preloadImageUrl(nextHeroUrl, { width: 1280, height: 720 }, 78);
+  }, [activeIndex, isHeroVariant, isTizenRuntime, items]);
 
   // Spotlight rail config (sticky card 0 + fixed focus cycling)
   // ONLY enabled for the single active spotlight rail (isFirstContentRail, never for Genre)
@@ -364,13 +395,13 @@ export function ContentRailList({
   // Eagerly preload title images for active spotlight rail so fast remote navigation has 0ms image delay
   useEffect(() => {
     if (!isSpotlightRail || !railActive || !items?.length) return;
-    const count = Math.min(items.length, 16);
+    const count = Math.min(items.length, isTizenRuntime ? 3 : 16);
     for (let i = 0; i < count; i++) {
       if (items[i]?.title_image) {
         preloadImageUrl(items[i].title_image, { width: 560, height: 160 });
       }
     }
-  }, [isSpotlightRail, railActive, items]);
+  }, [isSpotlightRail, railActive, items, isTizenRuntime]);
 
   // When cycling cards in spotlight rail, ensure adjacent items (next 4, prev 2) are preloaded immediately
   useEffect(() => {
@@ -378,23 +409,27 @@ export function ContentRailList({
     if (isTvFileRuntime && !railActive) return;
     const si = spotlightIndex;
     const len = items.length;
-    const lookaheadIndices = [
-      (si + 1) % len,
-      (si + 2) % len,
-      (si + 3) % len,
-      (si + 4) % len,
-      (si - 1 + len) % len,
-      (si - 2 + len) % len,
-    ];
+    const lookaheadIndices = isTizenRuntime
+      ? [(si + 1) % len, (si - 1 + len) % len]
+      : [
+          (si + 1) % len,
+          (si + 2) % len,
+          (si + 3) % len,
+          (si + 4) % len,
+          (si - 1 + len) % len,
+          (si - 2 + len) % len,
+        ];
     lookaheadIndices.forEach((idx) => {
       const it = items[idx];
       if (it) {
         preloadImageUrl(it.posterImage || it.heroImage || it.landscapeImage || it.image || it.portraitImage, { width: 871, height: 490 });
         preloadImageUrl(it.title_image, { width: 560, height: 160 });
-        preloadImageUrl(it.portraitImage || it.image, { width: 326, height: 490 });
+        if (!isTizenRuntime) {
+          preloadImageUrl(it.portraitImage || it.image, { width: 326, height: 490 });
+        }
       }
     });
-  }, [isSpotlightRail, items, spotlightIndex, isTvFileRuntime, railActive]);
+  }, [isSpotlightRail, items, spotlightIndex, isTvFileRuntime, railActive, isTizenRuntime]);
 
   // Fetch the next page of this rail's items well before the user reaches the end of what's
   // already loaded, so cycling Right (even held down, repeat-firing every ~100-150ms on a TV
@@ -620,7 +655,7 @@ export function ContentRailList({
             return (
               <div
                 key={`${item.id}-${index}`}
-                className={`absolute inset-0 h-full w-full transition-opacity duration-[900ms] ease-in-out ${isActive ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"}`}
+                className={`absolute inset-0 h-full w-full ${isTizenRuntime ? "transition-none" : "transition-opacity duration-[900ms] ease-in-out"} ${isActive ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"}`}
               >
                 <HeroCarouselCard
                   item={item}

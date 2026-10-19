@@ -11,6 +11,7 @@ import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.con
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { tvSoundManager } from "@/src/platform/audio/tvSoundManager";
+import { isTizen } from "@/src/platform/detectPlatform";
 
 interface BaseContentCardProps {
   item: ContentRailItem;
@@ -81,6 +82,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   const [isDomFocused, setIsDomFocused] = useState(false);
   const [isFocusExpanded, setIsFocusExpanded] = useState(false);
   const cardRef = useRef<HTMLAnchorElement>(null);
+  const isTizenRuntime = isTizen();
+  const [shouldLoadImage, setShouldLoadImage] = useState(
+    () => !isTizenRuntime || index < 6
+  );
   const t = useTranslations("contentRails");
   const { ref: focusRef, focused, focusKey } = useFocusable({
     focusKey: focusKeyProp,
@@ -216,9 +221,37 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   });
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
 
+<<<<<<< Updated upstream
   // Hoisted above cardInner's definition (below) so it can gate transform-gpu
   // there too — moved up, not duplicated or recomputed differently.
   const showFocusRing = focused || forceFocusRing || isDomFocused;
+=======
+  // Native lazy-loading support is inconsistent across Samsung TV browser
+  // generations. Explicitly gate off-screen card requests so a newly opened
+  // home rail cannot start 20+ simultaneous downloads/decodes. The first six
+  // cards (the visible 1080p row) still load immediately.
+  useEffect(() => {
+    if (!isTizenRuntime || shouldLoadImage) return;
+
+    const card = cardRef.current;
+    if (!card || typeof IntersectionObserver === "undefined") {
+      setShouldLoadImage(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setShouldLoadImage(true);
+        observer.disconnect();
+      },
+      { rootMargin: "300px 400px" }
+    );
+
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [isTizenRuntime, shouldLoadImage]);
+>>>>>>> Stashed changes
 
   // Debounce expansion on focus (80ms)
   // Keeps fast remote navigation at 60fps while still feeling responsive
@@ -319,6 +352,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
 
   const cardInner = (
     <div
+<<<<<<< Updated upstream
       // transform-gpu only while this card is actually focused/transitioning
       // (showFocusRing), not on every card unconditionally — a rail can have
       // 15-20+ of these mounted at once, and each was being permanently
@@ -328,6 +362,9 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       // cost. (A card's layer doesn't need to already be promoted before
       // focus arrives — the browser promotes it the same render it needs to.)
       className={`relative h-full w-full overflow-hidden bg-neutral-900 transition-colors isolation-isolate ${showFocusRing ? "transform-gpu" : ""}`}
+=======
+      className={`relative h-full w-full overflow-hidden bg-neutral-900 transition-colors isolation-isolate ${isTizenRuntime ? "" : "transform-gpu"}`}
+>>>>>>> Stashed changes
       style={{
         WebkitMaskImage: "-webkit-radial-gradient(white, black)",
         borderRadius: item.isPremium
@@ -340,8 +377,14 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         outlineOffset: "-2px",
       }}
     >
-      {resizedImageUrl && !imageFailed ? (
-        <div className="absolute inset-0 w-full h-full bg-neutral-900" style={{ transform: 'translateZ(0)' }}>
+      {shouldLoadImage && resizedImageUrl && !imageFailed ? (
+        <div
+          className="absolute inset-0 w-full h-full bg-neutral-900"
+          style={isTizenRuntime ? undefined : { transform: "translateZ(0)" }}
+        >
+          {/* Mounting is already visibility-gated on Tizen. Once mounted,
+              request immediately instead of relying on inconsistent native
+              lazy-loading implementations in older Samsung browsers. */}
           <img
             key={resizedImageUrl}
             src={resizedImageUrl}
@@ -522,6 +565,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+<<<<<<< Updated upstream
       // Explicit property list instead of transition-all: the only things
       // that actually animate here are width/height (the focus-expand
       // effect) and box-shadow (the focus ring's shadow-2xl) — transition-all
@@ -529,6 +573,9 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       // changes on every style recalculation, not just the two that move.
       // Same visual result, less work per frame.
       className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-[width,height,box-shadow] duration-300 ease-out ${sizingClassName} ${className} ${showFocusRing ? "z-30 shadow-2xl" : "scale-100"}`}
+=======
+      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer ${isTizenRuntime ? "transition-none" : "transition-all duration-300 ease-out"} ${sizingClassName} ${className} ${showFocusRing ? `z-30 ${isTizenRuntime ? "" : "shadow-2xl"}` : "scale-100"}`}
+>>>>>>> Stashed changes
       style={{
         ...cardStyle,
         zIndex: showFocusRing ? 30 : undefined,
