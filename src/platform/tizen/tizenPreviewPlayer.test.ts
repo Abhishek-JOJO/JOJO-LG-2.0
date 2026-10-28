@@ -70,6 +70,9 @@ function createFakeAVPlay() {
       setListener: (l: SamsungAVPlayListener) => { listener = l; },
       setDisplayRect: (...rect: number[]) => { rects.push(rect); },
       setDisplayMethod: () => undefined,
+      setBufferingParam: (option: string, unit: string, amount: number) => {
+        calls.push(`buffer:${option}:${unit}:${amount}`);
+      },
       getTotalTrackInfo: () => tracks,
     },
   };
@@ -125,11 +128,11 @@ test("page goes see-through only once playback has advanced, and is restored on 
   assert.ok(avplay.calls.includes("play"));
   assert.equal(page.classList.contains(PASSTHROUGH), false, "nothing changes before frames show");
 
-  avplay.listener.oncurrentplaytime?.(40);
-  assert.equal(readyCount, 0, "the first report can precede the first visible frame");
-  avplay.listener.oncurrentplaytime?.(300);
-  assert.equal(readyCount, 0, "260ms of clock is not yet proof of a picture");
-  avplay.listener.oncurrentplaytime?.(600);
+  avplay.listener.oncurrentplaytime?.(400);
+  assert.equal(readyCount, 0, "a single report — even a late one — is not proof of a picture");
+  avplay.listener.oncurrentplaytime?.(550);
+  assert.equal(readyCount, 0, "150ms of advance is not enough yet");
+  avplay.listener.oncurrentplaytime?.(700);
   avplay.listener.oncurrentplaytime?.(900);
   assert.equal(readyCount, 1);
   for (const el of [targetEl, page, html]) assert.ok(el.classList.contains(PASSTHROUGH));
@@ -294,4 +297,33 @@ test("a preview that is still buffering keeps its poster until buffering complet
   avplay.listener.oncurrentplaytime?.(1300);
   assert.equal(ready, true);
   stopTizenPreview();
+});
+
+test("autoPlay: false prepares straight away but holds playback until play()", () => {
+  const { avplay, target } = setup();
+  const preview = startTizenPreview({ url: "https://cdn/p.m3u8", target, autoPlay: false });
+  avplay.finishPrepare();
+  assert.equal(avplay.calls.includes("play"), false, "prepared, waiting for the dwell");
+  preview.play();
+  assert.deepEqual(avplay.calls.filter((c) => c === "play"), ["play"]);
+  preview.play();
+  assert.equal(avplay.calls.filter((c) => c === "play").length, 1, "play() is idempotent");
+  preview.stop();
+});
+
+test("play() before prepare finishes starts playback the moment it is prepared", () => {
+  const { avplay, target } = setup();
+  const preview = startTizenPreview({ url: "https://cdn/p.m3u8", target, autoPlay: false });
+  preview.play();
+  assert.equal(avplay.calls.includes("play"), false);
+  avplay.finishPrepare();
+  assert.ok(avplay.calls.includes("play"));
+  preview.stop();
+});
+
+test("previews start on a short buffer, set before prepare", () => {
+  const { avplay, target } = setup();
+  const preview = startTizenPreview({ url: "https://cdn/p.m3u8", target });
+  assert.ok(avplay.calls.includes("buffer:PLAYER_BUFFER_FOR_PLAY:PLAYER_BUFFER_SIZE_IN_SECOND:2"));
+  preview.stop();
 });

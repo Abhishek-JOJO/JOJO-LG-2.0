@@ -31,9 +31,12 @@ const BACKDROP_SELECTOR = "[data-tizen-video-backdrop]";
 const DEFAULT_VIDEO_ASPECT = 16 / 9;
 // AVPlay reports a play position before the plane shows a picture, and can do
 // so while still buffering; going see-through then showed a black card until
-// the picture caught up. Reveal only once the clock has genuinely run this far
-// across reports, with no buffering in progress.
-const REVEAL_AFTER_ADVANCE_MS = 400;
+// the picture caught up. Reveal only once the clock has been seen advancing
+// across reports, by at least this much, with no buffering in progress.
+const REVEAL_AFTER_ADVANCE_MS = 250;
+// A preview starts playing once this much is buffered instead of AVPlay's
+// default (sized for full playback), so the first frame comes sooner.
+const PREVIEW_START_BUFFER_SECONDS = 2;
 // AVPlay's display rect is always in the TV's 1920x1080 logical space.
 const LOGICAL_WIDTH = 1920;
 const LOGICAL_HEIGHT = 1080;
@@ -49,9 +52,17 @@ export interface TizenPreviewOptions {
   onEnded?: () => void;
   /** Failed, or was taken over by another preview / the movie player / the app being hidden. */
   onStop?: (reason: "error" | "superseded") => void;
+  /**
+   * false: prepare now (manifest + first segments, the slow part) but hold
+   * playback until handle.play(). Lets a caller warm a preview up during a
+   * dwell instead of only starting the download once the dwell ends.
+   */
+  autoPlay?: boolean;
 }
 
 export interface TizenPreviewHandle {
+  /** Starts a preview opened with autoPlay: false — at once if prepared, else as soon as it is. */
+  play(): void;
   pause(): void;
   resume(): void;
   /** Closes the preview. Does nothing if it has already ended or been superseded. */
@@ -67,13 +78,15 @@ interface Session {
   /** Position of the first time report, the baseline for REVEAL_AFTER_ADVANCE_MS. */
   firstReportMs: number | null;
   buffering: boolean;
+  prepared: boolean;
+  playRequested: boolean;
 }
 
 let current: Session | null = null;
 let lifecycleHooked = false;
 let nativeClosePending = false;
 
-const NOOP_HANDLE: TizenPreviewHandle = { pause() {}, resume() {}, stop() {} };
+const NOOP_HANDLE: TizenPreviewHandle = { play() {}, pause() {}, resume() {}, stop() {} };
 
 function getAVPlay(): SamsungAVPlay | null {
   return typeof window !== "undefined" ? window.webapis?.avplay ?? null : null;
@@ -287,6 +300,8 @@ export function startTizenPreview(options: TizenPreviewOptions): TizenPreviewHan
     videoAspect: DEFAULT_VIDEO_ASPECT,
     firstReportMs: null,
     buffering: false,
+    prepared: false,
+    playRequested: options.autoPlay !== false,
   };
   current = session;
   const isCurrent = () => current === session;
@@ -334,6 +349,12 @@ export function startTizenPreview(options: TizenPreviewOptions): TizenPreviewHan
     applyDisplayRect(avplay, session);
     // With the rect at the video's own aspect, letter-boxing fits it exactly.
     avplay.setDisplayMethod("PLAYER_DISPLAY_MODE_LETTER_BOX");
+    try {
+      // Must be set before prepare. Optional: older firmware may not have it.
+      avplay.setBufferingParam?.("PLAYER_BUFFER_FOR_PLAY", "PLAYER_BUFFER_SIZE_IN_SECOND", PREVIEW_START_BUFFER_SECONDS);
+    } catch {
+      // Keep AVPlay's default buffering.
+    }
     avplay.prepareAsync(
       () => {
         // Superseded or stopped while preparing: teardown already closed it.
@@ -341,7 +362,8 @@ export function startTizenPreview(options: TizenPreviewOptions): TizenPreviewHan
         try {
           session.videoAspect = readVideoAspect(avplay) ?? session.videoAspect;
           applyDisplayRect(avplay, session);
-          avplay.play();
+          session.prepared = true;
+          if (session.playRequested) avplay.play();
         } catch {
           fail();
         }
@@ -353,6 +375,16 @@ export function startTizenPreview(options: TizenPreviewOptions): TizenPreviewHan
   }
 
   return {
+    play() {
+      if (!isCurrent() || session.playRequested) return;
+      session.playRequested = true;
+      if (!session.prepared) return; // prepareAsync's callback starts it
+      try {
+        avplay.play();
+      } catch {
+        fail();
+      }
+    },
     pause() {
       if (!isCurrent()) return;
       try {

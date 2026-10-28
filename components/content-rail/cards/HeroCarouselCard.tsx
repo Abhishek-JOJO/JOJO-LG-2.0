@@ -242,7 +242,9 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
       settleTimeoutRef.current = null;
     }
     if (isActive) {
-      settleTimeoutRef.current = setTimeout(() => setIsSlideSettled(true), 950);
+      // 950ms outlasts the 900ms slide crossfade. Tizen swaps slides with no
+      // crossfade (ContentRailList), so it only needs a beat to settle.
+      settleTimeoutRef.current = setTimeout(() => setIsSlideSettled(true), isTizenRuntime ? 250 : 950);
     } else {
       setIsSlideSettled(false);
     }
@@ -252,7 +254,7 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
         settleTimeoutRef.current = null;
       }
     };
-  }, [previewEnabled, isActive]);
+  }, [previewEnabled, isActive, isTizenRuntime]);
 
 
   useEffect(() => {
@@ -510,8 +512,17 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
         <div className={`absolute inset-y-0 left-0 w-full sm:w-[55%] md:w-[50%] lg:w-[46%] xl:w-[42%] bg-gradient-to-r from-black/80 via-black/40 to-transparent z-10 pointer-events-none transition-opacity duration-700 ${isActive ? "opacity-100" : "opacity-0"}`} />
       </div>
       
-      {/* Hotstar Bottom Gradient */}
-      <div className={`absolute inset-x-0 bottom-0 h-[60%] sm:h-[50%] bg-gradient-to-t from-black via-black/80 to-transparent z-10 pointer-events-none transition-opacity duration-700 ${isActive ? "opacity-100" : "opacity-0"}`} />
+      {/* Text shade: a bottom-left corner vignette sized to the title/badges/
+          genres block, instead of a full-width black band over the bottom half
+          that darkened the whole lower artwork (and preview video) too. The
+          right side and the top of the slide stay clear. */}
+      <div
+        className={`absolute bottom-0 left-0 w-[75%] h-[75%] z-10 pointer-events-none transition-opacity duration-700 ${isActive ? "opacity-100" : "opacity-0"}`}
+        style={{
+          background:
+            "radial-gradient(ellipse at 0% 100%, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.55) 40%, rgba(0, 0, 0, 0) 72%)",
+        }}
+      />
 
 
 

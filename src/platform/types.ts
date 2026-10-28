@@ -116,6 +116,8 @@ export interface SamsungAVPlay {
   setSilentSubtitle?(silent: boolean): void;
   setSpeed?(speed: number): void;
   setStreamingProperty?(property: string, value: string): void;
+  /** e.g. ("PLAYER_BUFFER_FOR_PLAY", "PLAYER_BUFFER_SIZE_IN_SECOND", 2); call before prepare. */
+  setBufferingParam?(option: string, unit: string, amount: number): void;
   getStreamingProperty?(property: string): string;
   setDrm?(drmType: string, drmOperation: string, jsonParam: string): void;
   /** Multitasking: release the player while the app is hidden… */

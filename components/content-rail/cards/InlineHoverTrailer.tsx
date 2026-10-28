@@ -7,7 +7,21 @@ import { usePlayerStore } from "@/store/usePlayerStore";
 import { TitleLogoImage } from "@/components/ui/TitleLogoImage";
 import { ContentRailItem } from "../config/contentRail.types";
 import { isTizen } from "@/src/platform/detectPlatform";
-import { isTizenPreviewAvailable, startTizenPreview } from "@/src/platform/tizen/tizenPreviewPlayer";
+import {
+  isTizenPreviewAvailable,
+  startTizenPreview,
+  type TizenPreviewHandle,
+} from "@/src/platform/tizen/tizenPreviewPlayer";
+
+// <video> (webOS/browser): wait this long on a card before allocating a
+// hardware decoder for its preview.
+const VIDEO_PREVIEW_DWELL_MS = 1200;
+// Tizen splits that wait: AVPlay starts preparing (manifest + first segments,
+// most of the start-up time) once the card is clearly settled on — held keys
+// repeat every ~120ms — and starts playing at the full dwell. The download
+// then overlaps the dwell instead of only starting after it.
+const TIZEN_PREPARE_AFTER_MS = 300;
+const TIZEN_PLAY_AFTER_MS = 800;
 
 interface InlineHoverTrailerProps {
   item: ContentRailItem;
@@ -41,7 +55,12 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
   // open/close on a single keypress, felt as a hitch while fast scrolling.
   const itemId = item?.id != null ? String(item.id) : null;
   const [loadVideoForId, setLoadVideoForId] = useState<string | null>(null);
-  const shouldLoadVideo = previewEnabled && isExpanded && !!previewUrl && itemId !== null && loadVideoForId === itemId;
+  const [playVideoForId, setPlayVideoForId] = useState<string | null>(null);
+  const isGrantedFor = (grantedId: string | null) =>
+    previewEnabled && isExpanded && !!previewUrl && itemId !== null && grantedId === itemId;
+  // <video>: load and play together. Tizen: prepare at shouldLoadVideo, play at shouldPlayVideo.
+  const shouldLoadVideo = isGrantedFor(loadVideoForId);
+  const shouldPlayVideo = tizenPreviewEnabled ? isGrantedFor(playVideoForId) : shouldLoadVideo;
 
   useEffect(() => {
     if (!previewEnabled) return;
@@ -49,20 +68,32 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
     setVideoReady(false);
     setVideoError(false);
     setLoadVideoForId(null);
+    setPlayVideoForId(null);
 
     if (!isExpanded || !previewUrl) return;
 
-    // Debounce 1200ms before allocating webOS hardware video decoders
+    if (tizenPreviewEnabled) {
+      const prepareTimer = setTimeout(() => setLoadVideoForId(itemId), TIZEN_PREPARE_AFTER_MS);
+      const playTimer = setTimeout(() => setPlayVideoForId(itemId), TIZEN_PLAY_AFTER_MS);
+      return () => {
+        clearTimeout(prepareTimer);
+        clearTimeout(playTimer);
+      };
+    }
+
+    // Debounce before allocating webOS hardware video decoders
     const timer = setTimeout(() => {
       setLoadVideoForId(itemId);
-    }, 1200);
+    }, VIDEO_PREVIEW_DWELL_MS);
 
     return () => clearTimeout(timer);
-  }, [previewEnabled, previewUrl, itemId, isExpanded]);
+  }, [previewEnabled, tizenPreviewEnabled, previewUrl, itemId, isExpanded]);
 
-  // Tizen: same 1.2s debounce, then AVPlay into this overlay's box (the
-  // card's 16:9 rect). The card poster fades via data-tizen-video-cover.
-  // AVPlay has no per-stream mute, so a muted user keeps the poster.
+  // Tizen: AVPlay into this overlay's box (the card's 16:9 rect), prepared
+  // ahead and held until the play gate below. The card poster fades via
+  // data-tizen-video-cover once frames show. AVPlay has no per-stream mute,
+  // so a muted user keeps the poster.
+  const tizenPreviewRef = useRef<TizenPreviewHandle | null>(null);
   useEffect(() => {
     if (!tizenPreviewEnabled || !shouldLoadVideo || !previewUrl || isMuted) return;
     const target = containerRef.current;
@@ -70,6 +101,7 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
     const preview = startTizenPreview({
       url: previewUrl,
       target,
+      autoPlay: false,
       onReady: () => setVideoReady(true),
       onEnded: () => setVideoReady(false),
       onStop: (reason) => {
@@ -77,11 +109,19 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
         if (reason === "error") setVideoError(true);
       },
     });
+    tizenPreviewRef.current = preview;
     return () => {
       preview.stop();
+      tizenPreviewRef.current = null;
       setVideoReady(false);
     };
   }, [tizenPreviewEnabled, shouldLoadVideo, previewUrl, isMuted]);
+
+  // Declared after the effect above so a preview opened in the same commit
+  // already exists here.
+  useEffect(() => {
+    if (tizenPreviewEnabled && shouldPlayVideo) tizenPreviewRef.current?.play();
+  }, [tizenPreviewEnabled, shouldPlayVideo]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -164,8 +204,10 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
   // preview loads, and only fades once real frames are showing (videoReady).
   // Not shown when no preview will start: Tizen keeps the poster for a muted
   // user (AVPlay has no per-stream mute).
+  // Tizen counts from the play gate — before it the preview is only warming up
+  // in the background, with no reason to show a loader yet.
   const isPreviewLoading =
-    shouldLoadVideo && !videoReady && !videoError && !(tizenPreviewEnabled && isMuted);
+    shouldPlayVideo && !videoReady && !videoError && !(tizenPreviewEnabled && isMuted);
 
   const titleText = item?.title ? (
     <h3 className={`text-white font-extrabold line-clamp-1 drop-shadow-lg mb-2 text-left ${
@@ -196,7 +238,9 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
       )}
       
       {isPreviewLoading && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none" aria-hidden="true">
+        // Fades in only after 300ms (preview-loader-in), so a preview that
+        // starts promptly never flashes a spinner at all.
+        <div className="preview-loader-in absolute inset-0 z-30 flex items-center justify-center pointer-events-none" aria-hidden="true">
           <div className="w-12 h-12 rounded-full border-4 border-white/25 border-t-white animate-spin" />
         </div>
       )}

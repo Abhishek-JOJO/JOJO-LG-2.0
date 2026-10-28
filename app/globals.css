@@ -1301,3 +1301,14 @@ html.tv-tizen .tizen-video-passthrough[data-tizen-video-frame] {
      parent goes transparent, so an animated mask would let them flash. */
   transition: none !important;
 }
+
+/* Card preview loader (InlineHoverTrailer): only appears once a wait is
+   actually noticeable, so a preview that starts promptly shows no spinner. */
+@keyframes previewLoaderIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.preview-loader-in {
+  animation: previewLoaderIn 150ms ease-out 300ms both;
+}
