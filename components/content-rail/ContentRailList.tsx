@@ -22,7 +22,7 @@ import { mapBatchAssetAccess, useBatchAssetAccess } from "@/features/content/hoo
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { extractDominantAmbientColor } from "@/lib/utils/colorExtractor";
 import { useAmbientTintStore } from "@/store/useAmbientTintStore";
-import { preloadImageUrl, preloadRailItems } from "./utils/imagePreloader";
+import { preloadImageUrl, preloadRailItemImages, preloadRailItems } from "./utils/imagePreloader";
 import { tvSoundManager } from "@/src/platform/audio/tvSoundManager";
 import { useNavStore } from "@/store/useNavStore";
 import { ROUTES } from "@/lib/constants/routes";
@@ -332,6 +332,7 @@ export function ContentRailList({
       nextItem?.posterImage ||
       nextItem?.image;
     preloadImageUrl(nextHeroUrl, { width: 1280, height: 720 }, 78);
+    preloadImageUrl(nextItem?.title_image);
   }, [activeIndex, isHeroVariant, isTizenRuntime, items]);
 
   // Spotlight rail config (sticky card 0 + fixed focus cycling)
@@ -397,9 +398,8 @@ export function ContentRailList({
     if (!isSpotlightRail || !railActive || !items?.length) return;
     const count = Math.min(items.length, isTizenRuntime ? 3 : 16);
     for (let i = 0; i < count; i++) {
-      if (items[i]?.title_image) {
-        preloadImageUrl(items[i].title_image, { width: 560, height: 160 });
-      }
+      // Original URL: title art is never CDN-resized (see TitleLogoImage).
+      preloadImageUrl(items[i]?.title_image);
     }
   }, [isSpotlightRail, railActive, items, isTizenRuntime]);
 
@@ -419,16 +419,16 @@ export function ContentRailList({
           (si - 1 + len) % len,
           (si - 2 + len) % len,
         ];
+    // Same URLs the lead/portrait cards render (cardImageUrls) — these used
+    // to warm different fields, so the cards still loaded cold.
     lookaheadIndices.forEach((idx) => {
-      const it = items[idx];
-      if (it) {
-        preloadImageUrl(it.posterImage || it.heroImage || it.landscapeImage || it.image || it.portraitImage, { width: 871, height: 490 });
-        preloadImageUrl(it.title_image, { width: 560, height: 160 });
-        if (!isTizenRuntime) {
-          preloadImageUrl(it.portraitImage || it.image, { width: 326, height: 490 });
-        }
-      }
+      preloadRailItemImages(items[idx], { portrait: !isTizenRuntime });
     });
+    // A Left press moves the current lead into portrait slot 1, which renders
+    // its portrait-size poster — warm it so that slot doesn't flash dark.
+    if (isTizenRuntime) {
+      preloadRailItemImages(items[si], { lead: false, portrait: true });
+    }
   }, [isSpotlightRail, items, spotlightIndex, isTvFileRuntime, railActive, isTizenRuntime]);
 
   // Fetch the next page of this rail's items well before the user reaches the end of what's
@@ -755,9 +755,35 @@ export function ContentRailList({
 
   // For spotlight rail, only render the 6 visible slots that fit on a 1920px TV screen.
   // Offscreen slots (items 6+) never scroll into view and re-rendering 20 cards on every keypress causes TV CPU lag.
-  const visibleItems = isSpotlightRail && items?.length > 6 ? items.slice(0, 6) : (items || []);
+  // On Tizen: the lead (871px) plus three portraits fill the screen; slot 4
+  // sits just off the right edge and keeps the image slot 3 shows after a
+  // Right press already decoded. Slot 5 never comes near the viewport, so
+  // Tizen skips it rather than fetching and decoding it on every step.
+  const spotlightSlotCount = isTizenRuntime ? 5 : 6;
+  // Browse preview rows below the spotlight aren't D-pad focusable and Tizen
+  // has no pointer, so nothing can ever scroll them — only the first screen
+  // width of cards is visible. Mounting the full page of 20+ cards there just
+  // registers and lays out unreachable cards each time a preview row mounts
+  // after an Up/Down step. 8 keeps the row wider than the viewport plus
+  // ContentRailSection's 400px load-more margin, so it never triggers a fetch.
+  const TIZEN_PREVIEW_CARD_LIMIT = 8;
+  const isTizenPreviewRail =
+    isTizenRuntime &&
+    !isSpotlightRail &&
+    !forceFocusable &&
+    config?.variant !== RailCardVariant.GENRE &&
+    type !== ContentRailType.GENRE;
+  const visibleItems = isSpotlightRail && items?.length > spotlightSlotCount
+    ? items.slice(0, spotlightSlotCount)
+    : isTizenPreviewRail && items?.length > TIZEN_PREVIEW_CARD_LIMIT
+      ? items.slice(0, TIZEN_PREVIEW_CARD_LIMIT)
+      : (items || []);
 
   const cardElements = visibleItems.map((originalItem, index) => {
+    // Tizen preview rows are keyed by slot so they update in place when the
+    // row switches to the next rail (cards and their <img>s are reused)
+    // instead of tearing down and rebuilding every card.
+    const standardCardKey = isTizenPreviewRail ? `preview-slot-${index}` : (originalItem?.id || index);
     const effectiveItem = isSpotlightRail && items?.length
       ? items[(spotlightIndex + index) % items.length]
       : originalItem;
@@ -787,7 +813,7 @@ export function ContentRailList({
         }
         return (
           <PortraitCard
-            key={originalItem?.id || index}
+            key={standardCardKey}
             {...commonProps}
             config={standardCardConfig}
             focusable={forceFocusable}
@@ -797,7 +823,7 @@ export function ContentRailList({
       case RailCardVariant.GENRE:
         return (
           <GenreCard
-            key={originalItem?.id || index}
+            key={standardCardKey}
             item={originalItem}
             config={config}
             index={index}
@@ -823,7 +849,7 @@ export function ContentRailList({
         }
         return (
           <PortraitCard
-            key={originalItem?.id || index}
+            key={standardCardKey}
             {...commonProps}
             config={standardCardConfig}
             focusable={forceFocusable}
@@ -849,7 +875,7 @@ export function ContentRailList({
         }
         return (
           <PortraitCard
-            key={originalItem?.id || index}
+            key={standardCardKey}
             {...commonProps}
             config={standardCardConfig}
             focusable={forceFocusable}
@@ -860,7 +886,7 @@ export function ContentRailList({
       case RailCardVariant.UPCOMING:
         return (
           <PortraitCard
-            key={originalItem?.id || index}
+            key={standardCardKey}
             {...commonProps}
             config={standardCardConfig}
             focusable={forceFocusable}

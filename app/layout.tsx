@@ -48,7 +48,14 @@ export default function RootLayout({
   const includeTizenWebApis = process.env.NEXT_PUBLIC_TV_PLATFORM === "tizen";
 
   return (
-    <html lang={defaultLocale} suppressHydrationWarning data-scroll-behavior="smooth">
+    // tv-tizen gates the Samsung-only compositor budget rules in globals.css
+    // from the very first paint (see "SAMSUNG TIZEN — COMPOSITOR BUDGET").
+    <html
+      lang={defaultLocale}
+      className={includeTizenWebApis ? "tv-tizen" : undefined}
+      suppressHydrationWarning
+      data-scroll-behavior="smooth"
+    >
       <head>
         <script
           id="early-locale-boot"

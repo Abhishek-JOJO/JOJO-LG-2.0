@@ -6,6 +6,11 @@ export class TizenAdapter implements TVPlatformAdapter {
   private releaseKeys: (() => void) | null = null;
 
   initialize(): void {
+    // Packaged Tizen builds already render this class from app/layout.tsx.
+    // This covers runtime-detected Tizen (e.g. a dev build loaded on the TV).
+    if (typeof document !== "undefined") {
+      document.documentElement.classList.add("tv-tizen");
+    }
     if (!this.releaseKeys) this.releaseKeys = registerTizenKeys();
   }
 

@@ -18,6 +18,7 @@ import {
   type JOJOCGSize,
 } from "@/lib/config/imageRequest.config";
 import { isTizen } from "@/src/platform/detectPlatform";
+import { isImageUrlLoaded, markImageUrlLoaded } from "@/lib/utils/loadedImageCache";
 
 export {
   JOJOImageFit,
@@ -325,13 +326,6 @@ function getInitialState(
   return JOJOImageRenderState.FallbackText;
 }
 
-// Global cache to track successfully loaded image URLs in memory
-const loadedImageUrls = new Set<string>();
-
-function markImageAsLoaded(key: string) {
-  loadedImageUrls.add(key);
-}
-
 function getImageUrlKey(src: unknown): string | null {
   if (!src) return null;
   if (typeof src === "string") return src;
@@ -503,10 +497,15 @@ export default function JOJOCommonImage({
     [activeSrc, packagedAppBase]
   );
 
-  const [isLoaded, setIsLoaded] = useState(() => {
-    const key = getImageUrlKey(renderedSrc);
-    return key ? loadedImageUrls.has(key) : false;
-  });
+  // Derived per URL instead of reset by an effect: the effect-driven reset
+  // rendered every new src once with the previous src's "loaded" flag, then
+  // hid it again a frame later — a flash on each swap. Images the preloader
+  // has already decoded count as loaded from their very first frame.
+  const renderedKey = getImageUrlKey(renderedSrc);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const isLoaded =
+    renderedKey !== null &&
+    (loadedKey === renderedKey || isImageUrlLoaded(renderedKey));
 
   useEffect(() => {
     setRetriedOriginal(false);
@@ -515,21 +514,16 @@ export default function JOJOCommonImage({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setImageState(getInitialState(renderedSrc, fallbackType));
-    const key = getImageUrlKey(renderedSrc);
-    setIsLoaded(key ? loadedImageUrls.has(key) : false);
   }, [renderedSrc, fallbackType]);
 
   // Synchronously catch browser cached image loads where onload doesn't fire
   useEffect(() => {
-    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
-      const key = getImageUrlKey(renderedSrc);
-      if (key) {
-        markImageAsLoaded(key);
-      }
+    if (renderedKey && imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      markImageUrlLoaded(renderedKey);
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsLoaded(true);
+      setLoadedKey(renderedKey);
     }
-  }, [renderedSrc]);
+  }, [renderedKey]);
 
   const translate = (key?: string, fallbackValue = "") => {
     if (!key) return fallbackValue;
@@ -671,7 +665,11 @@ export default function JOJOCommonImage({
 
   return (
     <div className={wrapperClass} style={computedWrapperStyle}>
-      {!isLoaded && (
+      {/* No opaque placeholder behind "contain" images: those are logos/title
+          art with transparent backgrounds, so a dark box here reads as a
+          black skeleton until the artwork arrives (same reasoning as the
+          backgroundColor skip in imageStyle above). */}
+      {!isLoaded && resolvedContentMode !== "contain" && (
         <div className="absolute inset-0 bg-neutral-900 rounded-lg" />
       )}
       <Image
@@ -686,11 +684,10 @@ export default function JOJOCommonImage({
         fill={shouldUseFill}
         onError={handleError}
         onLoad={(e) => {
-          const key = getImageUrlKey(renderedSrc);
-          if (key) {
-            markImageAsLoaded(key);
+          if (renderedKey) {
+            markImageUrlLoaded(renderedKey);
+            setLoadedKey(renderedKey);
           }
-          setIsLoaded(true);
           onLoad?.(e);
         }}
         loading={isLoaded ? "eager" : rest.loading}

@@ -11,13 +11,13 @@
 
 import { ContentRailItem } from "../config/contentRail.types";
 import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
+import { markImageUrlLoaded } from "@/lib/utils/loadedImageCache";
+import { getLandscapeCardImageUrl, getPortraitCardImageUrl } from "./cardImageUrls";
 
 // Matches the spotlight lead card's rendered size (ContentRailList's slot0Config).
-const LEAD_IMAGE_SIZE = { width: 871, height: 490 };
+export const LEAD_IMAGE_SIZE = { width: 871, height: 490 };
 // Matches the standard portrait card's rendered size (portraitConfig / standardCardConfig).
-const PORTRAIT_IMAGE_SIZE = { width: 326, height: 490 };
-// Matches the spotlight title logo's rendered size (InlineHoverTrailer).
-const TITLE_IMAGE_SIZE = { width: 560, height: 160 };
+export const PORTRAIT_IMAGE_SIZE = { width: 326, height: 490 };
 
 const preloadedUrls = new Set<string>();
 const activePreloadMap = new Map<string, HTMLImageElement>();
@@ -56,17 +56,38 @@ export function preloadImageUrl(
     // when a DOM <img> later uses the same URL (avoids on-demand decode delay)
     if (typeof img.decode === "function") {
       img.decode().then(() => {
+        markImageUrlLoaded(resolvedUrl);
         activePreloadMap.delete(resolvedUrl);
       }).catch(() => {
         activePreloadMap.delete(resolvedUrl);
       });
     } else {
-      img.onload = () => { activePreloadMap.delete(resolvedUrl); };
+      img.onload = () => {
+        markImageUrlLoaded(resolvedUrl);
+        activePreloadMap.delete(resolvedUrl);
+      };
       img.onerror = () => { activePreloadMap.delete(resolvedUrl); };
     }
   } catch {
     // ignore
   }
+}
+
+/**
+ * Warms exactly what the cards render for one item: the lead landscape
+ * poster, the title logo (always its original URL — title art is never
+ * resized, see jojoResizedImageURL / TitleLogoImage), and optionally the
+ * portrait poster.
+ */
+export function preloadRailItemImages(
+  item: ContentRailItem | undefined,
+  options: { lead?: boolean; portrait?: boolean } = {}
+): void {
+  if (!item) return;
+  const { lead = true, portrait = false } = options;
+  if (lead) preloadImageUrl(getLandscapeCardImageUrl(item), LEAD_IMAGE_SIZE);
+  preloadImageUrl(item.title_image);
+  if (portrait) preloadImageUrl(getPortraitCardImageUrl(item), PORTRAIT_IMAGE_SIZE);
 }
 
 /**
@@ -79,9 +100,6 @@ export function preloadRailItems(items?: ContentRailItem[] | null, maxItems = 10
   for (let i = 0; i < count; i++) {
     const item = items[i];
     if (!item) continue;
-    const landscapeUrl = item.posterImage || item.heroImage || item.landscapeImage || item.image || item.portraitImage;
-    preloadImageUrl(landscapeUrl, LEAD_IMAGE_SIZE);
-    preloadImageUrl(item.title_image, TITLE_IMAGE_SIZE);
-    preloadImageUrl(item.portraitImage || item.image, PORTRAIT_IMAGE_SIZE);
+    preloadRailItemImages(item, { portrait: true });
   }
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAmbientTintStore } from "@/store/useAmbientTintStore";
+import { isTizen } from "@/src/platform/detectPlatform";
 
 export function AmbientBackground() {
   const [mounted, setMounted] = useState(false);
@@ -21,6 +22,14 @@ export function AmbientBackground() {
     return null;
   }
 
+  // Tizen skips hero colour sampling (ContentRailList), so the tint is never
+  // set there. Without this guard the two will-change layers below stay
+  // allocated as full-viewport GPU surfaces at opacity 0 for the whole session.
+  const isTizenRuntime = isTizen();
+  if (isTizenRuntime && !hasActiveColor) {
+    return null;
+  }
+
   return (
     <div
       aria-hidden="true"
@@ -34,7 +43,7 @@ export function AmbientBackground() {
         style={{
           opacity: activeLayer === "A" && hasActiveColor ? 1 : 0,
           background: getGradient(layerA),
-          willChange: "opacity",
+          willChange: isTizenRuntime ? undefined : "opacity",
         }}
       />
 
@@ -44,7 +53,7 @@ export function AmbientBackground() {
         style={{
           opacity: activeLayer === "B" && hasActiveColor ? 1 : 0,
           background: getGradient(layerB),
-          willChange: "opacity",
+          willChange: isTizenRuntime ? undefined : "opacity",
         }}
       />
     </div>

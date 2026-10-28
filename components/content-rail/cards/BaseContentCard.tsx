@@ -221,11 +221,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   });
   const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
 
-<<<<<<< Updated upstream
   // Hoisted above cardInner's definition (below) so it can gate transform-gpu
   // there too — moved up, not duplicated or recomputed differently.
   const showFocusRing = focused || forceFocusRing || isDomFocused;
-=======
+
   // Native lazy-loading support is inconsistent across Samsung TV browser
   // generations. Explicitly gate off-screen card requests so a newly opened
   // home rail cannot start 20+ simultaneous downloads/decodes. The first six
@@ -251,7 +250,6 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     observer.observe(card);
     return () => observer.disconnect();
   }, [isTizenRuntime, shouldLoadImage]);
->>>>>>> Stashed changes
 
   // Debounce expansion on focus (80ms)
   // Keeps fast remote navigation at 60fps while still feeling responsive
@@ -352,21 +350,17 @@ export const BaseContentCard = React.memo(function BaseContentCard({
 
   const cardInner = (
     <div
-<<<<<<< Updated upstream
       // transform-gpu only while this card is actually focused/transitioning
-      // (showFocusRing), not on every card unconditionally — a rail can have
-      // 15-20+ of these mounted at once, and each was being permanently
-      // promoted to its own GPU-composited layer regardless of whether it
-      // was ever interacted with. Same visual result for the card that's
-      // actually animating; the rest just don't carry the idle compositing
-      // cost. (A card's layer doesn't need to already be promoted before
-      // focus arrives — the browser promotes it the same render it needs to.)
-      className={`relative h-full w-full overflow-hidden bg-neutral-900 transition-colors isolation-isolate ${showFocusRing ? "transform-gpu" : ""}`}
-=======
-      className={`relative h-full w-full overflow-hidden bg-neutral-900 transition-colors isolation-isolate ${isTizenRuntime ? "" : "transform-gpu"}`}
->>>>>>> Stashed changes
+      // (showFocusRing) on non-Tizen runtimes — not on every card unconditionally,
+      // avoiding idle compositing overhead across 15-20+ mounted rail items.
+      className={`relative h-full w-full overflow-hidden bg-neutral-900 transition-colors isolation-isolate ${!isTizenRuntime && showFocusRing ? "transform-gpu" : ""}`}
       style={{
-        WebkitMaskImage: "-webkit-radial-gradient(white, black)",
+        // The radial mask forces rounded-corner clipping of GPU-promoted
+        // children. On Tizen nothing inside the card is promoted (no
+        // transform-gpu / translateZ above and below), so overflow-hidden +
+        // border-radius already clips — and the mask would push every mounted
+        // card through its own offscreen mask surface on each repaint.
+        WebkitMaskImage: isTizenRuntime ? undefined : "-webkit-radial-gradient(white, black)",
         borderRadius: item.isPremium
           ? Math.max(0, config.borderRadius - 3)
           : config.borderRadius,
@@ -384,9 +378,14 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         >
           {/* Mounting is already visibility-gated on Tizen. Once mounted,
               request immediately instead of relying on inconsistent native
-              lazy-loading implementations in older Samsung browsers. */}
+              lazy-loading implementations in older Samsung browsers.
+              On Tizen the <img> is reused when the slot's item changes
+              (spotlight Left/Right, preview rows updating in place): a warm
+              poster then replaces the old one on the next frame, where a
+              fresh element per URL started blank and flashed the dark card
+              background on every step. */}
           <img
-            key={resizedImageUrl}
+            key={isTizenRuntime ? undefined : resizedImageUrl}
             src={resizedImageUrl}
             alt={item?.title || ""}
             onError={handleImageError}
@@ -565,17 +564,11 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-<<<<<<< Updated upstream
       // Explicit property list instead of transition-all: the only things
       // that actually animate here are width/height (the focus-expand
-      // effect) and box-shadow (the focus ring's shadow-2xl) — transition-all
-      // made the browser watch every animatable property on this element for
-      // changes on every style recalculation, not just the two that move.
-      // Same visual result, less work per frame.
-      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer transition-[width,height,box-shadow] duration-300 ease-out ${sizingClassName} ${className} ${showFocusRing ? "z-30 shadow-2xl" : "scale-100"}`}
-=======
-      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer ${isTizenRuntime ? "transition-none" : "transition-all duration-300 ease-out"} ${sizingClassName} ${className} ${showFocusRing ? `z-30 ${isTizenRuntime ? "" : "shadow-2xl"}` : "scale-100"}`}
->>>>>>> Stashed changes
+      // effect) and box-shadow (the focus ring's shadow-2xl). On Tizen,
+      // transitions and heavy drop shadows are disabled for 60fps responsiveness.
+      className={`group relative overflow-hidden shrink-0 text-left cursor-pointer ${isTizenRuntime ? "transition-none" : "transition-[width,height,box-shadow] duration-300 ease-out"} ${sizingClassName} ${className} ${showFocusRing ? `z-30 ${isTizenRuntime ? "" : "shadow-2xl"}` : "scale-100"}`}
       style={{
         ...cardStyle,
         zIndex: showFocusRing ? 30 : undefined,

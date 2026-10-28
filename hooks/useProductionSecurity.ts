@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { isWebOS } from "@/src/platform";
+import { isTizen, isWebOS } from "@/src/platform";
 
 export interface ProductionSecurityOptions {
   /**
@@ -169,10 +169,12 @@ export function useProductionSecurity(options: ProductionSecurityOptions = {}) {
     }
 
     // 4. Subtle Anti-Debugging Trap (Debugger pause interval)
-    // Skipped on webOS: shipped TV apps never have a devtools inspector attached in the
-    // field, so this would just be a permanent 2s-interval CPU cost on constrained TV hardware.
+    // Skipped on webOS and Tizen: shipped TV apps never have a devtools inspector attached in
+    // the field, so this would just be a permanent 2s-interval CPU cost on constrained TV
+    // hardware — and with Tizen Studio's Web Inspector attached during on-TV testing, it
+    // freezes the app every 2 seconds.
     let debugInterval: NodeJS.Timeout | null = null;
-    if (enableDebuggerTrap && process.env.NODE_ENV === "production" && !isWebOS()) {
+    if (enableDebuggerTrap && process.env.NODE_ENV === "production" && !isWebOS() && !isTizen()) {
       debugInterval = setInterval(() => {
         const start = performance.now();
         // eslint-disable-next-line no-debugger

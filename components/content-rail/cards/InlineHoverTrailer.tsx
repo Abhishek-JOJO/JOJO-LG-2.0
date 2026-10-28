@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { isHlsUrl, VIDEO_CONSTANTS } from "@/lib/constants/video";
 import { usePlayerStore } from "@/store/usePlayerStore";
-import { jojoResizedImageURL } from "@/lib/config/imageRequest.config";
+import { TitleLogoImage } from "@/components/ui/TitleLogoImage";
 import { ContentRailItem } from "../config/contentRail.types";
 import { isTizen } from "@/src/platform/detectPlatform";
 
@@ -20,12 +20,7 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [videoError, setVideoError] = useState(false);
-  const [titleImageError, setTitleImageError] = useState(false);
 
-  useEffect(() => {
-    setTitleImageError(false);
-  }, [item?.title_image, item?.id]);
-  
   const isMuted = usePlayerStore((s) => s.isMuted);
 
   const previewUrl = useMemo(() => {
@@ -128,6 +123,14 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
     }
   }, [isMuted]);
 
+  const titleText = item?.title ? (
+    <h3 className={`text-white font-extrabold line-clamp-1 drop-shadow-lg mb-2 text-left ${
+      isLandscape ? "text-3xl" : "text-xl sm:text-2xl"
+    }`}>
+      {item.title}
+    </h3>
+  ) : null;
+
   return (
     <div className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-hidden">
 
@@ -158,29 +161,22 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
           ? "bottom-8 left-8 right-8"
           : "bottom-6 left-6 right-6 sm:bottom-8 sm:left-8 sm:right-8"
       }`}>
-        {item?.title_image && !titleImageError ? (
-          <div className={`relative mb-3 flex justify-start items-end ${
-            isLandscape
-              ? "w-[280px] h-[90px]"
-              : "w-[160px] sm:w-[220px] lg:w-[280px] h-[50px] sm:h-[65px] lg:h-[80px]"
-          }`}>
-            <img
-              src={jojoResizedImageURL(item.title_image, { targetSize: { width: 560, height: 160 } })}
-              alt={item?.title || ""}
-              className={`w-full h-full object-contain object-left-bottom ${videoEnabled ? "drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]" : ""}`}
-              loading="eager"
-              // @ts-ignore
-              fetchPriority="high"
-              onError={() => setTitleImageError(true)}
-            />
-          </div>
-        ) : item?.title ? (
-          <h3 className={`text-white font-extrabold line-clamp-1 drop-shadow-lg mb-2 text-left ${
-            isLandscape ? "text-3xl" : "text-xl sm:text-2xl"
-          }`}>
-            {item.title}
-          </h3>
-        ) : null}
+        {/* Original URL, same as the preloader warms: title art is never
+            CDN-resized (jojoResizedImageURL returns it untouched anyway). */}
+        {item?.title_image ? (
+          <TitleLogoImage
+            src={item.title_image}
+            alt={item?.title || ""}
+            wrapperClassName={`relative mb-3 flex justify-start items-end ${
+              isLandscape
+                ? "w-[280px] h-[90px]"
+                : "w-[160px] sm:w-[220px] lg:w-[280px] h-[50px] sm:h-[65px] lg:h-[80px]"
+            }`}
+            className={`w-full h-full object-contain object-left-bottom ${videoEnabled ? "drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]" : ""}`}
+            fallback={titleText}
+            highPriority
+          />
+        ) : titleText}
         {item?.genres && item.genres.length > 0 && (
           <span className={`text-white/90 font-semibold truncate drop-shadow-md text-left transition-opacity duration-300 ${
             isLandscape ? "text-base" : "text-sm sm:text-base"

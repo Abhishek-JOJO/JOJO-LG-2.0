@@ -1211,3 +1211,36 @@ input.bg-transparent-forced {
     animation-duration: 0.12s;
   }
 }
+
+/* ============================================================
+   SAMSUNG TIZEN — COMPOSITOR BUDGET
+   `html.tv-tizen` is set at build time (app/layout.tsx) and by
+   TizenAdapter at runtime. Samsung's embedded Chromium has a much
+   smaller GPU/raster budget than webOS, and these effects are the
+   ones that cost it frames on physical TVs:
+   - backdrop-filter re-blurs everything underneath on every frame
+     (sticky navbar on scroll, hero pills, modal scrims). Tizen
+     < 6.0 (Chromium < 76) never supported it, so every screen is
+     already designed to read correctly without it.
+   - filter: drop-shadow() forces each element through its own
+     filter surface, re-rasterized whenever a card's content swaps
+     (every Left/Right on the spotlight rail). Title logos and text
+     already sit on dark gradients, so legibility is unchanged.
+   - The browse tab slide animates the whole page as one layer
+     while the incoming tab is still mounting and decoding its hero.
+============================================================ */
+html.tv-tizen *,
+html.tv-tizen *::before,
+html.tv-tizen *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html.tv-tizen [class*="drop-shadow"] {
+  filter: none !important;
+}
+
+html.tv-tizen .browse-page-enter-layer {
+  animation: none;
+  will-change: auto;
+}

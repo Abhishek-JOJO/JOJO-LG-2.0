@@ -144,33 +144,52 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
       }
       this.configureDrm(drmConfig);
 
-      await new Promise<void>((resolve, reject) => {
-        const prepareTimeout = setTimeout(() => {
-          reject(new Error('AVPlay prepareAsync timed out after 15s'));
-        }, 15000);
+      // Try synchronous prepare first — on Samsung Tizen TVs, avplay.prepare()
+      // transitions immediately to READY in <200ms, whereas prepareAsync() is known
+      // to stall or fail to invoke its success callback on some Tizen 7/8 firmware versions.
+      let prepared = false;
+      try {
+        avplay.prepare();
+        prepared = true;
+        logger.info('[TizenAVPlayAdapter] Synchronous avplay.prepare() succeeded');
+      } catch (prepErr) {
+        logger.warn('[TizenAVPlayAdapter] Synchronous prepare failed, falling back to prepareAsync', { error: prepErr });
+      }
 
-        avplay.prepareAsync(
-          () => {
-            clearTimeout(prepareTimeout);
-            if (this.destroyed) {
-              reject(new Error('AVPlay was destroyed while preparing'));
-              return;
-            }
-            this.durationSeconds = Math.max(0, avplay.getDuration() / 1000);
-            this.tracks = avplay.getTotalTrackInfo() ?? [];
-            this.syncSelectedTracks();
-            this.handlers?.onDurationChange(this.durationSeconds);
+      if (!prepared) {
+        await new Promise<void>((resolve, reject) => {
+          const prepareTimeout = setTimeout(() => {
+            reject(new Error('AVPlay prepareAsync timed out after 15s'));
+          }, 15000);
 
-            const startTime = options?.startTime ?? 0;
-            if (startTime > 0) this.seek(startTime);
-            resolve();
-          },
-          (error) => {
-            clearTimeout(prepareTimeout);
-            reject(new Error(`AVPlay prepare failed: ${errorMessage(error)}`));
-          },
-        );
-      });
+          avplay.prepareAsync(
+            () => {
+              clearTimeout(prepareTimeout);
+              if (this.destroyed) {
+                reject(new Error('AVPlay was destroyed while preparing'));
+                return;
+              }
+              resolve();
+            },
+            (error) => {
+              clearTimeout(prepareTimeout);
+              reject(new Error(`AVPlay prepare failed: ${errorMessage(error)}`));
+            },
+          );
+        });
+      }
+
+      if (this.destroyed) {
+        throw new Error('AVPlay was destroyed while preparing');
+      }
+
+      this.durationSeconds = Math.max(0, avplay.getDuration() / 1000);
+      this.tracks = avplay.getTotalTrackInfo() ?? [];
+      this.syncSelectedTracks();
+      this.handlers?.onDurationChange(this.durationSeconds);
+
+      const startTime = options?.startTime ?? 0;
+      if (startTime > 0) this.seek(startTime);
 
       logger.info('[TizenAVPlayAdapter] Content prepared', {
         manifestUrl,

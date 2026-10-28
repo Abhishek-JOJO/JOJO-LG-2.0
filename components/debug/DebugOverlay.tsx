@@ -291,8 +291,12 @@ export function DebugOverlay() {
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
   }, [runMemoryCleanup]);
 
-  // High-performance polling for focus shifts, FPS, Memory, and Video metrics
+  // High-performance polling for focus shifts, FPS, Memory, and Video metrics.
+  // Only while the HUD is shown — this component is mounted for the whole
+  // session, and a permanent rAF loop makes the TV produce a main-thread
+  // frame on every vsync even when nothing on screen changes.
   useEffect(() => {
+    if (!visible) return;
     let rafId = 0;
     let frameCount = 0;
     let lastFpsSample = performance.now();
@@ -410,7 +414,7 @@ export function DebugOverlay() {
       cancelAnimationFrame(rafId);
       clearInterval(pollInterval);
     };
-  }, [getRawConsole]);
+  }, [getRawConsole, visible]);
 
   if (!visible) return null;
 

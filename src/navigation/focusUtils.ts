@@ -6,9 +6,20 @@ import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore"
 
 import { useExitConfirmStore } from "@/store/useExitConfirmStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
+import { isTizen } from "@/src/platform/detectPlatform";
 
 const MAX_ATTEMPTS = 20; // ~2s of retrying at 100ms — generous for slow TV hardware
 const POLL_INTERVAL_MS = 100;
+
+/**
+ * Scroll behavior for keeping a newly focused item in view. Each D-pad press
+ * starts a new smooth scroll that the next press interrupts mid-animation;
+ * Tizen's compositor can't keep that up, so it reads as stutter there. Snap
+ * instead on Tizen; other platforms keep the smooth scroll.
+ */
+export function focusScrollBehavior(): ScrollBehavior {
+  return isTizen() ? "auto" : "smooth";
+}
 
 /**
  * restorePageFocus — Rock-solid focus restoration helper for TV Spatial Navigation.

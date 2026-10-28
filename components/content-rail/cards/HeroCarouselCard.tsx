@@ -3,6 +3,7 @@
 import { JOJOButton, JOJOCustomButton } from "@/components/ui/JOJOButton";
 import JOJOCommonImage, { JOJOImagePosition, JOJOImagePreset } from "@/components/ui/JOJOCommonImage";
 import JOJOCommonVideo from "@/components/ui/JOJOCommonVideo";
+import { TitleLogoImage } from "@/components/ui/TitleLogoImage";
 import { LikeLovePartHerocarousel } from "@/enums/ui.enum";
 import { useWatchGating } from "@/features/asset/hooks/useWatchGating";
 import { getAssetButtonConfig } from "@/features/asset/model/assetButtonModel";
@@ -367,6 +368,12 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
     }
   }, [activeLikeState]);
 
+  const heroTitleText = (
+    <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-[6rem] font-bold text-white tracking-wide leading-tight drop-shadow-md">
+      {item?.title}
+    </h1>
+  );
+
   return (
     <div
       ref={(node) => {
@@ -479,22 +486,15 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
         {config?.showTitle && (
           <div className={`mb-4 transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-100`}>
             {item?.title_image ? (
-              <div className="relative w-full max-w-[380px] sm:max-w-[500px] md:max-w-[620px] lg:max-w-[720px] h-[86px] sm:h-[118px] md:h-[145px] lg:h-[168px]">
-                <JOJOCommonImage
-                  src={item.title_image}
-                  alt={item.title}
-                  fill
-                  contentMode="contain"
-                  position="left"
-                  optimizeRequestURL={false}
-                  wrapperClassName="h-full w-full drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]"
-                />
-              </div>
-            ) : (
-              <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-[6rem] font-bold text-white tracking-wide leading-tight drop-shadow-md">
-                {item?.title}
-              </h1>
-            )}
+              <TitleLogoImage
+                src={item.title_image}
+                alt={item.title}
+                wrapperClassName="relative w-full max-w-[380px] sm:max-w-[500px] md:max-w-[620px] lg:max-w-[720px] h-[86px] sm:h-[118px] md:h-[145px] lg:h-[168px]"
+                className="h-full w-full object-contain object-left drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+                fallback={heroTitleText}
+                highPriority={isActive}
+              />
+            ) : heroTitleText}
           </div>
         )}
 

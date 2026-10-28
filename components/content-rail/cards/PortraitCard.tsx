@@ -5,6 +5,8 @@ import { useActivePathname } from "@/hooks/useActivePathname";
 import { ROUTES } from "@/lib/constants/routes";
 
 import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
+import { TitleLogoImage } from "@/components/ui/TitleLogoImage";
+import { getPortraitCardImages, getPortraitCardImageUrl } from "../utils/cardImageUrls";
 import { ContentRailItem, RailCardVariant } from "../config/contentRail.types";
 import { RailCardDesignConfig } from "../config/contentRail.config";
 
@@ -43,6 +45,11 @@ export const PortraitCard = React.memo(function PortraitCard({
   const handleClick = useCallback(() => {
     onClick?.(item);
   }, [onClick, item]);
+
+  // Stable reference so BaseContentCard's React.memo can skip re-renders —
+  // an inline spread there was a new object on every render. Declared above
+  // the sub-variant early returns so it's never called conditionally.
+  const cardConfig = React.useMemo(() => ({ ...config, showBadge: false }), [config]);
 
   // 1. Handle Artist sub-variant
   if (config.variant === RailCardVariant.ARTIST) {
@@ -201,36 +208,22 @@ export const PortraitCard = React.memo(function PortraitCard({
   const isHomePage = !pathname || pathname === "/" || pathname === "/home" || pathname === ROUTES.HOME || pathname === ROUTES.HOMEPAGE;
   const isTopTen = isHomePage && config.variant === RailCardVariant.TOP_TEN;
 
-  // Resolve image for portrait card according to the client-specified fallback cascade:
-  // 1. POSTER Ratio 4 -> 2. POSTER Ratio 3 -> 3. POSTER Ratio 1 -> 4. POSTER (null)
-  // -> 5. LANDSCAPE Ratio 1 -> 6. LANDSCAPE (null) -> 7. PORTRAIT -> 8. Generic
-  const portraitFallbackList = React.useMemo(() => {
-    if (item.portraitFallbackImages && item.portraitFallbackImages.length > 0) {
-      return item.portraitFallbackImages;
-    }
-    const candidates = [
-      item.posterImageRatio4,
-      item.portraitImage,
-      item.posterImage,
-      item.landscapeImage,
-      item.image,
-    ];
-    const seen = new Set<string>();
-    return candidates.filter((u): u is string => {
-      if (typeof u === "string" && u.trim().length > 0 && !seen.has(u)) {
-        seen.add(u);
-        return true;
-      }
-      return false;
-    });
-  }, [item]);
+  // Resolve image for portrait card according to the client-specified fallback
+  // cascade (see getPortraitCardImages) — shared with the image preloader so
+  // its lookahead warms this exact URL.
+  const portraitFallbackList = React.useMemo(() => getPortraitCardImages(item), [item]);
+  const imageUrl = getPortraitCardImageUrl(item, portraitFallbackList);
 
-  const imageUrl = portraitFallbackList[0] || item.posterImageRatio4 || item.portraitImage || item.image || "";
+  const titleText = (
+    <h3 className="line-clamp-1 text-xs sm:text-sm font-semibold text-white drop-shadow-md text-center px-1">
+      {item?.title}
+    </h3>
+  );
 
   const cardContent = (
     <BaseContentCard
       item={item}
-      config={{ ...config, showBadge: false }}
+      config={cardConfig}
       imageUrl={imageUrl}
       fallbackImages={portraitFallbackList}
       className={`${isTopTen ? "ml-2" : ""} ${className || ""}`}
@@ -247,23 +240,14 @@ export const PortraitCard = React.memo(function PortraitCard({
       {(item?.title_image || (Boolean((config as any)?.isMixedSeries) && item?.title)) && (
         <div className="absolute bottom-0 left-0 right-0 z-20 p-3 pb-3.5 sm:p-4 sm:pb-4.5 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center justify-end text-center pointer-events-none">
           {item?.title_image ? (
-            <div className="relative w-[200px] sm:w-[250px] max-w-[90%] h-[56px] sm:h-[70px] flex justify-center items-end mx-auto">
-              <JOJOCommonImage
-                src={item.title_image}
-                alt={item.title}
-                fill
-                contentMode="contain"
-                position="center"
-                style={{ objectPosition: "center bottom" }}
-                optimizeRequestURL={false}
-                wrapperClassName="w-full h-full drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
-              />
-            </div>
-          ) : (
-            <h3 className="line-clamp-1 text-xs sm:text-sm font-semibold text-white drop-shadow-md text-center px-1">
-              {item?.title}
-            </h3>
-          )}
+            <TitleLogoImage
+              src={item.title_image}
+              alt={item.title}
+              wrapperClassName="relative w-[200px] sm:w-[250px] max-w-[90%] h-[56px] sm:h-[70px] flex justify-center items-end mx-auto"
+              className="w-full h-full object-contain object-bottom drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
+              fallback={titleText}
+            />
+          ) : titleText}
         </div>
       )}
 

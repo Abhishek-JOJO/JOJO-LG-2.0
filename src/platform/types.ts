@@ -90,6 +90,7 @@ export interface SamsungAVPlayListener {
 export interface SamsungAVPlay {
   open(url: string): void;
   close(): void;
+  prepare(): void;
   prepareAsync(successCallback: () => void, errorCallback: (error: unknown) => void): void;
   play(): void;
   pause(): void;

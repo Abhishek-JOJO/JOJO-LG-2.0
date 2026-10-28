@@ -4,7 +4,7 @@ import { analyticsService, buildContentClickedProperties } from "@/shared/analyt
 import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 // removed norigin imports from this line
 import { JOJOCustomButton } from "../ui/JOJOButton";
 import { CONTENT_RAIL_DESIGN_CONFIG } from "./config/contentRail.config";
@@ -73,18 +73,23 @@ export const ContentRailSection = memo(function ContentRailSection({
 
   const sectionRef = useRef<HTMLDivElement>(null);
   const isHeroSection = type === ContentRailType.HERO_CAROUSEL;
-  const baseConfig = CONTENT_RAIL_DESIGN_CONFIG[type];
-  const config = baseConfig
-    ? {
-      ...baseConfig,
-      hover: {
-        ...baseConfig.hover,
-        enabled: disableHover ? false : baseConfig.hover?.enabled,
-      },
-    }
-    : undefined;
+  // Memoized so ContentRailList's standardCardConfig and the React.memo'd
+  // cards below keep stable props. A fresh object (and click handler) on
+  // every render made every card in the section re-render with it.
+  const config = useMemo(() => {
+    const baseConfig = CONTENT_RAIL_DESIGN_CONFIG[type];
+    return baseConfig
+      ? {
+        ...baseConfig,
+        hover: {
+          ...baseConfig.hover,
+          enabled: disableHover ? false : baseConfig.hover?.enabled,
+        },
+      }
+      : undefined;
+  }, [type, disableHover]);
 
-  const handleItemClick = (item: ContentRailItem) => {
+  const handleItemClick = useCallback((item: ContentRailItem) => {
     try {
       const itemPosition = items.findIndex((i) => i?.id === item?.id);
       const clickProps = buildContentClickedProperties(
@@ -115,7 +120,7 @@ export const ContentRailSection = memo(function ContentRailSection({
     }
     // Non-genre — let the parent handle it
     onItemClick?.(item);
-  };
+  }, [items, cr_title, railId, config, type, onGenreClick, router, onItemClick]);
 
 
   const listRef = useRef<HTMLDivElement>(null);
@@ -157,6 +162,13 @@ export const ContentRailSection = memo(function ContentRailSection({
     };
   }, [items, isExpanded, loadNextPage, railId, cr_title]);
 
+  // Boolean selectors: a section only re-renders when its own dimming state
+  // flips, not on every activeSectionIndex change. Called before the early
+  // return below so the hook order never changes between renders.
+  const isSectionActive = useActiveRailStore((s) => s.activeSectionIndex === index);
+  const hasAnyRailActive = useActiveRailStore(
+    (s) => s.activeSectionIndex !== null && s.activeSectionIndex > 0
+  );
 
   if (!config || !items?.length) return null;
 
@@ -178,10 +190,6 @@ export const ContentRailSection = memo(function ContentRailSection({
   const isGenre = config.variant === RailCardVariant.GENRE;
   const isW_270 = config.width === 270;
   const mobileHeight = isLandscape ? "170px" : isGenre ? "58px" : isW_270 ? "210px" : "200px";
-
-  const activeSectionIndex = useActiveRailStore((s) => s.activeSectionIndex);
-  const isSectionActive = activeSectionIndex === index;
-  const hasAnyRailActive = activeSectionIndex !== null && activeSectionIndex > 0;
 
   const isStandardTvRail = !isHero && (
     config.variant === RailCardVariant.SERIES_MIXED ||

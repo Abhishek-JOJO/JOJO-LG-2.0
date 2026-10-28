@@ -25,7 +25,7 @@ import { logger } from "@/lib/logger/logger";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const stripHtml = (html: string) => {
   if (!html) return "";
@@ -53,7 +53,10 @@ import { buildPlanDetailAnalytics } from "@/features/asset/utils/buildPlanDetail
 import { useFocusable, setFocus, doesFocusableExist, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
 import { mapApiRailItem, getPortraitFallbackImages } from "@/components/content-rail/utils/contentRail.mapper";
-import { isBackEvent } from "@/src/platform";
+import { isBackEvent, isTizen } from "@/src/platform";
+import { focusScrollBehavior } from "@/src/navigation/focusUtils";
+import { preloadImageUrl } from "@/components/content-rail/utils/imagePreloader";
+import { TitleLogoImage } from "@/components/ui/TitleLogoImage";
 
 // This page's hero preview video fires onTimeUpdate ~4x/sec, which re-renders
 // the whole AssetDetailView tree (and every Focusable* child) on the same
@@ -768,8 +771,15 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // Mute State (hero preview video only — the mute/unmute button was removed)
   const isMuted = usePlayerStore((s) => s.isMuted);
 
-  // State to track the progress percentage (0 to 100) of the current active slide
-  const [slideProgress, setSlideProgress] = useState(0);
+  // Progress of the active slide's indicator is deliberately not state here:
+  // a video slide's timeupdate fires ~4x/second, and setState on this
+  // component re-rendered the entire view — tabs, episode list and all — on
+  // every tick, under the user's D-pad navigation. The active
+  // HeroSlideProgressFill subscribes and re-renders on its own instead.
+  const slideProgressListenerRef = useRef<SlideProgressListener | null>(null);
+  const subscribeSlideProgress = useCallback((listener: SlideProgressListener | null) => {
+    slideProgressListenerRef.current = listener;
+  }, []);
 
   // Title shrink animation (same as HoverCard)
   const [isTitleShrunk, setIsTitleShrunk] = useState(false);
@@ -814,35 +824,37 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // component tree the whole time an image slide was active, including the
   // entire time a user was browsing the tabs/episodes overlay further down
   // the same page (the hero area is only visually hidden behind it, not
-  // paused). Now the fill is a single CSS transition — target width flips
-  // once, the browser's compositor animates it with zero JS involvement per
-  // frame, and a single setTimeout (not a 16ms interval) advances the slide.
+  // paused). Now the fill is a single CSS transition owned by
+  // HeroSlideProgressFill — target width flips once, the browser's compositor
+  // animates it with zero JS involvement per frame — and a single setTimeout
+  // (not a 16ms interval) advances the slide.
   useEffect(() => {
-    setSlideProgress(0);
     if (previewsList.length <= 1) return;
+
+    // Warm the next slide's backdrop so auto-advance swaps straight to it
+    // instead of flashing the banner's dark background while it downloads.
+    const nextPreview = previewsList[(currentSlideIndex + 1) % previewsList.length];
+    preloadImageUrl(nextPreview?.poster);
+
+    // The content sheet fully covers the hero while it's open. Advancing
+    // slides nobody can see only re-rendered this view every 2s while the
+    // user was navigating the episodes/cast underneath — a periodic hitch.
+    if (contentOverlayOpen) return;
 
     const isImage = activePreview?.type === "image" || !activePreview?.videoUrl || videoError;
 
     if (isImage) {
-      const duration = 2000; // 2 seconds — must match the CSS transition-duration below
-      // Needs a real prior frame painted at 0% before the transition to 100%
-      // is a genuine animation instead of an instant snap (same rAF-reveal
-      // pattern used elsewhere in this codebase for crossfades).
-      const raf = requestAnimationFrame(() => setSlideProgress(100));
+      const duration = 2000; // 2 seconds — must match HeroSlideProgressFill's CSS transition
       const timer = setTimeout(autoNextSlide, duration);
-
-      return () => {
-        cancelAnimationFrame(raf);
-        clearTimeout(timer);
-      };
+      return () => clearTimeout(timer);
     }
-  }, [currentSlideIndex, activePreview, previewsList.length, videoError, autoNextSlide]);
+  }, [currentSlideIndex, activePreview, previewsList, videoError, autoNextSlide, contentOverlayOpen]);
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
     if (video.duration) {
       const pct = (video.currentTime / video.duration) * 100;
-      setSlideProgress(pct);
+      slideProgressListenerRef.current?.(pct);
     }
   };
 
@@ -1605,6 +1617,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       : (asset as any).title_image?.url) ||
     "";
 
+  const titleHeading = (
+    <h1 className={isStandalone ? "text-3xl sm:text-5xl md:text-6xl font-black drop-shadow-lg tracking-tight" : "text-2xl sm:text-4xl md:text-5xl font-black drop-shadow-lg tracking-tight"}>
+      {asset.title}
+    </h1>
+  );
+
   const titleBlock = (
     <div
       className="pointer-events-none transition-transform duration-700 ease-out origin-bottom-left"
@@ -1616,27 +1634,24 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       {effectiveTitleImage ? (
         <>
           <h1 className="sr-only">{asset.title}</h1>
-          <div className={
-            isStandalone
-              ? "relative w-[280px] h-[94px] sm:w-[420px] sm:h-[140px] lg:w-[600px] lg:h-[200px]"
-              : "relative w-[150px] h-[50px] sm:w-[260px] sm:h-[90px]"
-          }>
-            <JOJOCommonImage
-              src={effectiveTitleImage}
-              alt={asset.title}
-              fill
-              contentMode="contain"
-              position="left"
-              optimizeRequestURL={false}
-              wrapperClassName="w-full h-full"
-            />
-          </div>
+          {/* Plain eager <img> (TitleLogoImage): the loading preview above
+              already shows this same logo, and JOJOCommonImage hid the cached
+              copy until its own onLoad — the logo blinked out as the asset
+              finished loading. */}
+          <TitleLogoImage
+            src={effectiveTitleImage}
+            alt={asset.title}
+            wrapperClassName={
+              isStandalone
+                ? "relative w-[280px] h-[94px] sm:w-[420px] sm:h-[140px] lg:w-[600px] lg:h-[200px]"
+                : "relative w-[150px] h-[50px] sm:w-[260px] sm:h-[90px]"
+            }
+            className="w-full h-full object-contain object-left"
+            fallback={titleHeading}
+            highPriority
+          />
         </>
-      ) : (
-        <h1 className={isStandalone ? "text-3xl sm:text-5xl md:text-6xl font-black drop-shadow-lg tracking-tight" : "text-2xl sm:text-4xl md:text-5xl font-black drop-shadow-lg tracking-tight"}>
-          {asset.title}
-        </h1>
-      )}
+      ) : titleHeading}
     </div>
   );
 
@@ -1761,27 +1776,13 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                       position: "relative",
                     }}
                   >
-                    <span
-                      style={{
-                        display: "block",
-                        height: "100%",
-                        backgroundColor: "#ffffff",
-                        width: currentSlideIndex === idx
-                          ? `${slideProgress}%`
-                          : idx < currentSlideIndex
-                            ? "100%"
-                            : "0%",
-                        // Image slides: a real CSS transition drives the fill (see the
-                        // slide-progress effect above) — "none" would make the 0%→100%
-                        // flip an instant snap instead of a smooth 2s animation. Video
-                        // slides still snap directly since their width tracks native
-                        // timeupdate events in real time, where an added transition
-                        // would just make the bar visibly lag behind actual playback.
-                        transition: currentSlideIndex === idx
-                          ? ((activePreview?.type === "image" || !activePreview?.videoUrl || videoError) ? "width 2000ms linear" : "none")
-                          : "width 300ms ease",
-                        boxShadow: "0 0 4px rgba(255,255,255,0.8)",
-                      }}
+                    <HeroSlideProgressFill
+                      isActive={currentSlideIndex === idx}
+                      isPast={idx < currentSlideIndex}
+                      isTimedByCss={activePreview?.type === "image" || !activePreview?.videoUrl || videoError}
+                      isRunning={!contentOverlayOpen}
+                      slideKey={currentSlideIndex}
+                      subscribe={subscribeSlideProgress}
                     />
                   </span>
                 </FocusablePreviewDot>
@@ -2420,10 +2421,10 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
         if (scrollArea && scrollArea.scrollTop > 0) {
           scrollArea.scrollTop = 0;
         } else {
-          ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          ref.current?.scrollIntoView({ behavior: focusScrollBehavior(), block: "nearest" });
         }
       } else {
-        ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        ref.current?.scrollIntoView({ behavior: focusScrollBehavior(), block: "center" });
       }
       maybeLoadMore();
     }
@@ -2589,7 +2590,7 @@ function FocusableCastItem({
       return true;
     },
     onFocus: () => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      ref.current?.scrollIntoView({ behavior: focusScrollBehavior(), block: "nearest", inline: "nearest" });
       onFocused?.(castFocusKey);
     }
   });
@@ -2660,7 +2661,7 @@ function FocusableTrailerItem({ trailer, idx, asset, onWatch }: any) {
       return true;
     },
     onFocus: () => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      ref.current?.scrollIntoView({ behavior: focusScrollBehavior(), block: "center" });
     }
   });
 
@@ -2718,6 +2719,73 @@ function FocusableCloseButton({ onClose }: { onClose?: () => void }) {
     </button>
   );
 }
+
+type SlideProgressListener = (percent: number) => void;
+
+/**
+ * Fill bar of one hero slide indicator. Owns its own progress so the active
+ * slide's updates — the image-slide 0→100% kick-off and a video slide's
+ * timeupdate ticks — re-render this span alone, not the whole AssetDetailView.
+ */
+const HeroSlideProgressFill = memo(function HeroSlideProgressFill({
+  isActive,
+  isPast,
+  isTimedByCss,
+  isRunning,
+  slideKey,
+  subscribe,
+}: {
+  isActive: boolean;
+  isPast: boolean;
+  /** Image slides fill with one 2s CSS transition; video slides track playback. */
+  isTimedByCss: boolean;
+  /** False while the content sheet covers the hero (image auto-advance is paused). */
+  isRunning: boolean;
+  /** Changes on every slide change so the fill restarts from 0. */
+  slideKey: number;
+  subscribe: (listener: SlideProgressListener | null) => void;
+}) {
+  const [progress, setProgress] = useState(0);
+  const imageFillRunning = isTimedByCss && isRunning;
+
+  // Restart from 0 on each slide. An image slide also restarts when
+  // auto-advance resumes, in step with the parent's fresh 2s timer.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setProgress(0);
+    if (!isActive || !imageFillRunning) return;
+    // Needs a real prior frame painted at 0% before the transition to 100%
+    // is a genuine animation instead of an instant snap.
+    const raf = requestAnimationFrame(() => setProgress(100));
+    return () => cancelAnimationFrame(raf);
+  }, [isActive, imageFillRunning, slideKey]);
+
+  // Video slides: follow the parent's timeupdate ticks.
+  useEffect(() => {
+    if (!isActive || isTimedByCss) return;
+    subscribe(setProgress);
+    return () => subscribe(null);
+  }, [isActive, isTimedByCss, subscribe]);
+
+  return (
+    <span
+      style={{
+        display: "block",
+        height: "100%",
+        backgroundColor: "#ffffff",
+        width: isActive ? `${progress}%` : isPast ? "100%" : "0%",
+        // Image slides: a real CSS transition drives the fill — "none" would
+        // make the 0%→100% flip an instant snap instead of a smooth 2s
+        // animation. Video slides snap directly since their width tracks
+        // native timeupdate events, where a transition would lag playback.
+        transition: isActive
+          ? (isTimedByCss ? "width 2000ms linear" : "none")
+          : "width 300ms ease",
+        boxShadow: "0 0 4px rgba(255,255,255,0.8)",
+      }}
+    />
+  );
+});
 
 function FocusablePreviewDot({ idx, onClick, assetId, children }: any) {
   const { ref, focused } = useFocusable({
@@ -2961,7 +3029,7 @@ function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback
       return true;
     },
     onFocus: () => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      ref.current?.scrollIntoView({ behavior: focusScrollBehavior(), block: "nearest" });
     }
   });
 
@@ -2984,7 +3052,10 @@ function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback
       {img ? (
         <div
           className="absolute inset-0 w-full h-full bg-neutral-900"
-          style={{ transform: "translateZ(0)", willChange: "contents" }}
+          // Not on Tizen: a permanent GPU layer per related card (with
+          // will-change: contents defeating raster caching) costs every
+          // scroll frame of the "More like this" grid there.
+          style={isTizen() ? undefined : { transform: "translateZ(0)", willChange: "contents" }}
         >
           <img
             src={resizedImageUrl || img}

@@ -467,9 +467,13 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   );
   const activeRail = contentRails[safeActiveRailIndex];
 
-  // During a held Up/Down key, only the active spotlight rail is useful. Delay
-  // mounting the next preview rail until navigation settles so Tizen does not
-  // repeatedly construct and discard a full row of cards between key repeats.
+  // During a held Up/Down key, only the active spotlight rail is useful. Tizen
+  // only moves the preview row to the next rail once navigation settles, so it
+  // doesn't re-render a row of cards (and request their images) between key
+  // repeats. Until then it keeps showing the last settled preview, mounted and
+  // in place — it used to be unmounted for the duration, leaving an empty gap
+  // under the spotlight that the row then popped back into, rebuilt from
+  // scratch with its images reloading: the jerk on every Up/Down.
   const [settledPreviewRailIndex, setSettledPreviewRailIndex] = useState(safeActiveRailIndex);
   useEffect(() => {
     if (!isTizenRuntime) return;
@@ -482,12 +486,9 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   const previewRailIndex = isTizenRuntime
     ? Math.min(settledPreviewRailIndex, Math.max(0, contentRails.length - 1))
     : safeActiveRailIndex;
-  const isPreviewRailSettled = !isTizenRuntime || previewRailIndex === safeActiveRailIndex;
   const upcomingRails = useMemo(
-    () => isPreviewRailSettled
-      ? contentRails.slice(previewRailIndex + 1, previewRailIndex + (isTvFileRuntime ? 2 : 4))
-      : [],
-    [contentRails, previewRailIndex, isPreviewRailSettled, isTvFileRuntime]
+    () => contentRails.slice(previewRailIndex + 1, previewRailIndex + (isTvFileRuntime ? 2 : 4)),
+    [contentRails, previewRailIndex, isTvFileRuntime]
   );
   const showPreviewRails = true;
 
@@ -698,7 +699,10 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
       {/* Upcoming Preview Rails (Section index 2+) - 100% standard portrait cards only */}
       {showPreviewRails && upcomingRails.map((rail, idx) => (
         <PreviewRail
-          key={rail.id}
+          // Tizen: keyed by position so switching rails updates the row in
+          // place (useRailItems re-syncs on railId) instead of remounting it
+          // and re-running its visibility gate.
+          key={isTizenRuntime ? `preview-rail-${idx}` : rail.id}
           index={2 + idx}
           isFirstContentRail={false}
           disableHover={true}

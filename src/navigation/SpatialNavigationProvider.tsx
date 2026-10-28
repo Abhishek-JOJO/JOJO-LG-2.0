@@ -4,6 +4,7 @@ import React from 'react';
 import { init, FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useRemoteManager } from './RemoteManager';
 import { useRemotePointer } from './PointerManager';
+import { isTizen } from '@/src/platform/detectPlatform';
 
 // Initialize spatial navigation once (only on client side).
 // Debug mode (verbose console logs + on-screen focusable bounding boxes) is
@@ -19,9 +20,18 @@ if (typeof window !== 'undefined') {
     // ignore — localStorage unavailable
   }
 
+  // Samsung remotes repeat-fire a held arrow faster than a Tizen TV can
+  // render a step (each spotlight step swaps a whole row's images). Unthrottled,
+  // the extra repeats queue up and focus keeps moving after the key is
+  // released. With throttleKeypresses false, every keyup resets the throttle,
+  // so separate taps are never delayed — only held-key repeats are capped.
+  const isTizenRuntime = isTizen();
+
   init({
     debug: debugEnabled,
     visualDebug: debugEnabled,
+    throttle: isTizenRuntime ? 120 : 0,
+    throttleKeypresses: false,
   });
 }
 
