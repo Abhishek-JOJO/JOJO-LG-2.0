@@ -22,17 +22,17 @@ export function AmbientBackground() {
     return null;
   }
 
-  // Tizen skips hero colour sampling (ContentRailList), so the tint is never
-  // set there. Without this guard the two will-change layers below stay
-  // allocated as full-viewport GPU surfaces at opacity 0 for the whole session.
+  // No will-change on Tizen: it kept both full-viewport layers allocated as
+  // GPU surfaces at all times, even at opacity 0. Without it they're only
+  // promoted while their crossfade actually runs.
   const isTizenRuntime = isTizen();
-  if (isTizenRuntime && !hasActiveColor) {
-    return null;
-  }
 
   return (
     <div
       aria-hidden="true"
+      // Tizen: a playing AVPlay preview cuts a hole through this layer (it
+      // sits behind the hero) — see tizenPreviewPlayer.
+      data-tizen-video-backdrop
       className={`absolute top-0 left-0 right-0 h-[100vh] w-full pointer-events-none z-0 overflow-hidden transition-opacity duration-1000 ease-out ${
         hasActiveColor ? "opacity-100" : "opacity-0"
       }`}

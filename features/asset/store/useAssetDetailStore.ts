@@ -47,6 +47,29 @@ export function getAssetTypeSlug(type: string | number | undefined): string {
 // real, same as if the user had clicked the card themselves.
 const PENDING_OPEN_KEY = "jojo_pending_asset_detail";
 
+/**
+ * The backdrop the asset-detail hero paints first for a given initial asset
+ * (AssetDetailView's first slide). Stored with a pending reopen so the
+ * pre-hydration overlay in app/layout.tsx draws exactly the same image —
+ * when it picked its own (a different crop), the real page visibly swapped
+ * it on taking over.
+ */
+export function getAssetDetailBackdropUrl(asset: any): string {
+  return (
+    asset?.heroImage ||
+    asset?.landscapeImage ||
+    asset?.landscapeFallbackImages?.[0] ||
+    asset?.landscape?.url ||
+    (typeof asset?.landscape === "string" ? asset.landscape : "") ||
+    asset?.posterImage ||
+    asset?.poster?.url ||
+    (typeof asset?.poster === "string" ? asset.poster : "") ||
+    asset?.image ||
+    asset?.thumbnailUrl ||
+    ""
+  );
+}
+
 export function schedulePendingAssetDetailOpen(
   id: string,
   contentType: string | number,
@@ -77,7 +100,16 @@ export function schedulePendingAssetDetailOpen(
       }
     }
 
-    sessionStorage.setItem(PENDING_OPEN_KEY, JSON.stringify({ id, contentType, title, cachedAsset: assetToSave }));
+    sessionStorage.setItem(
+      PENDING_OPEN_KEY,
+      JSON.stringify({
+        id,
+        contentType,
+        title,
+        cachedAsset: assetToSave,
+        backdropUrl: getAssetDetailBackdropUrl(assetToSave),
+      })
+    );
     if (assetToSave) {
       sessionStorage.setItem(`asset_cache_${id}`, JSON.stringify(assetToSave));
     }

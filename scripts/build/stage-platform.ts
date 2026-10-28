@@ -35,6 +35,13 @@ export function stagePlatformBuild(platform: BuildPlatform, version: string): st
     fs.rmSync(path.join(targetDir, "appinfo.json"), { force: true });
     fs.rmSync(path.join(targetDir, "webOSTV.js"), { force: true });
 
+    // Smart Hub app icon (config.xml <icon src="icon.png">): the 512x423 JOJO
+    // brand tile. The exported public/icon.png is the transparent play-circle
+    // favicon, which is what the Samsung launcher showed before. largeIcon.png
+    // belongs to webOS's icon pair (appinfo.json) only.
+    fs.copyFileSync(path.resolve("platforms/tizen/icon.png"), path.join(targetDir, "icon.png"));
+    fs.rmSync(path.join(targetDir, "largeIcon.png"), { force: true });
+
     // Copy Tizen Studio / Eclipse project descriptors if present
     for (const projectFile of [".project", ".tproject"]) {
       const srcFile = path.resolve("platforms/tizen", projectFile);

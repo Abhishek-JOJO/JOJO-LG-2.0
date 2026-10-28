@@ -33,6 +33,7 @@ import AccountSettingsPage from "@/app/account-settings/page";
 import WatchingClient from "@/app/watching/WatchingClient";
 import SubscriptionPage from "@/app/subscription/SubscriptionClient";
 import { normalizePathname } from "@/lib/utils/pathname";
+import { isTizen } from "@/src/platform/detectPlatform";
 
 type LayoutChromeContextValue = {
   setInlineStandalonePage: (active: boolean) => void;
@@ -186,6 +187,15 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   // overlays remain above browse chrome and do not render the navbar at all.
   const tvOverlayZIndex = isTvSubscriptionOverlay ? "z-[998]" : "z-[1000]";
 
+  // Tizen: the asset-detail modal fully covers everything below it, but its
+  // AVPlay preview needs every layer above the hardware video plane to be
+  // see-through — the browse page (or search) underneath would otherwise
+  // paint over the video. visibility (not display) keeps their layout,
+  // scroll position and focus targets intact for the return, and spares the
+  // TV rastering a page nobody can see.
+  const hideUnderAssetDetail = isTizen() && isAssetDetailOpen;
+  const underAssetDetailStyle = hideUnderAssetDetail ? { visibility: "hidden" as const } : undefined;
+
   let mainClassName = "min-h-screen flex flex-col max-lg:pb-20";
   if (isMobileLegalPage) {
     mainClassName = "min-h-screen flex flex-col";
@@ -230,18 +240,20 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
       )}
       <main
         className={`${mainClassName} bg-transparent`}
-        style={isTvOverlayOpen ? { display: "none" } : undefined}
+        style={isTvOverlayOpen ? { display: "none" } : underAssetDetailStyle}
       >
         {children}
       </main>
       <CookieBanner />
       <AssetDetailModal />
-      <SearchModal isOpen={isSearchOpen && !isTvOverlayOpen} onClose={() => setSearchOpen(false)} />
+      <div style={underAssetDetailStyle}>
+        <SearchModal isOpen={isSearchOpen && !isTvOverlayOpen} onClose={() => setSearchOpen(false)} />
+      </div>
       <GuestLoginPopup />
       <SessionExpiredModal />
       <ExitConfirmModal />
       <AppUpdateModal />
-      <AppVersionWatermark />
+      {!hideUnderAssetDetail && <AppVersionWatermark />}
       {showFooter && !hideHeaderFooter && !isTvOverlayOpen && <Footer />}
       <StatusLine />
     </LayoutChromeContext.Provider>

@@ -42,6 +42,23 @@ export class PlayerEngine {
   private destroyed = false;
   private hasFatalError = false;
 
+  // ── Network-loss handling ────────────────────────────────────────────────
+  // A dropped connection is not a playback failure. The engine pauses while
+  // offline (the NoInternet screen covers the player) and resumes at the same
+  // spot when the TV is back online; if the stream itself died in between,
+  // it is reopened at the last known position instead of ending in the error
+  // screen — recovery used to give up on the spot whenever navigator.onLine
+  // was false, and never retried once the network returned.
+  /** Last position the adapter reported — survives a session that dies with the network. */
+  private lastKnownPosition = 0;
+  /** What the last play()/pause() asked for: whether playback should be running. */
+  private wantsPlayback = false;
+  /** Paused by the engine (not the user) because the network dropped. */
+  private pausedForNetwork = false;
+  /** Playback failed while offline; reopen at this position once online. */
+  private pendingNetworkResume: { position: number; error: PlayerError } | null = null;
+  private networkListenersAttached = false;
+
   // Shaka remains the default. AVPlay is selected only on a real Tizen runtime.
   private readonly shakaAdapter = new ShakaAdapter();
 
@@ -69,6 +86,16 @@ export class PlayerEngine {
     this.recoveryManager.reset();
     this.sessionManager.startSession(video.contentId);
 
+    this.lastKnownPosition = options?.startTime ?? 0;
+    this.wantsPlayback = false;
+    this.pausedForNetwork = false;
+    this.pendingNetworkResume = null;
+    if (typeof window !== 'undefined' && !this.networkListenersAttached) {
+      window.addEventListener('offline', this.handleOffline);
+      window.addEventListener('online', this.handleOnline);
+      this.networkListenersAttached = true;
+    }
+
     await this.loadAdapter(videoEl, video);
   }
 
@@ -76,11 +103,15 @@ export class PlayerEngine {
 
   play(): void {
     if (this.destroyed) return;
+    this.wantsPlayback = true;
+    this.pausedForNetwork = false;
     this.adapter?.play();
   }
 
   pause(): void {
     if (this.destroyed) return;
+    this.wantsPlayback = false;
+    this.pausedForNetwork = false;
     this.adapter?.pause();
   }
 
@@ -197,6 +228,12 @@ export class PlayerEngine {
    */
   async destroy(): Promise<void> {
     this.destroyed = true;
+    if (this.networkListenersAttached) {
+      window.removeEventListener('offline', this.handleOffline);
+      window.removeEventListener('online', this.handleOnline);
+      this.networkListenersAttached = false;
+    }
+    this.pendingNetworkResume = null;
 
     // CRITICAL: Stop playback immediately — pause + detach src + load()
     // forces the browser to release the media pipeline synchronously.
@@ -329,6 +366,7 @@ export class PlayerEngine {
       },
       onTimeUpdate: (currentTime, duration, buffered) => {
         if (this.destroyed) return;
+        if (currentTime > 0) this.lastKnownPosition = currentTime;
         this.eventBus.emit('TIME_UPDATE', { currentTime, duration, buffered });
         if (duration > 0) this.sessionManager.updateProgress((currentTime / duration) * 100);
       },
@@ -393,6 +431,7 @@ export class PlayerEngine {
     });
 
     add('timeupdate', () => {
+      if (videoEl.currentTime > 0) this.lastKnownPosition = videoEl.currentTime;
       const buffered =
         videoEl.buffered.length > 0
           ? videoEl.buffered.end(videoEl.buffered.length - 1)
@@ -451,27 +490,24 @@ export class PlayerEngine {
     }
     if (!this.video || !this.videoEl) return;
 
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      this.waitForNetwork(error);
+      return;
+    }
+
     this.isRecovering = true;
     try {
-      const currentPosition = this.getCurrentTime();
+      const currentPosition = this.getResumePosition();
       const recoveryStartTime = Date.now();
       
       // Notify UI that we are buffering during recovery attempt
       this.eventBus.emit('BUFFER_START', { position: currentPosition });
 
       const reload = async () => {
-        if (!this.video || !this.videoEl) throw new Error('No video');
-        if (this.adapter) {
-          const a = this.adapter;
-          this.adapter = null;
-          await a.destroy();
-        }
-        await this.loadAdapter(this.videoEl, this.video);
-        const activeAdapter = this.adapter as PlayerAdapter | null;
-        if (currentPosition > 0 && activeAdapter) {
+        await this.reloadAt(currentPosition);
+        if (currentPosition > 0 || this.wantsPlayback) {
           logger.info('[PlayerEngine] Restoring position on reload', { currentPosition });
-          activeAdapter.seek(currentPosition);
-          activeAdapter.play();
+          this.adapter?.play();
         }
       };
 
@@ -500,6 +536,86 @@ export class PlayerEngine {
     } finally {
       this.isRecovering = false;
     }
+  }
+
+  /** Where to pick up after a failure: the adapter's clock, or the last reported position if that session lost it. */
+  private getResumePosition(): number {
+    const current = this.getCurrentTime();
+    return current > 0 ? current : this.lastKnownPosition;
+  }
+
+  /**
+   * Reopens the current video at `position` on a fresh adapter session.
+   * Starting there (startTime) rather than seeking after load matters on
+   * AVPlay: a seek racing the load-time one can fail and loop recovery.
+   */
+  private async reloadAt(position: number): Promise<void> {
+    if (!this.video || !this.videoEl) throw new Error('No video');
+    if (this.adapter) {
+      const a = this.adapter;
+      this.adapter = null;
+      await a.destroy();
+    }
+    // loadAdapter re-attaches the media listeners for Shaka; without this
+    // every reload stacked another copy of each (duplicate PLAY/TIME events).
+    this.clearNativeListeners();
+    this.loadOptions = { ...this.loadOptions, startTime: position > 0 ? position : undefined };
+    await this.loadAdapter(this.videoEl, this.video);
+  }
+
+  private readonly handleOffline = (): void => {
+    if (this.destroyed || !this.adapter || this.adapter.isPaused()) return;
+    // The NoInternet screen covers the player — don't play out the buffer under it.
+    this.pausedForNetwork = true;
+    this.adapter.pause();
+  };
+
+  private readonly handleOnline = (): void => {
+    if (this.destroyed) return;
+    if (this.pendingNetworkResume) {
+      void this.resumeAfterNetwork();
+      return;
+    }
+    if (this.pausedForNetwork) {
+      this.pausedForNetwork = false;
+      if (this.wantsPlayback) this.adapter?.play();
+    }
+  };
+
+  /** Playback failed while offline: hold the position (no retries, no error screen) until the network returns. */
+  private waitForNetwork(error: PlayerError): void {
+    if (this.pendingNetworkResume) return;
+    const position = this.getResumePosition();
+    logger.warn('[PlayerEngine] Playback lost with the network; resuming when back online', { position });
+    this.pendingNetworkResume = { position, error };
+    this.eventBus.emit('BUFFER_START', { position });
+  }
+
+  private async resumeAfterNetwork(): Promise<void> {
+    const pending = this.pendingNetworkResume;
+    this.pendingNetworkResume = null;
+    if (!pending || this.destroyed || this.isRecovering) return;
+
+    this.isRecovering = true;
+    const startedAt = Date.now();
+    let failed = false;
+    try {
+      await this.reloadAt(pending.position);
+      if (this.wantsPlayback || this.pausedForNetwork) this.adapter?.play();
+      this.pausedForNetwork = false;
+      this.recoveryManager.reset();
+      this.eventBus.emit('BUFFER_END', {
+        position: pending.position,
+        bufferingDurationMs: Date.now() - startedAt,
+      });
+    } catch (err) {
+      logger.warn('[PlayerEngine] Reopening after network loss failed; handing to recovery', { err });
+      failed = true;
+    } finally {
+      this.isRecovering = false;
+    }
+    // Outside the finally: handleError skips while isRecovering is set.
+    if (failed && !this.destroyed) void this.handleError(pending.error);
   }
 
   private getActiveQualityLabel(): string {

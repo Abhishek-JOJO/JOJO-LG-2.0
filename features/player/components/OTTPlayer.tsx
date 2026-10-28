@@ -994,8 +994,13 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         // Apply saved preferences
         const currentMuted = usePlayerStore.getState().isMuted;
         const currentVolume = usePlayerStore.getState().volume;
-        engine.setVolume(currentMuted ? 0 : currentVolume);
         const capabilities = engine.getCapabilities();
+        // 'mute-only' is Tizen AVPlay, whose only mute is the TV's global
+        // mute: re-applying the saved preference would mute (or unmute) the
+        // whole TV just by starting playback. Leave the TV as the user set it.
+        if (capabilities.volumeControl !== 'mute-only') {
+          engine.setVolume(currentMuted ? 0 : currentVolume);
+        }
         const savedSpeed = usePlayerStore.getState().speed;
         const requestedSpeed = capabilities.playbackSpeeds.includes(savedSpeed) ? savedSpeed : 1;
         const speedApplied = engine.setPlaybackSpeed(requestedSpeed);
@@ -1009,8 +1014,12 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
           if (isCancelled || engineRef.current !== engine) return;
 
           if (video.bypassResumePrompt && video.savedPosition && video.savedPosition > 0) {
-            logger.info('[OTTPlayer] Bypassing resume prompt, seeking to position', { pos: video.savedPosition });
-            engine.seek(video.savedPosition);
+            // No seek here: initialize() above already received this position
+            // as startTime and both adapters start there. A second seek was
+            // redundant, and on AVPlay one issued while the first is still in
+            // flight can fail — which engine recovery answers by reloading
+            // the whole session (a visible restart).
+            logger.info('[OTTPlayer] Bypassing resume prompt, starting at saved position', { pos: video.savedPosition });
             if (playedAdCuesRef.current && video.adCuePoints) {
               video.adCuePoints.forEach((cue) => {
                 if (cue <= video.savedPosition!) {
@@ -1272,7 +1281,10 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     isEnabled: !!video.playerId,
   });
 
+  const isLeavingRef = useRef(false);
   const handleBack = useCallback(() => {
+    if (isLeavingRef.current) return;
+    isLeavingRef.current = true;
     logger.info('[OTTPlayer] handleBack called — emitting watch-end');
     // emitWatchEnd is a side-effecting analytics/socket call, not something
     // the actual navigation should ever depend on — if it throws (e.g. a
@@ -1285,11 +1297,30 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     } catch (err) {
       logger.warn('[OTTPlayer] emitWatchEnd threw — continuing with navigation anyway', err);
     }
-    if (onBack) {
-      onBack();
-    } else {
-      router.back();
-    }
+
+    // Release playback before navigating. On the packaged TV apps leaving is
+    // a full document load, where React's unmount cleanup (the only other
+    // place the engine is destroyed) never runs: Tizen's AVPlay kept its
+    // video plane and audio alive into the next page's startup. Capped so a
+    // slow Shaka teardown can never hold up the Back press.
+    const engine = engineRef.current;
+    engineRef.current = null;
+    adEngineRef.current?.destroy();
+    adEngineRef.current = null;
+    const released = engine
+      ? Promise.race([
+          engine.destroy().catch(() => undefined),
+          new Promise<void>((resolve) => setTimeout(resolve, 600)),
+        ])
+      : Promise.resolve();
+
+    void released.then(() => {
+      if (onBack) {
+        onBack();
+      } else {
+        router.back();
+      }
+    });
   }, [onBack, router, emitWatchEnd]);
 
   // ── Mid-roll ad polling ────────────────────────────────────────────────────

@@ -310,13 +310,25 @@ export function ContentRailList({
       activeItem?.posterImage ||
       activeItem?.image;
 
-    // Canvas sampling forces another image decode and a synchronous pixel read.
-    // Skip that decorative work on Tizen so the visible poster wins the race.
-    if (heroImageUrl && !isTizenRuntime) {
+    if (!heroImageUrl) return;
+
+    // The ambient tint behind the header follows the active slide. Sampling
+    // decodes only a 64px CDN thumbnail into a 32x32 canvas (colorExtractor,
+    // cached per URL), but Tizen still lets the visible poster land first.
+    // It was skipped on Tizen entirely, which left the header untinted there.
+    let cancelled = false;
+    const sample = () => {
       extractDominantAmbientColor(heroImageUrl).then((color) => {
-        useAmbientTintStore.getState().setAmbientColor(color);
+        // A slide that has since been replaced must not repaint the tint.
+        if (!cancelled) useAmbientTintStore.getState().setAmbientColor(color);
       });
-    }
+    };
+    const timer = isTizenRuntime ? window.setTimeout(sample, 500) : null;
+    if (timer === null) sample();
+    return () => {
+      cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
+    };
   }, [isHeroVariant, items, activeIndex, isTizenRuntime]);
 
   // Tizen swaps hero posters without a two-layer crossfade, so warm only the
@@ -632,6 +644,8 @@ export function ContentRailList({
         id="hero-carousel-container"
         ref={focusKeyRef}
         data-focuskey={focusKey}
+        // Rounded box over a Tizen AVPlay preview — see globals.css passthrough rules.
+        data-tizen-video-frame
         tabIndex={0}
         className={`relative overflow-hidden w-[calc(100%-2rem)] sm:w-[calc(100%-4rem)] lg:w-[calc(100%-5rem)] mx-auto select-none h-[78vh] mt-2 sm:mt-3 rounded-[32px] bg-neutral-950 transition-all duration-300 ${focused ? "z-[99]" : ""}`}
         onTouchStart={onTouchStart}

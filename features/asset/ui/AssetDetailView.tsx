@@ -35,7 +35,7 @@ const stripHtml = (html: string) => {
 import NotFound from "@/app/not-found";
 import { useWatchGating } from "@/features/asset/hooks/useWatchGating";
 import { getAssetButtonConfig } from "@/features/asset/model/assetButtonModel";
-import { getAssetTypeSlug, slugify, useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
+import { getAssetDetailBackdropUrl, getAssetTypeSlug, slugify, useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 import { CastDetailsPopup } from "@/features/asset/ui/CastDetailsPopup";
 import { GatePopup } from "@/features/asset/ui/GatePopup";
 import { useContentRails } from "@/features/content-rail/hooks/useContentRails";
@@ -57,6 +57,11 @@ import { isBackEvent, isTizen } from "@/src/platform";
 import { focusScrollBehavior } from "@/src/navigation/focusUtils";
 import { preloadImageUrl } from "@/components/content-rail/utils/imagePreloader";
 import { TitleLogoImage } from "@/components/ui/TitleLogoImage";
+import {
+  isTizenPreviewAvailable,
+  startTizenPreview,
+  type TizenPreviewHandle,
+} from "@/src/platform/tizen/tizenPreviewPlayer";
 
 // This page's hero preview video fires onTimeUpdate ~4x/sec, which re-renders
 // the whole AssetDetailView tree (and every Focusable* child) on the same
@@ -231,19 +236,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // even when both URLs belong to the same asset, because their source crops
   // can differ. AssetDetailView is keyed by assetId, so this value naturally
   // resets for each newly opened detail.
-  const initialHeroPosterUrl = useMemo(() => (
-    initialAsset?.heroImage ||
-    initialAsset?.landscapeImage ||
-    initialAsset?.landscapeFallbackImages?.[0] ||
-    initialAsset?.landscape?.url ||
-    (typeof initialAsset?.landscape === "string" ? initialAsset.landscape : "") ||
-    initialAsset?.posterImage ||
-    initialAsset?.poster?.url ||
-    (typeof initialAsset?.poster === "string" ? initialAsset.poster : "") ||
-    initialAsset?.image ||
-    initialAsset?.thumbnailUrl ||
-    ""
-  ), [initialAsset]);
+  // Shared with the pre-hydration return overlay (app/layout.tsx) so both
+  // paint the identical backdrop.
+  const initialHeroPosterUrl = useMemo(() => getAssetDetailBackdropUrl(initialAsset), [initialAsset]);
 
   // The hero (backdrop + title + action buttons) used to sit in normal
   // document flow, so reaching the tabs/episodes/cast content meant
@@ -762,11 +757,20 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   }, []);
 
   // Video Autoplay States
-  const [videoStarted, setVideoStarted] = useState(false);
+  // The poster delay is granted to one slide (asset + index + URL), so it
+  // ends in the same render the slide changes. As a boolean reset by an
+  // effect it stayed true for one more render, which started the next
+  // slide's preview at once (no poster delay) and then tore it down again.
+  const [videoStartedFor, setVideoStartedFor] = useState<string | null>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [shouldPassSrcNatively, setShouldPassSrcNatively] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Tizen previews play through AVPlay instead of <video>, which paints
+  // white/late frames on Samsung hardware (see tizenPreviewPlayer).
+  const tizenPreviewEnabled = isTizen() && isTizenPreviewAvailable();
+  const heroBannerRef = useRef<HTMLDivElement>(null);
+  const tizenPreviewRef = useRef<TizenPreviewHandle | null>(null);
 
   // Mute State (hero preview video only — the mute/unmute button was removed)
   const isMuted = usePlayerStore((s) => s.isMuted);
@@ -862,8 +866,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     autoNextSlide();
   };
 
+  const previewSlideKey = `${assetId}:${currentSlideIndex}:${activePreview?.videoUrl ?? ""}`;
+  const videoStarted = videoStartedFor === previewSlideKey;
+
   useEffect(() => {
-    setVideoStarted(false);
+    setVideoStartedFor(null);
     setVideoReady(false);
     setVideoError(false);
 
@@ -873,11 +880,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     isUserSlideChangeRef.current = false; // reset after reading
 
     const timer = setTimeout(() => {
-      setVideoStarted(true);
+      setVideoStartedFor(previewSlideKey);
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [assetId, currentSlideIndex, activePreview?.videoUrl]);
+  }, [assetId, currentSlideIndex, activePreview?.videoUrl, previewSlideKey]);
 
   // Sync mute state with video element
   useEffect(() => {
@@ -898,6 +905,42 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       video.play().catch(() => { });
     }
   }, [contentOverlayOpen, videoStarted, videoError]);
+
+  // Tizen: AVPlay preview into the full-screen banner once the poster delay
+  // elapses. Mirrors the <video> path: timeupdate drives the slide indicator,
+  // the end advances the slideshow, and it pauses (not tears down) while the
+  // content sheet covers the hero. AVPlay has no per-stream mute, so a muted
+  // user keeps the poster.
+  useEffect(() => {
+    if (!tizenPreviewEnabled || !videoStarted || !activePreview?.videoUrl || videoError || isMuted) return;
+    const target = heroBannerRef.current;
+    if (!target) return;
+    const preview = startTizenPreview({
+      url: activePreview.videoUrl,
+      target,
+      onReady: () => {
+        if (contentOverlayOpenRef.current) preview.pause();
+        setVideoReady(true);
+      },
+      onTimeUpdate: (currentMs, durationMs) => {
+        if (durationMs > 0) slideProgressListenerRef.current?.((currentMs / durationMs) * 100);
+      },
+      onEnded: () => autoNextSlide(),
+      onStop: () => setVideoError(true),
+    });
+    tizenPreviewRef.current = preview;
+    return () => {
+      preview.stop();
+      tizenPreviewRef.current = null;
+    };
+  }, [tizenPreviewEnabled, videoStarted, activePreview?.videoUrl, videoError, isMuted, autoNextSlide]);
+
+  useEffect(() => {
+    const preview = tizenPreviewRef.current;
+    if (!preview) return;
+    if (contentOverlayOpen) preview.pause();
+    else preview.resume();
+  }, [contentOverlayOpen]);
 
   // Load and play HLS video if needed
   useEffect(() => {
@@ -1677,6 +1720,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       <div id="asset-detail-hero-layer" className="fixed inset-0 z-0">
       {/* Top Banner Section */}
       <div
+        ref={heroBannerRef}
         className={
           isStandalone
             ? "relative w-full h-screen overflow-hidden group bg-neutral-950"
@@ -1694,7 +1738,22 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             content sheet is open — a moving video peeking through the
             translucent overlay reads as distracting/messy, so we freeze
             back to the calm poster image for that state. */}
-        {videoStarted && activePreview?.videoUrl && !videoError ? (
+        {/* Tizen: AVPlay draws behind the page and the preview passthrough
+            wipes this banner's own background, so this copy of the poster is
+            what fades out (data-tizen-video-cover) once frames are showing. */}
+        {tizenPreviewEnabled && activePreview?.videoUrl && bgPosterUrl && (
+          <div
+            data-tizen-video-cover
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: `url("${bgPosterUrl}")`,
+              backgroundSize: "cover",
+              backgroundPosition: "center top",
+              backgroundRepeat: "no-repeat",
+            }}
+          />
+        )}
+        {!tizenPreviewEnabled && videoStarted && activePreview?.videoUrl && !videoError ? (
           <video
             ref={videoRef}
             src={shouldPassSrcNatively ? activePreview.videoUrl : undefined}

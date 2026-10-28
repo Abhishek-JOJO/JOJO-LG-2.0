@@ -112,6 +112,10 @@ export interface SamsungAVPlay {
   setStreamingProperty?(property: string, value: string): void;
   getStreamingProperty?(property: string): string;
   setDrm?(drmType: string, drmOperation: string, jsonParam: string): void;
+  /** Multitasking: release the player while the app is hidden… */
+  suspend?(): void;
+  /** …and take it back on return (no arguments: resume the suspended session). */
+  restore?(url?: string, resumeTimeMs?: number, prepare?: boolean): void;
 }
 
 declare global {

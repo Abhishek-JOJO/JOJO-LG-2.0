@@ -19,6 +19,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useSessionExpiredStore } from "@/store/useSessionExpiredStore";
 import { isTizen } from "@/src/platform/detectPlatform";
+import { isTizenPreviewAvailable, startTizenPreview } from "@/src/platform/tizen/tizenPreviewPlayer";
 import { Check, Play, Plus, Share2, Volume2, VolumeX } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -69,7 +70,12 @@ const ENABLE_HERO_BACKGROUND_VIDEO = true;
 export function HeroCarouselCard({ item, config, index, isActive, isFocused = false, onClick, onHoverChange, onVideoPlayChange, batchPricing }: Props) {
   const t = useTranslations("contentRails");
   const isTizenRuntime = isTizen();
+  // <video> path everywhere except Tizen; Tizen previews through AVPlay
+  // instead (tizenPreviewPlayer), which renders reliably on Samsung hardware.
   const heroVideoEnabled = ENABLE_HERO_BACKGROUND_VIDEO && !isTizenRuntime;
+  const tizenPreviewEnabled = ENABLE_HERO_BACKGROUND_VIDEO && isTizenRuntime && isTizenPreviewAvailable();
+  const previewEnabled = heroVideoEnabled || tizenPreviewEnabled;
+  const tizenVideoBoxRef = useRef<HTMLDivElement>(null);
   const heroImageUrl = item?.heroImage || item?.landscapeImage || item?.posterImage || item?.image;
   const hasImage = !!heroImageUrl;
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
@@ -229,7 +235,7 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
   const [isSlideSettled, setIsSlideSettled] = useState(isActive);
   const settleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
-    if (!heroVideoEnabled) return;
+    if (!previewEnabled) return;
 
     if (settleTimeoutRef.current) {
       clearTimeout(settleTimeoutRef.current);
@@ -246,11 +252,11 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
         settleTimeoutRef.current = null;
       }
     };
-  }, [heroVideoEnabled, isActive]);
+  }, [previewEnabled, isActive]);
 
 
   useEffect(() => {
-    if (!heroVideoEnabled) return;
+    if (!previewEnabled) return;
 
     const container = containerRef.current;
     if (!container) return;
@@ -268,19 +274,40 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
     return () => {
       observer.unobserve(container);
     };
-  }, [heroVideoEnabled]);
+  }, [previewEnabled]);
 
-  // Samsung's Tizen web runtime has a much smaller decode/compositor budget.
-  // Keeping an HLS decoder alive behind a full-screen image starves image
-  // decoding and produces white/late frames on physical TVs, so use the
-  // poster-only hero there. Browser and webOS behavior remains unchanged.
-  const shouldPlay = heroVideoEnabled && isFocused && heavyActive && isSlideSettled && isIntersecting && !isAnyCardHovered && !isSearchOpen && !isAssetDetailOpen && !isSessionExpiredVisible;
+  // Samsung's Tizen web runtime has a much smaller decode/compositor budget:
+  // an HTML5/HLS decoder behind a full-screen image starves image decoding
+  // and produces white/late frames on physical TVs. Tizen plays the preview
+  // through AVPlay instead (effect below). Browser and webOS are unchanged.
+  const shouldPlay = previewEnabled && isFocused && heavyActive && isSlideSettled && isIntersecting && !isAnyCardHovered && !isSearchOpen && !isAssetDetailOpen && !isSessionExpiredVisible;
   const showVideo = Boolean(shouldPlay && isVideoLoaded);
 
   // Unmute hero carousel by default when mounting and focused
   useEffect(() => {
-    if (heroVideoEnabled && heavyActive && isFocused) setMuted(false);
-  }, [heroVideoEnabled, heavyActive, isFocused, setMuted]);
+    if (previewEnabled && heavyActive && isFocused) setMuted(false);
+  }, [previewEnabled, heavyActive, isFocused, setMuted]);
+
+  // Tizen: AVPlay preview into the right-aligned 16:9 box below. Its onReady
+  // drives the same isVideoLoaded/showVideo flow as the <video> path, so the
+  // poster fade and autoplay pause behave identically. AVPlay has no
+  // per-stream mute, so a muted user gets the poster rather than sound.
+  useEffect(() => {
+    if (!tizenPreviewEnabled || !shouldPlay || !heroPreviewUrl || isMuted) return;
+    const target = tizenVideoBoxRef.current;
+    if (!target) return;
+    const preview = startTizenPreview({
+      url: heroPreviewUrl,
+      target,
+      onReady: () => setIsVideoLoaded(true),
+      onEnded: () => setIsVideoLoaded(false),
+      onStop: () => setIsVideoLoaded(false),
+    });
+    return () => {
+      preview.stop();
+      setIsVideoLoaded(false);
+    };
+  }, [tizenPreviewEnabled, shouldPlay, heroPreviewUrl, isMuted]);
 
   useEffect(() => {
     if (!shouldPlay) {
@@ -390,6 +417,13 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
       <div
         className="absolute inset-0 w-full h-full z-0 pointer-events-none"
       >
+        {/* Tizen AVPlay target: the whole hero. tizenPreviewPlayer sizes the
+            video to cover it (like the <video> path's object-fit: cover) —
+            a hero-height 16:9 box only reached ~80% of the width and left a
+            bare black strip down the left side. */}
+        {tizenPreviewEnabled && heroPreviewUrl && (
+          <div ref={tizenVideoBoxRef} className="absolute inset-0" />
+        )}
         {/* Background preview video — right-aligned, 80% visible, never cropped at any breakpoint */}
         {heroVideoEnabled && heroPreviewUrl && (
           <div
@@ -447,7 +481,10 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
         {/* Background poster image — bg-neutral-900 behind it always, so the browser's
             default white canvas never flashes through while the image is still
             downloading (it also swallows the focus border's contrast otherwise). */}
-        <div className={`absolute inset-0 w-full h-full z-0 bg-neutral-900 transition-opacity ${showVideo ? "duration-500 opacity-0 pointer-events-none" : "duration-0 opacity-100"}`}>
+        <div
+          data-tizen-video-cover
+          className={`absolute inset-0 w-full h-full z-0 bg-neutral-900 transition-opacity ${showVideo ? "duration-500 opacity-0 pointer-events-none" : "duration-0 opacity-100"}`}
+        >
           {hasImage ? (
             <JOJOCommonImage
               src={heroImageUrl}

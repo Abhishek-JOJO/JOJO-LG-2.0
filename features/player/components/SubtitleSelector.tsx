@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useFocusable, setFocus, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import type { SubtitleTrack } from '../model/types';
+import { PLAYER_MENU_HEADING_CLASS, PLAYER_MENU_ROW_CLASS } from '../constants/player.constants';
 
 const OFF_TRACK: SubtitleTrack = {
   id: -1,
@@ -13,7 +14,7 @@ const OFF_TRACK: SubtitleTrack = {
 
 function CheckIcon() {
   return (
-    <svg width="14" height="12" viewBox="0 0 14 12" fill="none" className="shrink-0" aria-hidden="true">
+    <svg width="21" height="18" viewBox="0 0 14 12" fill="none" className="shrink-0" aria-hidden="true">
       <path d="M1.5 6L5 9.5L12.5 1.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -39,7 +40,7 @@ function FocusableTrackBtn({ label, isActive, focusKey, isVisible, onClick }: Fo
       ref={ref}
       onClick={onClick}
       data-focuskey={focusKey}
-      className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-all duration-150 outline-none rounded-lg cursor-pointer ${
+      className={`w-full flex items-center justify-between gap-4 ${PLAYER_MENU_ROW_CLASS} transition-all duration-150 outline-none rounded-lg cursor-pointer ${
         focused
           ? 'bg-white text-black font-bold shadow-lg scale-[1.02]'
           : isActive
@@ -147,14 +148,14 @@ export function SubtitleSelector({
           <FocusContext.Provider value={subtitlePanelFocusKey}>
             <div
               ref={subtitleBoundaryRef as any}
-              className="absolute bottom-full right-0 mb-3 bg-[#141414]/98 border border-white/15 rounded-xl overflow-hidden min-w-[240px] max-w-[320px] z-50 shadow-2xl backdrop-blur-md player-menu-pop-in p-1.5"
+              className="absolute bottom-full right-0 mb-3 bg-[#141414]/98 border border-white/15 rounded-xl overflow-hidden min-w-[320px] max-w-[440px] z-50 shadow-2xl backdrop-blur-md player-menu-pop-in p-1.5"
             >
-              <div className="px-3 py-2 border-b border-white/10 mb-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
+              <div className="px-4 py-3 border-b border-white/10 mb-1">
+                <p className={`${PLAYER_MENU_HEADING_CLASS} text-white/50`}>
                   Subtitles
                 </p>
               </div>
-              <div className="py-1 max-h-64 overflow-y-auto space-y-1">
+              <div className="py-1 max-h-[440px] overflow-y-auto space-y-1">
                 {allOptions.map((track) => (
                   <FocusableTrackBtn
                     key={track.id}

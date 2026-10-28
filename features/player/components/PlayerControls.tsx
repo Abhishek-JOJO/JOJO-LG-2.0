@@ -28,6 +28,12 @@ import { PlayerIcon } from './PlayerIcon';
 import { SubtitleSelector } from './SubtitleSelector';
 import { useFocusable, setFocus, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { analyticsService } from '@/shared/analytics';
+import {
+  PLAYER_CONTROL_ICON_SIZE,
+  PLAYER_CONTROL_LABEL_CLASS,
+  PLAYER_MENU_HEADING_CLASS,
+  PLAYER_MENU_ROW_CLASS,
+} from '../constants/player.constants';
 import { EVENT_NAMES } from '@/shared/analytics/constants/analytics.constants';
 import type {
   QualityOption,
@@ -75,7 +81,7 @@ function IconBtn({ onClick, label, children, active = false, disabled = false, i
       aria-label={label}
       disabled={disabled}
       className={`
-        flex items-center justify-center gap-2 px-3.5 py-2 rounded-full transition-all duration-150 outline-none
+        flex items-center justify-center gap-3 px-5 py-3 rounded-full transition-all duration-150 outline-none
         hover:bg-theme_1/10 active:scale-95
         ${active ? 'opacity-100' : 'opacity-90 hover:opacity-100'}
         ${disabled ? 'pointer-events-none opacity-40' : ''}
@@ -92,7 +98,7 @@ function IconBtn({ onClick, label, children, active = false, disabled = false, i
 
 function QualityIcon() {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+    <svg width={PLAYER_CONTROL_ICON_SIZE} height={PLAYER_CONTROL_ICON_SIZE} viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
       <rect x="3" y="5" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.8" />
       <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       <circle cx="12" cy="11" r="2.5" stroke="currentColor" strokeWidth="1.6" />
@@ -102,7 +108,7 @@ function QualityIcon() {
 
 function SpeedIcon() {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+    <svg width={PLAYER_CONTROL_ICON_SIZE} height={PLAYER_CONTROL_ICON_SIZE} viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
       <circle cx="12" cy="13" r="8" stroke="currentColor" strokeWidth="1.8" />
       <path d="M12 13L16 9M9 4h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
@@ -111,7 +117,7 @@ function SpeedIcon() {
 
 function AudioTrackIcon() {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+    <svg width={PLAYER_CONTROL_ICON_SIZE} height={PLAYER_CONTROL_ICON_SIZE} viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
       <path d="M4 14v-4M9 17v-10M14 20v-16M19 14v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
@@ -119,12 +125,12 @@ function AudioTrackIcon() {
 
 function MuteIcon({ muted }: { muted: boolean }) {
   return muted ? (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+    <svg width={PLAYER_CONTROL_ICON_SIZE} height={PLAYER_CONTROL_ICON_SIZE} viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
       <path d="M5 10v4h3l4 3V7L8 10H5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
       <path d="m16 10 4 4m0-4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   ) : (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+    <svg width={PLAYER_CONTROL_ICON_SIZE} height={PLAYER_CONTROL_ICON_SIZE} viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
       <path d="M5 10v4h3l4 3V7L8 10H5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
       <path d="M16 9.5c1.2 1.4 1.2 3.6 0 5M18.5 7c2.7 2.8 2.7 7.2 0 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
@@ -150,7 +156,7 @@ function SettingsOptionRow({ label, isActive, focusKey, isVisible = true, onClic
     <button
       ref={ref}
       onClick={onClick}
-      className={`w-full text-left px-4 py-3 text-sm transition-colors outline-none ${isActive
+      className={`w-full text-left ${PLAYER_MENU_ROW_CLASS} transition-colors outline-none ${isActive
         ? 'text-theme_13_samecolour bg-theme_1/10 font-semibold'
         : 'text-theme_1 hover:bg-theme_1/10'
         } ${focused ? 'bg-neutral-800 ring-2 ring-inset ring-white font-bold' : ''}`}
@@ -283,16 +289,16 @@ function SettingsSelector({
           active={open && view === 'quality'}
         >
           <QualityIcon />
-          <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Quality</span>
+          <span className={`${PLAYER_CONTROL_LABEL_CLASS} text-theme_1/90`}>Quality</span>
         </IconBtn>
       ) : (
         <div
-          className="flex items-center justify-center gap-2 px-3.5 py-2 text-theme_1/65"
+          className="flex items-center justify-center gap-3 px-5 py-3 text-theme_1/65"
           aria-label="Quality: Auto"
           title="Samsung AVPlay manages video quality automatically"
         >
           <QualityIcon />
-          <span className="text-sm sm:text-base font-medium whitespace-nowrap">Auto</span>
+          <span className={PLAYER_CONTROL_LABEL_CLASS}>Auto</span>
         </div>
       )}
 
@@ -305,7 +311,7 @@ function SettingsSelector({
           active={open && view === 'audio'}
         >
           <AudioTrackIcon />
-          <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Audio</span>
+          <span className={`${PLAYER_CONTROL_LABEL_CLASS} text-theme_1/90`}>Audio</span>
         </IconBtn>
       )}
 
@@ -317,7 +323,7 @@ function SettingsSelector({
         active={open && view === 'speed'}
       >
         <SpeedIcon />
-        <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Speed</span>
+        <span className={`${PLAYER_CONTROL_LABEL_CLASS} text-theme_1/90`}>Speed</span>
       </IconBtn>
 
       {open && (
@@ -326,16 +332,16 @@ function SettingsSelector({
           <FocusContext.Provider value={settingsPanelFocusKey}>
           <div
             ref={settingsBoundaryRef as any}
-            className="absolute bottom-full right-0 mb-3 bg-[#141414]/98 border border-theme_1/15 rounded-xl overflow-hidden min-w-[220px] z-50 shadow-2xl backdrop-blur-md player-menu-pop-in"
+            className="absolute bottom-full right-0 mb-3 bg-[#141414]/98 border border-theme_1/15 rounded-xl overflow-hidden min-w-[320px] z-50 shadow-2xl backdrop-blur-md player-menu-pop-in"
           >
-            <div className="px-4 py-3 border-b border-theme_1/10">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-theme_1/50">
+            <div className="px-6 py-4 border-b border-theme_1/10">
+              <p className={`${PLAYER_MENU_HEADING_CLASS} text-theme_1/50`}>
                 {view === 'quality' ? 'Quality' : view === 'audio' ? 'Audio' : 'Speed'}
               </p>
             </div>
 
             {view === 'quality' && qualitySelection === 'manual' && (
-              <div className="py-1 max-h-72 overflow-y-auto">
+              <div className="py-1 max-h-[440px] overflow-y-auto">
                 {(qualities.length > 0 ? qualities : [{ id: -1, label: 'Auto', height: null, bitrate: null, isAuto: true }]).map((q) => (
                   <SettingsOptionRow
                     key={q.id}
@@ -358,7 +364,7 @@ function SettingsSelector({
             )}
 
             {view === 'audio' && (
-              <div className="py-1 max-h-72 overflow-y-auto">
+              <div className="py-1 max-h-[440px] overflow-y-auto">
                 {audioTracks.map((track) => (
                   <SettingsOptionRow
                     key={track.id}
@@ -635,7 +641,7 @@ export function PlayerControls({
                 active={isMuted}
               >
                 <MuteIcon muted={isMuted} />
-                <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">
+                <span className={`${PLAYER_CONTROL_LABEL_CLASS} text-theme_1/90`}>
                   {isMuted ? 'Unmute' : 'Mute'}
                 </span>
               </IconBtn>
@@ -661,8 +667,8 @@ export function PlayerControls({
                   isVisible={isVisible}
                   renderTrigger={(onClick) => (
                     <IconBtn focusKey="subtitles-trigger-btn" onClick={onClick} label="Subtitles" isVisible={isVisible}>
-                      <PlayerIcon name="captions" size={26} />
-                      <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Subtitles</span>
+                      <PlayerIcon name="captions" size={PLAYER_CONTROL_ICON_SIZE} />
+                      <span className={`${PLAYER_CONTROL_LABEL_CLASS} text-theme_1/90`}>Subtitles</span>
                     </IconBtn>
                   )}
                 />
@@ -694,8 +700,8 @@ export function PlayerControls({
               // param would otherwise silently receive that event object on a
               // real mouse/pointer click instead of staying undefined.
               <IconBtn onClick={() => onNextEpisode()} label="Next episode" isVisible={isVisible}>
-                <PlayerIcon name="next-episode" size={26} />
-                <span className="text-sm sm:text-base font-medium text-theme_1/90 whitespace-nowrap">Next Episode</span>
+                <PlayerIcon name="next-episode" size={PLAYER_CONTROL_ICON_SIZE} />
+                <span className={`${PLAYER_CONTROL_LABEL_CLASS} text-theme_1/90`}>Next Episode</span>
               </IconBtn>
             )}
 

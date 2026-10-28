@@ -361,7 +361,8 @@ export function ProgressBar({
 
       <span
         className="shrink-0 text-theme_1 font-semibold tabular-nums select-none"
-        style={{ fontSize: 16, letterSpacing: '0.02em', minWidth: 64, textAlign: 'right' }}
+        // 10-foot size, matching the control labels (PLAYER_CONTROL_LABEL_CLASS).
+        style={{ fontSize: 24, letterSpacing: '0.02em', minWidth: 120, textAlign: 'right' }}
       >
         -{formatPlayerTime(remainingSeconds)}
       </span>

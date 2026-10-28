@@ -7,6 +7,7 @@ import { usePlayerStore } from "@/store/usePlayerStore";
 import { TitleLogoImage } from "@/components/ui/TitleLogoImage";
 import { ContentRailItem } from "../config/contentRail.types";
 import { isTizen } from "@/src/platform/detectPlatform";
+import { isTizenPreviewAvailable, startTizenPreview } from "@/src/platform/tizen/tizenPreviewPlayer";
 
 interface InlineHoverTrailerProps {
   item: ContentRailItem;
@@ -16,7 +17,13 @@ interface InlineHoverTrailerProps {
 }
 
 export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item, isExpanded, isLandscape = false }: InlineHoverTrailerProps) {
-  const videoEnabled = !isTizen();
+  // <video> everywhere except Tizen, where it paints white/late frames on
+  // Samsung hardware; Tizen previews through AVPlay (tizenPreviewPlayer).
+  const isTizenRuntime = isTizen();
+  const videoEnabled = !isTizenRuntime;
+  const tizenPreviewEnabled = isTizenRuntime && isTizenPreviewAvailable();
+  const previewEnabled = videoEnabled || tizenPreviewEnabled;
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [videoError, setVideoError] = useState(false);
@@ -27,24 +34,54 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
     return item?.previewUrl || (item as any)?.preview_url || null;
   }, [item]);
 
-  const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
+  // The 1.2s gate is granted to a specific item, so it closes in the same
+  // render the slot switches items. As a boolean reset by an effect it stayed
+  // true for one more render: the first step after resting on a card started
+  // (and at once killed) a preview of the next item — a native AVPlay
+  // open/close on a single keypress, felt as a hitch while fast scrolling.
+  const itemId = item?.id != null ? String(item.id) : null;
+  const [loadVideoForId, setLoadVideoForId] = useState<string | null>(null);
+  const shouldLoadVideo = previewEnabled && isExpanded && !!previewUrl && itemId !== null && loadVideoForId === itemId;
 
   useEffect(() => {
-    if (!videoEnabled) return;
+    if (!previewEnabled) return;
 
     setVideoReady(false);
     setVideoError(false);
-    setShouldLoadVideo(false);
+    setLoadVideoForId(null);
 
     if (!isExpanded || !previewUrl) return;
 
     // Debounce 1200ms before allocating webOS hardware video decoders
     const timer = setTimeout(() => {
-      setShouldLoadVideo(true);
+      setLoadVideoForId(itemId);
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [videoEnabled, previewUrl, item?.id, isExpanded]);
+  }, [previewEnabled, previewUrl, itemId, isExpanded]);
+
+  // Tizen: same 1.2s debounce, then AVPlay into this overlay's box (the
+  // card's 16:9 rect). The card poster fades via data-tizen-video-cover.
+  // AVPlay has no per-stream mute, so a muted user keeps the poster.
+  useEffect(() => {
+    if (!tizenPreviewEnabled || !shouldLoadVideo || !previewUrl || isMuted) return;
+    const target = containerRef.current;
+    if (!target) return;
+    const preview = startTizenPreview({
+      url: previewUrl,
+      target,
+      onReady: () => setVideoReady(true),
+      onEnded: () => setVideoReady(false),
+      onStop: (reason) => {
+        setVideoReady(false);
+        if (reason === "error") setVideoError(true);
+      },
+    });
+    return () => {
+      preview.stop();
+      setVideoReady(false);
+    };
+  }, [tizenPreviewEnabled, shouldLoadVideo, previewUrl, isMuted]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -132,7 +169,7 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
   ) : null;
 
   return (
-    <div className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-hidden">
+    <div ref={containerRef} className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-hidden">
 
       {/* Video Player - Only mounted when card is active/expanded, debounced, and hidden until first frame is ready */}
       {videoEnabled && shouldLoadVideo && previewUrl && !videoError && (

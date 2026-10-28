@@ -8,6 +8,7 @@
 
 import { logger } from '@lib/logger/logger';
 import type { SamsungAVPlay, SamsungAVPlayTrack } from '@/src/platform/types';
+import { stopTizenPreview, TIZEN_VIDEO_FULLSCREEN_CLASS } from '@/src/platform/tizen/tizenPreviewPlayer';
 import type {
   AdapterName,
   AudioTrack,
@@ -24,6 +25,20 @@ import type {
 
 const TIZEN_LOGICAL_WIDTH = 1920;
 const TIZEN_LOGICAL_HEIGHT = 1080;
+// Long enough for a slow manifest + DRM license; past it, prepareAsync is
+// treated as never reporting back (see load()).
+const PREPARE_ASYNC_TIMEOUT_MS = 10000;
+// Time updates reach the UI at the HTML5 timeupdate cadence (~4/s); more
+// often only re-renders the whole player for no visible gain.
+const TIME_UPDATE_INTERVAL_MS = 250;
+// A seekTo whose callbacks never arrive must not block every later seek.
+const SEEK_SETTLE_TIMEOUT_MS = 5000;
+
+class PrepareTimeoutError extends Error {
+  constructor() {
+    super(`AVPlay prepareAsync did not report back within ${PREPARE_ASYNC_TIMEOUT_MS}ms`);
+  }
+}
 
 const TIZEN_AVPLAY_CAPABILITIES: PlayerCapabilities = {
   playbackSpeeds: [1, 2],
@@ -73,6 +88,16 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
   private selectedTextIndex: number | null = null;
   private originalBackgrounds = new Map<HTMLElement, string>();
   private destroyed = false;
+  /** The TV's own mute state before this session, restored if setVolume changed it. */
+  private initialTvMute: boolean | null = null;
+  private changedTvMute = false;
+  /** A native seekTo is running; newer requests wait in queuedSeekMs (only the latest is kept). */
+  private seekInFlight = false;
+  private queuedSeekMs: number | null = null;
+  private seekSettleTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastTimeUpdateAt = 0;
+  /** suspend() was called for the app going to the background; restore() on return. */
+  private suspendedForBackground = false;
 
   static isAvailable(): boolean {
     return typeof window !== 'undefined' && Boolean(window.webapis?.avplay);
@@ -127,56 +152,38 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
 
     window.addEventListener('resize', this.updateDisplayRect);
     document.addEventListener('fullscreenchange', this.updateDisplayRect);
+    // Leaving the watch page is a full document load on the packaged app, and
+    // React's unmount cleanup never runs on unload — so destroy() didn't
+    // either. AVPlay is native: left open, its video plane and audio carried
+    // on into the next page's startup (the glitch landing back on asset
+    // detail). pagehide always fires; destroy()'s native calls are synchronous.
+    window.addEventListener('pagehide', this.handlePageHide);
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    this.initialTvMute = this.readTvMute();
+    this.changedTvMute = false;
 
     try {
+      // One native instance: an inline preview must give it up first.
+      stopTizenPreview();
+      // On Tizen the page background is a backdrop layer, not html/body
+      // (globals.css); this drops it so the video plane shows behind the player.
+      document.documentElement.classList.add(TIZEN_VIDEO_FULLSCREEN_CLASS);
       this.safeCloseExistingSession();
-      avplay.open(manifestUrl);
-      avplay.setListener(this.createListener());
-      try {
-        this.updateDisplayRect();
-      } catch (e) {
-        logger.warn('[TizenAVPlayAdapter] Initial setDisplayRect failed', { error: e });
-      }
-      try {
-        avplay.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX');
-      } catch (e) {
-        logger.warn('[TizenAVPlayAdapter] setDisplayMethod failed', { error: e });
-      }
-      this.configureDrm(drmConfig);
+      this.openSession(avplay, manifestUrl, drmConfig);
 
-      // Try synchronous prepare first — on Samsung Tizen TVs, avplay.prepare()
-      // transitions immediately to READY in <200ms, whereas prepareAsync() is known
-      // to stall or fail to invoke its success callback on some Tizen 7/8 firmware versions.
-      let prepared = false;
+      // prepareAsync keeps the page responsive while the manifest (and any
+      // DRM license) loads — prepare() blocks the whole UI, loading spinner
+      // and Back key included, for that entire time. prepare() stays as the
+      // fallback, on a fresh session, for firmware where prepareAsync never
+      // reports back at all.
       try {
+        await this.prepareAsync(avplay);
+      } catch (error) {
+        if (this.destroyed || !(error instanceof PrepareTimeoutError)) throw error;
+        logger.warn('[TizenAVPlayAdapter] prepareAsync never reported; retrying with synchronous prepare');
+        this.safeCloseExistingSession();
+        this.openSession(avplay, manifestUrl, drmConfig);
         avplay.prepare();
-        prepared = true;
-        logger.info('[TizenAVPlayAdapter] Synchronous avplay.prepare() succeeded');
-      } catch (prepErr) {
-        logger.warn('[TizenAVPlayAdapter] Synchronous prepare failed, falling back to prepareAsync', { error: prepErr });
-      }
-
-      if (!prepared) {
-        await new Promise<void>((resolve, reject) => {
-          const prepareTimeout = setTimeout(() => {
-            reject(new Error('AVPlay prepareAsync timed out after 15s'));
-          }, 15000);
-
-          avplay.prepareAsync(
-            () => {
-              clearTimeout(prepareTimeout);
-              if (this.destroyed) {
-                reject(new Error('AVPlay was destroyed while preparing'));
-                return;
-              }
-              resolve();
-            },
-            (error) => {
-              clearTimeout(prepareTimeout);
-              reject(new Error(`AVPlay prepare failed: ${errorMessage(error)}`));
-            },
-          );
-        });
       }
 
       if (this.destroyed) {
@@ -235,14 +242,55 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     const target = this.durationSeconds > 0
       ? Math.min(seconds, Math.max(0, this.durationSeconds - 0.1))
       : seconds;
+    // Report the requested position straight away: relative seeks (each
+    // FF/RW press) chain from it, and the seek bar doesn't jump back to the
+    // old position while the native seek runs.
+    this.currentTimeSeconds = target;
+    // …and show it on the seek bar now, since time updates are held while
+    // the seek runs. Not for the load-time seek: playback hasn't reported yet
+    // and the player UI is still in its loading state.
+    if (this.lastTimeUpdateAt > 0) {
+      this.lastTimeUpdateAt = Date.now();
+      this.handlers?.onTimeUpdate(target, this.durationSeconds, this.bufferedSeconds);
+    }
+    const targetMs = Math.round(target * 1000);
+    // One native seek at a time. A burst of FF/RW presses issues a seek per
+    // press, and a seekTo issued while another is still running can fail on
+    // AVPlay. The newest target waits and runs as soon as the current lands.
+    if (this.seekInFlight) {
+      this.queuedSeekMs = targetMs;
+      return;
+    }
+    this.runSeek(targetMs);
+  }
+
+  private runSeek(targetMs: number): void {
+    const avplay = this.avplay;
+    if (!avplay || this.destroyed) return;
+    this.seekInFlight = true;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      if (this.seekSettleTimer) clearTimeout(this.seekSettleTimer);
+      this.seekSettleTimer = null;
+      this.seekInFlight = false;
+      const next = this.queuedSeekMs;
+      this.queuedSeekMs = null;
+      if (next !== null && next !== targetMs) this.runSeek(next);
+    };
+    // A failed seek leaves playback running where it was. It used to be
+    // reported as a playback error, which engine recovery answers by
+    // reloading the whole session — a visible restart for a missed seek.
+    const fail = (error: unknown) => {
+      logger.warn('[TizenAVPlayAdapter] Seek failed; playback continues', { targetMs, error: errorMessage(error) });
+      settle();
+    };
+    this.seekSettleTimer = setTimeout(settle, SEEK_SETTLE_TIMEOUT_MS);
     try {
-      this.avplay.seekTo(
-        Math.round(target * 1000),
-        () => { this.currentTimeSeconds = target; },
-        (error) => this.reportError('AVPLAY_SEEK_FAILED', error, true),
-      );
+      avplay.seekTo(targetMs, settle, fail);
     } catch (error) {
-      this.reportError('AVPLAY_SEEK_FAILED', error, true);
+      fail(error);
     }
   }
 
@@ -294,7 +342,11 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
       const normalized = Math.max(0, Math.min(1, volume));
       // AVPlay has no per-stream gain API. Map only mute state here; changing
       // the TV's global volume during player initialization would be surprising.
-      audio.setMute(normalized === 0);
+      // destroy() restores the TV's own mute state afterwards.
+      const mute = normalized === 0;
+      if (audio.isMute() === mute) return;
+      audio.setMute(mute);
+      this.changedTvMute = true;
     } catch (error) {
       logger.warn('[TizenAVPlayAdapter] TV audio control failed', { error });
     }
@@ -344,7 +396,8 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
   }
 
   getCurrentTime(): number {
-    if (!this.avplay) return this.currentTimeSeconds;
+    // Mid-seek the native clock still reads the pre-seek position.
+    if (!this.avplay || this.seekInFlight) return this.currentTimeSeconds;
     try {
       const state = this.avplay.getState();
       if (state !== 'NONE' && state !== 'IDLE') {
@@ -381,6 +434,24 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     this.destroyed = true;
     window.removeEventListener('resize', this.updateDisplayRect);
     document.removeEventListener('fullscreenchange', this.updateDisplayRect);
+    window.removeEventListener('pagehide', this.handlePageHide);
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    if (this.seekSettleTimer) clearTimeout(this.seekSettleTimer);
+    this.seekSettleTimer = null;
+    this.seekInFlight = false;
+    this.queuedSeekMs = null;
+    this.suspendedForBackground = false;
+
+    // The player's mute control can only reach the TV's global mute; leaving
+    // the player must hand the TV back exactly as the user had it.
+    if (this.changedTvMute && this.initialTvMute !== null) {
+      try {
+        window.tizen?.tvaudiocontrol?.setMute(this.initialTvMute);
+      } catch (error) {
+        logger.warn('[TizenAVPlayAdapter] Restoring TV mute failed', { error });
+      }
+    }
+    this.changedTvMute = false;
 
     if (this.avplay) {
       try {
@@ -397,6 +468,7 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     }
 
     this.objectEl?.remove();
+    document.documentElement.classList.remove(TIZEN_VIDEO_FULLSCREEN_CLASS);
     if (this.videoEl) this.videoEl.style.visibility = this.previousVideoVisibility;
 
     // Restore original background colors on ancestors
@@ -414,6 +486,72 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     this.handlers = null;
     this.tracks = [];
     logger.info('[TizenAVPlayAdapter] Destroyed');
+  }
+
+  private readonly handlePageHide = (): void => {
+    void this.destroy();
+  };
+
+  // Samsung multitasking: hand the decoder back while the app is hidden
+  // (Home, input switch) and take it again on return, so the TV can't
+  // reclaim it from under a paused session. The player has already paused
+  // itself by then (RemoteManager → tv-media-pause).
+  private readonly handleVisibilityChange = (): void => {
+    const avplay = this.avplay;
+    if (!avplay || this.destroyed) return;
+    try {
+      if (document.hidden) {
+        if (avplay.suspend && avplay.getState() !== 'NONE' && avplay.getState() !== 'IDLE') {
+          avplay.suspend();
+          this.suspendedForBackground = true;
+        }
+      } else if (this.suspendedForBackground) {
+        this.suspendedForBackground = false;
+        avplay.restore?.();
+      }
+    } catch (error) {
+      logger.warn('[TizenAVPlayAdapter] Multitasking suspend/restore failed', { error });
+    }
+  };
+
+  private readTvMute(): boolean | null {
+    try {
+      return window.tizen?.tvaudiocontrol?.isMute() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private openSession(avplay: SamsungAVPlay, manifestUrl: string, drmConfig: DrmConfig | null): void {
+    avplay.open(manifestUrl);
+    avplay.setListener(this.createListener());
+    try {
+      this.updateDisplayRect();
+    } catch (e) {
+      logger.warn('[TizenAVPlayAdapter] Initial setDisplayRect failed', { error: e });
+    }
+    try {
+      avplay.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX');
+    } catch (e) {
+      logger.warn('[TizenAVPlayAdapter] setDisplayMethod failed', { error: e });
+    }
+    this.configureDrm(drmConfig);
+  }
+
+  private prepareAsync(avplay: SamsungAVPlay): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const prepareTimeout = setTimeout(() => reject(new PrepareTimeoutError()), PREPARE_ASYNC_TIMEOUT_MS);
+      avplay.prepareAsync(
+        () => {
+          clearTimeout(prepareTimeout);
+          resolve();
+        },
+        (error) => {
+          clearTimeout(prepareTimeout);
+          reject(new Error(`AVPlay prepare failed: ${errorMessage(error)}`));
+        },
+      );
+    });
   }
 
   private createNativeVideoObject(): void {
@@ -480,7 +618,13 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
       },
       onbufferingcomplete: () => this.handlers?.onBufferingEnd(this.getCurrentTime()),
       oncurrentplaytime: (milliseconds: number) => {
+        // While a native seek runs AVPlay still reports pre-seek positions;
+        // passing them on made the seek bar jump back, then forward again.
+        if (this.seekInFlight) return;
         this.currentTimeSeconds = milliseconds / 1000;
+        const now = Date.now();
+        if (now - this.lastTimeUpdateAt < TIME_UPDATE_INTERVAL_MS) return;
+        this.lastTimeUpdateAt = now;
         this.handlers?.onTimeUpdate(this.currentTimeSeconds, this.durationSeconds, this.bufferedSeconds);
       },
       onstreamcompleted: () => {

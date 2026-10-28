@@ -314,27 +314,27 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     });
   }, [imageUrl, fallbackImages, item?.portraitFallbackImages]);
 
-  const [fallbackIndex, setFallbackIndex] = useState(0);
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => {
-    setFallbackIndex(0);
-    setImageFailed(false);
-  }, [item?.id, imageUrl]);
+  // Fallback progress belongs to the item/URL it was reached for, so a slot
+  // that switches items starts from the new item's first image in the same
+  // render. Reset by an effect, it rendered one frame of the previous item's
+  // state first (its fallback image, or the title placeholder).
+  const imageSourceKey = `${item?.id}|${imageUrl}`;
+  const [fallback, setFallback] = useState({ key: imageSourceKey, index: 0, failed: false });
+  const fallbackIndex = fallback.key === imageSourceKey ? fallback.index : 0;
+  const imageFailed = fallback.key === imageSourceKey && fallback.failed;
 
   const activeRawUrl = !imageFailed && fallbackIndex < candidateUrls.length
     ? candidateUrls[fallbackIndex]
     : "";
 
   const handleImageError = useCallback(() => {
-    setFallbackIndex((prev) => {
-      if (prev + 1 < candidateUrls.length) {
-        return prev + 1;
-      }
-      setImageFailed(true);
-      return prev;
+    setFallback((prev) => {
+      const index = prev.key === imageSourceKey ? prev.index : 0;
+      return index + 1 < candidateUrls.length
+        ? { key: imageSourceKey, index: index + 1, failed: false }
+        : { key: imageSourceKey, index, failed: true };
     });
-  }, [candidateUrls.length]);
+  }, [imageSourceKey, candidateUrls.length]);
 
   // Stable CDN-resized image URL, requested at the card's actual base aspect
   // ratio/size (e.g. 2:3 portrait) so the CDN crop matches the box the browser
@@ -373,26 +373,29 @@ export const BaseContentCard = React.memo(function BaseContentCard({
     >
       {shouldLoadImage && resizedImageUrl && !imageFailed ? (
         <div
+          // Fades out over a playing Tizen AVPlay preview (InlineHoverTrailer).
+          data-tizen-video-cover
           className="absolute inset-0 w-full h-full bg-neutral-900"
           style={isTizenRuntime ? undefined : { transform: "translateZ(0)" }}
         >
           {/* Mounting is already visibility-gated on Tizen. Once mounted,
               request immediately instead of relying on inconsistent native
               lazy-loading implementations in older Samsung browsers.
-              On Tizen the <img> is reused when the slot's item changes
-              (spotlight Left/Right, preview rows updating in place): a warm
-              poster then replaces the old one on the next frame, where a
-              fresh element per URL started blank and flashed the dark card
-              background on every step. */}
+              One element per URL: reusing a single <img> across items kept
+              painting the previous item's poster until the new one finished
+              downloading — after a fast scroll a card could sit on another
+              title's artwork. A preloaded poster still shows on the first
+              frame: Tizen decodes it with the frame (sync) instead of
+              presenting the card empty for a frame first. */}
           <img
-            key={isTizenRuntime ? undefined : resizedImageUrl}
+            key={resizedImageUrl}
             src={resizedImageUrl}
             alt={item?.title || ""}
             onError={handleImageError}
             className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
             loading="eager"
-            decoding="async"
+            decoding={isTizenRuntime ? "sync" : "async"}
           />
         </div>
       ) : null}
@@ -546,6 +549,8 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       }}
       href={itemUrl}
       data-focuskey={focusKey}
+      // Rounded box over a Tizen AVPlay preview — see globals.css passthrough rules.
+      data-tizen-video-frame
       data-asset-id={item?.id}
       onFocus={() => {
         setIsDomFocused(true);

@@ -1244,3 +1244,60 @@ html.tv-tizen .browse-page-enter-layer {
   animation: none;
   will-change: auto;
 }
+
+/* ============================================================
+   SAMSUNG TIZEN — AVPLAY PREVIEW PASSTHROUGH
+   Inline previews play through AVPlay, which draws on a hardware
+   video plane behind the page (src/platform/tizen/tizenPreviewPlayer).
+   Once frames are showing, the preview box and every ancestor get
+   .tizen-video-passthrough:
+   - their backgrounds go transparent so the plane shows through
+     (outside the video rect the plane is black, i.e. the page bg);
+   - poster artwork marked data-tizen-video-cover fades out;
+   - rounded boxes marked data-tizen-video-frame paint the page
+     colour just outside their curve, masking the video's square
+     corners (the spread covers the corner pocket of a 32px radius).
+============================================================ */
+html.tv-tizen.tizen-video-passthrough,
+html.tv-tizen .tizen-video-passthrough {
+  background: transparent !important;
+}
+
+/* The page background is its own layer on Tizen (#tizen-page-backdrop,
+   app/layout.tsx), not html/body: turning a root background transparent
+   repaints the entire screen, and previews toggle it on every start/stop —
+   the hitch as a preview appeared or a keypress stopped it. A preview cuts a
+   hole in this layer over its own box (tizenPreviewPlayer); the movie player
+   drops the whole layer with a compositor-only opacity change. */
+html.tv-tizen,
+html.tv-tizen body {
+  background: transparent !important;
+}
+
+#tizen-page-backdrop {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: -1;
+  background: var(--theme_12);
+  pointer-events: none;
+  will-change: opacity;
+}
+
+html.tv-tizen.tizen-video-fullscreen #tizen-page-backdrop {
+  opacity: 0;
+}
+
+html.tv-tizen .tizen-video-passthrough > [data-tizen-video-cover] {
+  opacity: 0 !important;
+  transition: opacity 500ms ease-out;
+}
+
+html.tv-tizen .tizen-video-passthrough[data-tizen-video-frame] {
+  box-shadow: 0 0 0 16px var(--theme_12) !important;
+  /* Applied instantly: the plane shows in the corners the moment the
+     parent goes transparent, so an animated mask would let them flash. */
+  transition: none !important;
+}

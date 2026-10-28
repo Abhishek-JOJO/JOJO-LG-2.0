@@ -23,9 +23,9 @@ interface TitleLogoImageProps {
  * a card. Through JOJOCommonImage / next/image it was lazy-loaded, hidden
  * until onLoad, and drawn over an opaque placeholder: the black box seen
  * while scrolling fast. This is a plain eager <img> instead — nothing is
- * drawn until the logo arrives, a logo the preloader already fetched shows on
- * the first frame, and the element is reused (src swapped in place) when a
- * card's item changes rather than remounted.
+ * drawn until the logo arrives, and a logo the preloader already fetched shows
+ * on the first frame. Each URL gets its own <img>: reusing one across items
+ * kept the previous title's logo on screen until the new one downloaded.
  */
 export const TitleLogoImage = React.memo(function TitleLogoImage({
   src,
@@ -44,6 +44,7 @@ export const TitleLogoImage = React.memo(function TitleLogoImage({
     <div className={wrapperClassName}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        key={src}
         src={src}
         alt={alt}
         className={className}

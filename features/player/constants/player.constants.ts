@@ -70,3 +70,16 @@ export const HEARTBEAT_INTERVAL_MS = 1_000;
 
 /** Mid-roll ad polling interval in milliseconds */
 export const AD_POLL_INTERVAL_MS = 500;
+
+/**
+ * 10-foot sizing for the control bar and its menus. The TV lays out at
+ * 1920x1080 and is read from across a room: 16px labels and 26px icons —
+ * web-player sizes — were too small to read there.
+ */
+export const PLAYER_CONTROL_ICON_SIZE = 36;
+/** Label next to a control icon (Mute, Subtitles, Audio, Speed…). */
+export const PLAYER_CONTROL_LABEL_CLASS = 'text-2xl font-medium whitespace-nowrap';
+/** One option row in the Subtitles / Quality / Audio / Speed menus. */
+export const PLAYER_MENU_ROW_CLASS = 'px-6 py-4 text-[22px]';
+/** Small caps heading at the top of those menus. */
+export const PLAYER_MENU_HEADING_CLASS = 'text-base font-semibold uppercase tracking-[0.14em]';
