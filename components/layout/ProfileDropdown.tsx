@@ -364,7 +364,7 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
           aria-label="Profile Menu"
         >
           {selectedProfile?.avatar && (selectedProfile.avatar.startsWith("http") || selectedProfile.avatar.startsWith("/")) ? (
-            <div id="navbar-profile-avatar" className="w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] p-[3px] rounded-full overflow-hidden shrink-0 bg-[#1a1a1a]">
+            <div id="navbar-profile-avatar" className="w-[56px] h-[56px] p-[3px] rounded-full overflow-hidden shrink-0 bg-[#1a1a1a]">
               <JOJOCommonImage
                 src={selectedProfile.avatar}
                 alt={selectedProfile.profile_name}
@@ -375,9 +375,9 @@ export function ProfileDropdown({ totalNavItems = 0, isGold = false }: ProfileDr
               />
             </div>
           ) : (
-            <div id="navbar-profile-avatar" className="w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full flex items-center justify-center text-sm font-bold text-white bg-theme_13_samecolour shrink-0">
+            <div id="navbar-profile-avatar" className="w-[56px] h-[56px] rounded-full flex items-center justify-center text-2xl font-bold text-white bg-theme_13_samecolour shrink-0">
               {selectedProfile?.profile_name?.charAt(0).toUpperCase() ||
-                <UserCircle className="w-6 h-6 text-white" />}
+                <UserCircle className="w-8 h-8 text-white" />}
             </div>
           )}
         </div>

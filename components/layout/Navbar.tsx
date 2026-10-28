@@ -104,7 +104,7 @@ function FocusableGetGold({
       tabIndex={0}
       data-focuskey="navbar-get-gold"
       onClick={handleOpen}
-      className={`cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 text-base sm:text-lg tracking-wide whitespace-nowrap rounded-full transition-all duration-200 shrink-0 border ${
+      className={`cursor-pointer px-7 py-3 text-2xl tracking-wide whitespace-nowrap rounded-full transition-all duration-200 shrink-0 border ${
         focused
           ? "bg-gradient-to-r from-[#FAAF3F] via-[#FFD691] to-[#FAAF3F] text-black font-extrabold scale-105 border-transparent"
           : "bg-transparent border-white/40 text-white font-medium hover:border-white/70 hover:bg-[#FAAF3F]/10"
@@ -179,7 +179,7 @@ function FocusableSearch({
       tabIndex={0}
       data-focuskey="navbar-search"
       onClick={() => setSearchOpen(true)}
-      className={`p-2.5 rounded-full cursor-pointer flex items-center justify-center transition-all duration-200 shrink-0 ${
+      className={`p-3 rounded-full cursor-pointer flex items-center justify-center transition-all duration-200 shrink-0 ${
         focused
           ? "bg-white text-black scale-110 ring-4 ring-white ring-offset-2 ring-offset-black font-bold shadow-2xl"
           : isSearchActive
@@ -188,7 +188,7 @@ function FocusableSearch({
       }`}
       aria-label="Search"
     >
-      <Search className="w-5 h-5 sm:w-6 sm:h-6" />
+      <Search className="w-7 h-7" />
     </div>
   );
 }
@@ -228,7 +228,7 @@ function FocusableLoginButton({ t, router }: { t: any; router: any }) {
         hoverColor={themeColors.theme_13_samecolour}
         state={JOJOButton.State.ACTIVE}
         onClick={() => safeNavigate(router, ROUTES.LOGIN)}
-        className="rounded-[100px] body-xs-medium sm:body-sm-medium h-8 sm:h-10 px-4 ml-1 cursor-pointer"
+        className="rounded-[100px] !text-2xl font-medium h-14 px-7 ml-1 cursor-pointer"
       >
         {t("login")}
       </JOJOCustomButton>
@@ -325,7 +325,13 @@ export function Navbar() {
       }}
     >
       {showBrowseHeader ? (
-        <div className="relative py-4 sm:py-5 lg:py-6 px-6 sm:px-12 lg:px-16 w-full flex items-center justify-between z-50">
+        <div
+          // 20px vertical padding: with the 10-foot nav pills (56px) and
+          // avatar (64px) the header stays ~104px tall — under the 105px
+          // offset the rails anchor the active row at (ContentRailsView /
+          // BaseContentCard).
+          className="relative py-4 sm:py-5 px-6 sm:px-12 lg:px-16 w-full flex items-center justify-between z-50"
+        >
           {/* 1. Left JOJO Logo */}
           <div className="flex items-center shrink-0">
             <Link

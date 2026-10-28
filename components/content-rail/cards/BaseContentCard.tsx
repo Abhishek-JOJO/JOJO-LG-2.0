@@ -403,7 +403,7 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       {/* Fallback title shown only if no image URL is available or all fallback candidates failed */}
       {(!resizedImageUrl || imageFailed) && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-neutral-900 px-2 pointer-events-none select-none">
-          <span className="text-[11px] sm:text-xs text-theme_1/50 font-semibold text-center line-clamp-3 leading-snug px-1">
+          <span className="text-base text-theme_1/50 font-semibold text-center line-clamp-3 leading-snug px-1">
             {item.title}
           </span>
         </div>
@@ -428,8 +428,8 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       {config?.showBadge && item?.asset_tags_badgeText && !(isLandscapeCard && item.asset_tags_badgeText.toLowerCase().includes("new")) && (
         <div
           className={`absolute bottom-0 left-1/2 -translate-x-1/2 text-center uppercase z-30 font-bold transition-all duration-300 ${isLandscapeCard
-            ? "w-[170px] sm:w-[210px] text-xs sm:text-sm tracking-wider py-1 sm:py-1.5 rounded-t-lg shadow-lg"
-            : "w-[110px] text-[11px] tracking-wide py-0.5 rounded-t-md"
+            ? "w-[230px] text-base tracking-wider py-1.5 rounded-t-lg shadow-lg"
+            : "w-[140px] text-sm tracking-wide py-1 rounded-t-md"
             } ${item?.isPremium
               ? "premium-badge-bg shadow-md shadow-amber-500/20 !text-black"
               : "bg-theme_13_samecolour text-white"

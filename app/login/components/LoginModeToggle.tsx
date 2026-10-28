@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { useFocusable, FocusContext, setFocus } from "@noriginmedia/norigin-spatial-navigation";
+import { focusLoginInput } from "../loginInputFocus";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 
@@ -59,9 +60,7 @@ function ToggleOption({
     onEnterPress: () => {
       onSelect();
       if (focusKey === "login-mode-remote") {
-        setFocus("login-input");
-        const el = document.getElementById("login-input-field");
-        if (el) el.focus();
+        focusLoginInput();
       }
     },
     onArrowPress: (direction) => {
@@ -84,9 +83,7 @@ function ToggleOption({
       }
       if (direction === "down") {
         if (focusKey === "login-mode-remote") {
-          setFocus("login-input");
-          const el = document.getElementById("login-input-field");
-          if (el) el.focus();
+          focusLoginInput();
           return false;
         }
         if (focusKey === "login-mode-phone") {
@@ -109,9 +106,7 @@ function ToggleOption({
       onClick={() => {
         onSelect();
         if (focusKey === "login-mode-remote") {
-          setFocus("login-input");
-          const el = document.getElementById("login-input-field");
-          if (el) el.focus();
+          focusLoginInput();
         }
       }}
       animate={{ scale: focused ? 1.05 : 1 }}

@@ -218,7 +218,7 @@ export const FocusableNavLink = React.memo(({
       data-active={isItemActive ? "true" : "false"}
       data-focuskey={`nav-link-${index}`}
       onClick={handleClick}
-      className={`relative cursor-pointer px-5 sm:px-6 py-2 sm:py-2.5 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none transition-[background-color,color,transform] duration-300 ease-out ${
+      className={`relative cursor-pointer px-7 py-3 rounded-full z-10 flex items-center justify-center shrink-0 select-none outline-none transition-[background-color,color,transform] duration-300 ease-out ${
         focused
           ? "bg-white text-black scale-105"
           : isItemActive
@@ -227,7 +227,7 @@ export const FocusableNavLink = React.memo(({
       }`}
     >
       <span
-        className={`relative z-10 text-base sm:text-lg tracking-wide whitespace-nowrap transition-colors duration-300 ease-out ${
+        className={`relative z-10 text-2xl tracking-wide whitespace-nowrap transition-colors duration-300 ease-out ${
           focused
             ? "text-black font-extrabold"
             : isItemActive

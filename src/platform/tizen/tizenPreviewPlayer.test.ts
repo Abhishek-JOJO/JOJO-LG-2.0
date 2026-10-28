@@ -128,7 +128,9 @@ test("page goes see-through only once playback has advanced, and is restored on 
   avplay.listener.oncurrentplaytime?.(40);
   assert.equal(readyCount, 0, "the first report can precede the first visible frame");
   avplay.listener.oncurrentplaytime?.(300);
+  assert.equal(readyCount, 0, "260ms of clock is not yet proof of a picture");
   avplay.listener.oncurrentplaytime?.(600);
+  avplay.listener.oncurrentplaytime?.(900);
   assert.equal(readyCount, 1);
   for (const el of [targetEl, page, html]) assert.ok(el.classList.contains(PASSTHROUGH));
 
@@ -246,7 +248,8 @@ test("the page backdrop and ambient tint open only over the box, and close again
   avplay.finishPrepare();
   assert.equal(backdrop.style.clipPath ?? "", "", "opaque until frames show");
 
-  avplay.listener.oncurrentplaytime?.(300);
+  avplay.listener.oncurrentplaytime?.(0);
+  avplay.listener.oncurrentplaytime?.(500);
   assert.equal(
     backdrop.style.clipPath,
     "polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 40px 114px, 1880px 114px, 1880px 956px, 40px 956px, 40px 114px)",
@@ -267,10 +270,28 @@ test("scrolling stops the preview — the box has moved out from under the video
   let reason = "";
   startTizenPreview({ url: "https://cdn/p.m3u8", target, onStop: (r) => { reason = r; } });
   avplay.finishPrepare();
-  avplay.listener.oncurrentplaytime?.(300);
+  avplay.listener.oncurrentplaytime?.(0);
+  avplay.listener.oncurrentplaytime?.(500);
   fireWindow("scroll");
   assert.equal(reason, "superseded");
   assert.equal(avplay.calls.includes("close"), false, "native close deferred past the keypress");
   stopTizenPreview();
   assert.equal(avplay.calls.at(-1), "close");
+});
+
+test("a preview that is still buffering keeps its poster until buffering completes", () => {
+  const { avplay, page, target } = setup();
+  let ready = false;
+  startTizenPreview({ url: "https://cdn/p.m3u8", target, onReady: () => { ready = true; } });
+  avplay.finishPrepare();
+  avplay.listener.onbufferingstart?.();
+  avplay.listener.oncurrentplaytime?.(0);
+  avplay.listener.oncurrentplaytime?.(800);
+  assert.equal(ready, false, "clock reports during buffering are not a picture");
+  assert.equal(page.classList.contains(PASSTHROUGH), false);
+
+  avplay.listener.onbufferingcomplete?.();
+  avplay.listener.oncurrentplaytime?.(1300);
+  assert.equal(ready, true);
+  stopTizenPreview();
 });

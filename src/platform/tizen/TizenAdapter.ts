@@ -1,4 +1,4 @@
-import type { TVDeviceInfo, TVPlatformAdapter } from "../types";
+import type { TizenCurrentApplication, TVDeviceInfo, TVPlatformAdapter } from "../types";
 import { registerTizenKeys } from "./registerTizenKeys";
 
 export class TizenAdapter implements TVPlatformAdapter {
@@ -21,10 +21,18 @@ export class TizenAdapter implements TVPlatformAdapter {
 
   exitOrDeactivateApp(): void {
     if (typeof window === "undefined") return;
+    let app: TizenCurrentApplication | undefined;
     try {
-      window.tizen?.application?.getCurrentApplication().exit();
+      app = window.tizen?.application?.getCurrentApplication();
+      app?.exit();
     } catch (error) {
-      console.warn("[Tizen] Failed to exit application", error);
+      console.warn("[Tizen] Failed to exit application; hiding it instead", error);
+      // Never leave the user on the screen they just asked to exit.
+      try {
+        app?.hide?.();
+      } catch {
+        // Nothing further the web runtime allows.
+      }
     }
   }
 

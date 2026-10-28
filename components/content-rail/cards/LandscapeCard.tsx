@@ -65,7 +65,7 @@ export const LandscapeCard = React.memo(function LandscapeCard({
   const isTrailerActive = Boolean(railActive || forceFocusRing);
 
   const titleText = item?.title ? (
-    <h3 className="line-clamp-1 text-sm font-semibold text-white drop-shadow-md">
+    <h3 className="line-clamp-1 text-xl font-semibold text-white drop-shadow-md">
       {item.title}
     </h3>
   ) : null;
@@ -99,7 +99,7 @@ export const LandscapeCard = React.memo(function LandscapeCard({
             />
           ) : titleText}
           {item?.genres && item.genres.length > 0 && (
-            <p className="mt-0.5 line-clamp-1 text-xs text-white/70">
+            <p className="mt-0.5 line-clamp-1 text-base text-white/70">
               {item.genres.join(" • ")}
             </p>
           )}

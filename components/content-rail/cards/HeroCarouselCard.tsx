@@ -537,25 +537,25 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
 
         {/* Top Left Badge moved below title */}
         {item?.asset_tags_badgeText && item.asset_tags_badgeText.toLowerCase().includes("new") && (
-          <div className={`mb-4 inline-flex items-center bg-[#251307] px-4 py-1.5 rounded-full transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-150`}>
-            <span className="text-[#FF6A00] font-bold text-xs sm:text-sm tracking-wider uppercase">{item.asset_tags_badgeText}</span>
+          <div className={`mb-4 inline-flex items-center bg-[#251307] px-5 py-2 rounded-full transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-150`}>
+            <span className="text-[#FF6A00] font-bold text-lg tracking-wider uppercase">{item.asset_tags_badgeText}</span>
           </div>
         )}
 
         {/* Certificate, Year, Duration */}
         <div className={`mb-4 flex flex-wrap items-center gap-3 transition-all duration-700 transform ease-out ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} delay-200`}>
           {displayCertification && (
-            <span className="bg-white/20 text-neutral-100 font-semibold text-sm sm:text-base lg:text-xl px-4 py-1.5 rounded-full drop-shadow-md backdrop-blur-sm">
+            <span className="bg-white/20 text-neutral-100 font-semibold text-2xl px-5 py-2 rounded-full drop-shadow-md backdrop-blur-sm">
               {displayCertification}
             </span>
           )}
           {item?.year && (
-            <span className="bg-white/20 text-neutral-100 font-semibold text-sm sm:text-base lg:text-xl px-4 py-1.5 rounded-full drop-shadow-md backdrop-blur-sm">
+            <span className="bg-white/20 text-neutral-100 font-semibold text-2xl px-5 py-2 rounded-full drop-shadow-md backdrop-blur-sm">
               {item.year}
             </span>
           )}
           {displayDuration && (
-            <span className="bg-white/20 text-neutral-100 font-semibold text-sm sm:text-base lg:text-xl px-4 py-1.5 rounded-full drop-shadow-md backdrop-blur-sm">
+            <span className="bg-white/20 text-neutral-100 font-semibold text-2xl px-5 py-2 rounded-full drop-shadow-md backdrop-blur-sm">
               {displayDuration}
             </span>
           )}

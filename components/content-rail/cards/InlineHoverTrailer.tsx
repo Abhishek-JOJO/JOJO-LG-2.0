@@ -160,6 +160,13 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
     }
   }, [isMuted]);
 
+  // The poster stays up (with this loader over it) for the whole time the
+  // preview loads, and only fades once real frames are showing (videoReady).
+  // Not shown when no preview will start: Tizen keeps the poster for a muted
+  // user (AVPlay has no per-stream mute).
+  const isPreviewLoading =
+    shouldLoadVideo && !videoReady && !videoError && !(tizenPreviewEnabled && isMuted);
+
   const titleText = item?.title ? (
     <h3 className={`text-white font-extrabold line-clamp-1 drop-shadow-lg mb-2 text-left ${
       isLandscape ? "text-3xl" : "text-xl sm:text-2xl"
@@ -188,6 +195,12 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
         />
       )}
       
+      {isPreviewLoading && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none" aria-hidden="true">
+          <div className="w-12 h-12 rounded-full border-4 border-white/25 border-t-white animate-spin" />
+        </div>
+      )}
+
       {/* Shadow overlay for text */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 via-35% to-transparent pointer-events-none" />
       
@@ -216,7 +229,7 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
         ) : titleText}
         {item?.genres && item.genres.length > 0 && (
           <span className={`text-white/90 font-semibold truncate drop-shadow-md text-left transition-opacity duration-300 ${
-            isLandscape ? "text-base" : "text-sm sm:text-base"
+            isLandscape ? "text-2xl" : "text-base sm:text-lg"
           }`}>
             {item.genres.join(" • ")}
           </span>

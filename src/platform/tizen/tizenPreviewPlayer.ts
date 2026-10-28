@@ -29,10 +29,11 @@ export const TIZEN_VIDEO_FULLSCREEN_CLASS = "tizen-video-fullscreen";
 const BACKDROP_SELECTOR = "[data-tizen-video-backdrop]";
 // Until the stream reports its real size (after prepare), assume 16:9.
 const DEFAULT_VIDEO_ASPECT = 16 / 9;
-// AVPlay reports a play position slightly before the plane shows a frame;
-// going see-through on the very first report flashed the empty (black) plane
-// before the video appeared. Reveal once playback has visibly advanced.
-const REVEAL_AFTER_MS = 250;
+// AVPlay reports a play position before the plane shows a picture, and can do
+// so while still buffering; going see-through then showed a black card until
+// the picture caught up. Reveal only once the clock has genuinely run this far
+// across reports, with no buffering in progress.
+const REVEAL_AFTER_ADVANCE_MS = 400;
 // AVPlay's display rect is always in the TV's 1920x1080 logical space.
 const LOGICAL_WIDTH = 1920;
 const LOGICAL_HEIGHT = 1080;
@@ -63,6 +64,9 @@ interface Session {
   passthrough: HTMLElement[];
   ready: boolean;
   videoAspect: number;
+  /** Position of the first time report, the baseline for REVEAL_AFTER_ADVANCE_MS. */
+  firstReportMs: number | null;
+  buffering: boolean;
 }
 
 let current: Session | null = null;
@@ -275,7 +279,15 @@ export function startTizenPreview(options: TizenPreviewOptions): TizenPreviewHan
   });
   options.target.prepend(objectEl);
 
-  const session: Session = { options, objectEl, passthrough: [], ready: false, videoAspect: DEFAULT_VIDEO_ASPECT };
+  const session: Session = {
+    options,
+    objectEl,
+    passthrough: [],
+    ready: false,
+    videoAspect: DEFAULT_VIDEO_ASPECT,
+    firstReportMs: null,
+    buffering: false,
+  };
   current = session;
   const isCurrent = () => current === session;
   const fail = () => {
@@ -287,10 +299,17 @@ export function startTizenPreview(options: TizenPreviewOptions): TizenPreviewHan
   try {
     avplay.open(options.url);
     avplay.setListener({
+      onbufferingstart: () => {
+        if (isCurrent()) session.buffering = true;
+      },
+      onbufferingcomplete: () => {
+        if (isCurrent()) session.buffering = false;
+      },
       oncurrentplaytime: (milliseconds) => {
         if (!isCurrent()) return;
         if (!session.ready) {
-          if (milliseconds < REVEAL_AFTER_MS) return;
+          if (session.firstReportMs === null) session.firstReportMs = milliseconds;
+          if (session.buffering || milliseconds - session.firstReportMs < REVEAL_AFTER_ADVANCE_MS) return;
           // Only now drop the artwork: the plane is showing real frames.
           session.ready = true;
           applyPassthrough(session);

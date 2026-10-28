@@ -215,7 +215,7 @@ export const PortraitCard = React.memo(function PortraitCard({
   const imageUrl = getPortraitCardImageUrl(item, portraitFallbackList);
 
   const titleText = (
-    <h3 className="line-clamp-1 text-xs sm:text-sm font-semibold text-white drop-shadow-md text-center px-1">
+    <h3 className="line-clamp-1 text-lg font-semibold text-white drop-shadow-md text-center px-1">
       {item?.title}
     </h3>
   );

@@ -34,6 +34,14 @@ import { QrPairingPanel } from "./components/QrPairingPanel";
 import { AccountNotFoundModal } from "./components/AccountNotFoundModal";
 
 import { TvKeyboard } from "@/components/search/TvKeyboard";
+import { isBackEvent } from "@/src/platform";
+import {
+  focusLoginInput,
+  placeCaretInLoginInput,
+  TIZEN_IME_CANCEL_KEY_CODE,
+  TIZEN_IME_DONE_KEY_CODE,
+  usesNativeLoginKeyboard,
+} from "./loginInputFocus";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useProfileStore } from "@/store/useProfileStore";
@@ -73,6 +81,8 @@ function LoginPageContent() {
   const { data: countries, isLoading: countriesLoading, error: countriesError } = useCountries();
   const { isAvailable, countryCode: geoCountryCode } = useGeoAvailability();
   const setAuthContext = useOtpStore(state => state.setAuthContext);
+  // Samsung: the TV's own keyboard instead of the custom TvKeyboard below.
+  const nativeKeyboard = usesNativeLoginKeyboard();
   const clearSelectedProfile = useProfileStore(state => state.clearSelectedProfile);
   const { isAppReady } = useBootstrap();
   const sessionId = useAuthStore(state => state.token);
@@ -103,15 +113,7 @@ function LoginPageContent() {
 
   const handleCloseNotFoundModal = useCallback(() => {
     setIsNotFoundModalOpen(false);
-    setTimeout(() => {
-      setFocus('login-input');
-      const el = document.getElementById("login-input-field") as HTMLInputElement | null;
-      if (el) {
-        el.focus();
-        const len = el.value.length;
-        el.setSelectionRange(len, len);
-      }
-    }, 150);
+    setTimeout(focusLoginInput, 150);
   }, []);
 
   const handleTvKeyPress = useCallback((char: string) => {
@@ -150,12 +152,10 @@ function LoginPageContent() {
     focusable: !isNotFoundModalOpen,
     onEnterPress: () => {
       // Trigger native keyboard / focus
-      const el = document.getElementById("login-input-field") as HTMLInputElement | null;
-      if (el) {
-        el.focus();
-        const len = el.value.length;
-        el.setSelectionRange(len, len);
-      }
+      placeCaretInLoginInput();
+      // Samsung: OK on the field only opens the TV keyboard; Next submits.
+      // Submitting here would send a pre-filled value the user meant to edit.
+      if (nativeKeyboard) return;
       if (canSubmit && !initiateOtp.isPending && !checkUserExists.isPending) {
         const form = document.getElementById("login-form") as HTMLFormElement;
         if (form) {
@@ -216,9 +216,7 @@ function LoginPageContent() {
     // Set initial focus on mount
     const timer = setTimeout(() => {
       if (mode === "remote") {
-        setFocus('login-input');
-        const el = document.getElementById("login-input-field");
-        if (el) el.focus();
+        focusLoginInput();
       } else {
         setFocus('login-mode-phone');
       }
@@ -401,6 +399,26 @@ function LoginPageContent() {
   };
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (nativeKeyboard) {
+      const keyCode = e.nativeEvent.keyCode;
+      // The TV keyboard closed: Done moves on to Next (once the value is
+      // valid), Cancel stays on the field. Blurring runs validation (onBlur).
+      if (keyCode === TIZEN_IME_DONE_KEY_CODE || keyCode === TIZEN_IME_CANCEL_KEY_CODE) {
+        e.preventDefault();
+        (e.target as HTMLElement)?.blur();
+        setFocus(keyCode === TIZEN_IME_DONE_KEY_CODE && canSubmit ? "login-submit" : "login-input");
+        return;
+      }
+      // Back while typing only closes the keyboard. Handled (preventDefault)
+      // here, before RemoteManager's window listener, which would otherwise
+      // treat it as Back on a root screen and open the exit popup.
+      if (isBackEvent(e.nativeEvent)) {
+        e.preventDefault();
+        (e.target as HTMLElement)?.blur();
+        setFocus("login-input");
+        return;
+      }
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       (e.target as HTMLElement)?.blur();
@@ -678,19 +696,24 @@ function LoginPageContent() {
                 </p>
               </div>
 
-              {/* On-screen TV Keyboard for remote & simulator input */}
-              <div className="w-full">
-                <TvKeyboard
-                  keyPrefix="login-tv-key"
-                  rows={LOGIN_KEYBOARD_ROWS}
-                  onKeyPress={handleTvKeyPress}
-                  onBackspace={handleTvBackspace}
-                  onClear={handleTvClear}
-                  onTopEdge={() => setFocus('login-input')}
-                  onBottomEdge={() => setFocus('login-submit')}
-                  className="bg-black/50 border-white/10 backdrop-blur-md scale-95 origin-top"
-                />
-              </div>
+              {/* On-screen TV Keyboard for remote & simulator input. Samsung
+                  types with the TV's own keyboard instead (OK on the field
+                  opens it), so without this the field moves straight on to
+                  Next — the arrow handlers above fall through to it. */}
+              {!nativeKeyboard && (
+                <div className="w-full">
+                  <TvKeyboard
+                    keyPrefix="login-tv-key"
+                    rows={LOGIN_KEYBOARD_ROWS}
+                    onKeyPress={handleTvKeyPress}
+                    onBackspace={handleTvBackspace}
+                    onClear={handleTvClear}
+                    onTopEdge={() => setFocus('login-input')}
+                    onBottomEdge={() => setFocus('login-submit')}
+                    className="bg-black/50 border-white/10 backdrop-blur-md scale-95 origin-top"
+                  />
+                </div>
+              )}
 
               <div
                 ref={submitRef as any}

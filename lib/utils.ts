@@ -140,6 +140,11 @@ export const handleLoginKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => 
   if (allowedControlKeys.includes(e.key)) return;
   // Allow copy, paste, select all, cut
   if (e.ctrlKey || e.metaKey) return;
+  // A TV's own on-screen keyboard delivers characters as IME input (key
+  // "Unidentified"/"Process", keyCode 229), not as the character itself, so
+  // they can't be checked here — blocking them blocked all typing. onChange
+  // sanitises whatever arrives.
+  if (e.key === "Unidentified" || e.key === "Process" || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
 
   // Block special characters from keyboard typing
   if (!REGEX.ALLOW_LOGIN_KEY.test(e.key)) {

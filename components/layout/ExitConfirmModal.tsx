@@ -48,6 +48,24 @@ export function ExitConfirmModal() {
     }
   }, [isOpen]);
 
+  // Never come back to an exit prompt. Samsung's long-press Back (its exit
+  // gesture) and the Home key take the app out of the foreground with
+  // whatever is on screen — and the first Back of a long press has already
+  // opened this popup — so reopening the app resumed straight into it.
+  // Leaving the foreground, by any route, closes it.
+  useEffect(() => {
+    if (!isOpen) return;
+    const closeWhenHidden = () => {
+      if (document.hidden) close();
+    };
+    document.addEventListener("visibilitychange", closeWhenHidden);
+    window.addEventListener("pagehide", close);
+    return () => {
+      document.removeEventListener("visibilitychange", closeWhenHidden);
+      window.removeEventListener("pagehide", close);
+    };
+  }, [isOpen, close]);
+
   // webOS's home screen shows a cached screenshot of this app's last-painted
   // frame as a placeholder while the real webview resumes from PalmSystem's
   // deactivate() — it isn't reading our live DOM at that moment, it's reading

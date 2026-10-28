@@ -43,8 +43,14 @@ export interface TizenApplicationControlConstructor {
   new (operation: string, uri?: string): TizenApplicationControlInstance;
 }
 
+export interface TizenCurrentApplication {
+  exit(): void;
+  /** Sends the app to the background instead of ending it. */
+  hide?(): void;
+}
+
 export interface TizenApplicationManager {
-  getCurrentApplication(): { exit(): void };
+  getCurrentApplication(): TizenCurrentApplication;
   launchAppControl?(
     control: TizenApplicationControlInstance,
     applicationId?: string | null,

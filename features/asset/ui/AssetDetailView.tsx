@@ -1854,22 +1854,22 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         {isStandalone && hasAnyTab && (
           <div className={`absolute left-6 sm:left-10 lg:left-16 bottom-8 sm:bottom-10 z-20 flex flex-row items-center gap-8 sm:gap-12 pointer-events-none transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
             {hasEpisodesTab && (
-              <span className="text-base sm:text-lg lg:text-xl font-medium text-white/70 tracking-wide">
+              <span className="text-2xl font-medium text-white/70 tracking-wide">
                 {t("episodes")}
               </span>
             )}
             {hasTrailersTab && (
-              <span className="text-base sm:text-lg lg:text-xl font-medium text-white/70 tracking-wide">
+              <span className="text-2xl font-medium text-white/70 tracking-wide">
                 {t("trailers")}
               </span>
             )}
             {hasCastTab && (
-              <span className="text-base sm:text-lg lg:text-xl font-medium text-white/70 tracking-wide">
+              <span className="text-2xl font-medium text-white/70 tracking-wide">
                 {t("cast_crew")}
               </span>
             )}
             {hasMoreLikeThisTab && (
-              <span className="text-base sm:text-lg lg:text-xl font-medium text-white/70 tracking-wide">
+              <span className="text-2xl font-medium text-white/70 tracking-wide">
                 {t("more_like_this")}
               </span>
             )}
@@ -1889,27 +1889,27 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           <div className="flex items-center gap-2 flex-wrap">
             {/* Show the "New" tag only when this is NOT a Coming Soon asset */}
             {!isComingSoon && asset.asset_tags_badgeText && asset.asset_tags_badgeText.toLowerCase().includes("new") && (
-              <span className="px-3 py-1 rounded-full bg-white/15 text-white text-xs font-bold uppercase tracking-wider">
+              <span className="px-4 py-1.5 rounded-full bg-white/15 text-white text-base font-bold uppercase tracking-wider">
                 {asset.asset_tags_badgeText}
               </span>
             )}
             {isHomePage && asset.isInTop10 && (
-              <span className="px-3.5 py-1 rounded-full bg-[#FF8800]/15 border border-[#FF8800]/40 text-[#FF8800] text-xs font-bold uppercase tracking-wider">
+              <span className="px-4 py-1.5 rounded-full bg-[#FF8800]/15 border border-[#FF8800]/40 text-[#FF8800] text-base font-bold uppercase tracking-wider">
                 {t("top", { rank: asset?.numberintop10 || 10 })}
               </span>
             )}
             {asset.certification && (
-              <span className="px-3.5 py-1 rounded-full bg-white/10 text-white/90 border border-white/15 text-xs font-semibold uppercase tracking-wide">
+              <span className="px-4 py-1.5 rounded-full bg-white/10 text-white/90 border border-white/15 text-base font-semibold uppercase tracking-wide">
                 {asset.certification}
               </span>
             )}
             {(asset.releaseDate || asset.release_date || asset.asset_release_date) && (
-              <span className="px-3.5 py-1 rounded-full bg-white/10 text-white/90 border border-white/15 text-xs font-semibold uppercase tracking-wide">
+              <span className="px-4 py-1.5 rounded-full bg-white/10 text-white/90 border border-white/15 text-base font-semibold uppercase tracking-wide">
                 {(asset.releaseDate || asset.release_date || asset.asset_release_date).split('-')[0]}
               </span>
             )}
             {(isShow ? (asset.seasons?.length || 0) > 0 : !!asset.durationSeconds) && (
-              <span className="px-3.5 py-1 rounded-full bg-white/10 text-white/90 border border-white/15 text-xs font-semibold uppercase tracking-wide">
+              <span className="px-4 py-1.5 rounded-full bg-white/10 text-white/90 border border-white/15 text-base font-semibold uppercase tracking-wide">
                 {isShow
                   ? `${asset.seasons?.length || 1} Season${(asset.seasons?.length || 1) > 1 ? "s" : ""}`
                   : asset.durationSeconds
@@ -1921,7 +1921,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
           {/* Genre Line */}
           {asset.genres && asset.genres.length > 0 && (
-            <div className="flex flex-wrap items-center text-sm sm:text-base font-bold text-white tracking-wide mt-0.5">
+            <div className="flex flex-wrap items-center text-xl font-bold text-white tracking-wide mt-0.5">
               {asset.genres.map((genre: string, i: number) => (
                 <span key={i} className="flex items-center">
                   {i > 0 && <span className="mx-2 text-white/40 font-normal">•</span>}
@@ -1932,7 +1932,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           )}
 
           {/* Description Paragraph */}
-          <div className="text-sm sm:text-base leading-relaxed text-white/80 max-w-[640px] font-normal line-clamp-3 sm:line-clamp-4 mt-0.5">
+          <div className="text-[22px] leading-relaxed text-white/80 max-w-[760px] font-normal line-clamp-3 sm:line-clamp-4 mt-0.5">
             {asset.description ? (
               <div
                 className="[&>p]:mb-2 [&>p:last-child]:mb-0 [&_*]:!text-white/80"
@@ -1948,7 +1948,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         {asset?.assetCategoryCode === ASSET_CATEGORY_CODE.TVOD && (
           <div className="flex items-center gap-2 px-1 overflow-hidden mt-0.5">
             <TvodIcon
-              size={15}
+              size={20}
               className="shrink-0"
               style={{
                 animation: tvodAnimate
@@ -1958,7 +1958,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
               }}
             />
             <span
-              className="text-[13px] font-semibold text-theme_1 leading-none whitespace-nowrap overflow-hidden"
+              className="text-lg font-semibold text-theme_1 leading-none whitespace-nowrap overflow-hidden"
               style={{
                 animation: tvodAnimate
                   ? "tvodTextReveal 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both"
@@ -1975,11 +1975,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         <div className="flex items-center justify-start gap-4 sm:gap-5 w-full mt-2">
           {/* Primary Play/Rent CTA */}
           {isComingSoon ? (
-            <span className="text-sm sm:text-base font-bold text-white select-none">
+            <span className="text-xl font-bold text-white select-none">
               Coming Soon
             </span>
           ) : isAuthLoading ? (
-            <div className="h-10 sm:h-12 w-32 sm:w-44 bg-neutral-800 rounded-full animate-pulse shrink-0" />
+            <div className="h-14 w-52 bg-neutral-800 rounded-full animate-pulse shrink-0" />
           ) : (
             <div
               ref={watchNowRef as any}
@@ -1995,9 +1995,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 size={JOJOButton.Size.M}
                 appearance={buttonConfig.appearance}
                 disabled={buttonConfig.disabled || isPreparingPlayback}
-                leftIcon={isPreparingPlayback ? <Loader size="sm" /> : buttonConfig.showIcon ? <Play className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" fill="currentColor" /> : undefined}
+                leftIcon={isPreparingPlayback ? <Loader size="sm" /> : buttonConfig.showIcon ? <Play className="w-7 h-7 shrink-0" fill="currentColor" /> : undefined}
                 onClick={handleWatchNow}
-                className="text-theme_1 !text-sm sm:!text-base sm:body-sm-medium font-bold gap-2 sm:gap-2.5 h-10 sm:h-12 px-5 sm:px-8 transition-all !rounded-full shrink-0"
+                className="text-theme_1 !text-xl font-bold gap-3 h-14 px-10 transition-all !rounded-full shrink-0"
               >
                 {(() => {
                   const text = isPreparingPlayback ? "Loading..." : buttonConfig.text;
@@ -2021,7 +2021,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
           <div className="flex items-center gap-3 sm:gap-4">
             {isAuthLoading ? (
-              <div className="h-10 w-10 sm:h-12 sm:w-12 bg-neutral-800 rounded-full animate-pulse shrink-0" />
+              <div className="h-14 w-14 bg-neutral-800 rounded-full animate-pulse shrink-0" />
             ) : (
               <>
                 {/* Add to list */}
@@ -2046,14 +2046,14 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                       description: asset.description,
                     } : undefined);
                   }}
-                  className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 outline-none ${
+                  className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 outline-none ${
                     watchlistFocused
                       ? "bg-white text-black border-white scale-105 z-50"
                       : "bg-white/10 text-white/90 border-white/20 hover:bg-white/20 hover:text-white"
                   }`}
                   title={t("add_to_watchlist")}
                 >
-                  {inWatchlist ? <Check size={20} className="text-theme_13_samecolour" /> : <Plus size={20} />}
+                  {inWatchlist ? <Check size={28} className="text-theme_13_samecolour" /> : <Plus size={28} />}
                 </button>
               </>
             )}
@@ -2268,7 +2268,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                           )}
                         </div>
                       ) : (
-                        <div className="text-center py-10 text-neutral-500 text-sm">
+                        <div className="text-center py-10 text-neutral-500 text-xl">
                           {t("no_episodes_found")}
                         </div>
                       )}
@@ -2292,7 +2292,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-12 text-neutral-400 text-sm border border-white/5 rounded-2xl bg-white/[0.02] mb-4">
+                      <div className="text-center py-12 text-neutral-400 text-xl border border-white/5 rounded-2xl bg-white/[0.02] mb-4">
                         {t("no_trailers_found")}
                       </div>
                     )}
@@ -2541,13 +2541,13 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
       {/* Episode Details — no focus highlight, stays neutral */}
       <div className="flex flex-col flex-1 justify-center min-w-0">
         <h4
-          className={`text-base sm:text-lg lg:text-xl font-bold line-clamp-1 mb-1 transition-colors duration-150 ${
+          className={`text-2xl font-bold line-clamp-1 mb-1.5 transition-colors duration-150 ${
             focused ? "text-theme_13_samecolour" : "text-white group-hover:text-theme_13_samecolour"
           }`}
         >
           {ep.title}
         </h4>
-        <div className="text-xs sm:text-sm font-semibold text-neutral-400 mb-2 flex items-center gap-2">
+        <div className="text-lg font-semibold text-neutral-400 mb-2 flex items-center gap-2">
           <span>S{selectedSeasonIndex + 1} EP{ep.episodeNumber || index + 1}</span>
           {durationText && (
             <>
@@ -2556,7 +2556,7 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
             </>
           )}
         </div>
-        <p className="text-xs sm:text-sm leading-relaxed line-clamp-2 sm:line-clamp-3 text-neutral-400">
+        <p className="text-lg leading-relaxed line-clamp-2 text-neutral-400">
           {stripHtml(ep.description) || t("no_description_episode")}
         </p>
       </div>
@@ -2687,7 +2687,7 @@ function FocusableCastItem({
       </div>
       {/* Name */}
       <span
-        className={`text-sm sm:text-base font-bold line-clamp-2 leading-tight w-full transition-colors min-h-[2.5rem] flex items-center justify-center ${
+        className={`text-xl font-bold line-clamp-2 leading-tight w-full transition-colors min-h-[3.25rem] flex items-center justify-center ${
           focused ? "text-theme_13_samecolour" : "text-white group-hover:text-theme_13_samecolour"
         }`}
       >
@@ -2695,7 +2695,7 @@ function FocusableCastItem({
       </span>
       {/* Role */}
       {cleanCastRole(cast.role) ? (
-        <span className="text-xs sm:text-sm text-neutral-400 line-clamp-1 leading-tight w-full mt-1">
+        <span className="text-base text-neutral-400 line-clamp-1 leading-tight w-full mt-1">
           {cleanCastRole(cast.role)}
         </span>
       ) : null}
@@ -2749,11 +2749,11 @@ function FocusableTrailerItem({ trailer, idx, asset, onWatch }: any) {
         </div>
       </div>
       <div className="flex flex-col">
-        <h4 className={`text-sm sm:text-base font-bold line-clamp-1 transition-colors ${focused ? "text-theme_13_samecolour" : "text-white group-hover:text-theme_13_samecolour"}`}>
+        <h4 className={`text-xl font-bold line-clamp-1 transition-colors ${focused ? "text-theme_13_samecolour" : "text-white group-hover:text-theme_13_samecolour"}`}>
           {trailerTitle}
         </h4>
         {duration > 0 && (
-          <span className="text-xs text-neutral-400 mt-0.5">
+          <span className="text-base text-neutral-400 mt-0.5">
             {Math.round(duration / 60)} min
           </span>
         )}
@@ -2956,7 +2956,7 @@ function FocusableTabButton({
       data-focuskey={focusKeyPrefix}
       data-focused={focused ? "true" : "false"}
       onClick={handleActivate}
-      className={`relative flex flex-col items-center justify-center py-2 px-3 text-base sm:text-lg lg:text-xl font-semibold transition-all outline-none shrink-0 cursor-pointer select-none ${
+      className={`relative flex flex-col items-center justify-center py-2 px-3 text-2xl font-semibold transition-all outline-none shrink-0 cursor-pointer select-none ${
         isActive
           ? "text-theme_13_samecolour"
           : focused
@@ -3044,10 +3044,10 @@ function FocusableSeasonListItem({ idx, isSelected, label, subtitle, onClick, se
             : "bg-white/10 text-white/80 font-semibold border-transparent hover:bg-white/15"
       }`}
     >
-      <span className="text-sm sm:text-base truncate">{label}</span>
+      <span className="text-xl truncate">{label}</span>
       {subtitle && (
         <span
-          className={`text-xs sm:text-sm font-medium shrink-0 ${
+          className={`text-base font-medium shrink-0 ${
             focused && isSelected
               ? "text-neutral-700"
               : isSelected
@@ -3125,12 +3125,12 @@ function FocusableRelatedItem({ item, idx, id, title, img, assetType, isFallback
           />
         </div>
       ) : (
-        <div className="w-full h-full flex items-center justify-center p-2 text-center text-sm text-neutral-500 bg-neutral-900">
+        <div className="w-full h-full flex items-center justify-center p-2 text-center text-lg text-neutral-500 bg-neutral-900">
           {title}
         </div>
       )}
       <div className={`absolute inset-0 z-20 bg-gradient-to-t from-black/80 via-transparent to-transparent transition-opacity duration-300 flex items-end p-4 ${focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-        <span className={`text-sm sm:text-base font-semibold truncate w-full ${focused ? "text-theme_13_samecolour" : "text-white"}`}>{title}</span>
+        <span className={`text-xl font-semibold truncate w-full ${focused ? "text-theme_13_samecolour" : "text-white"}`}>{title}</span>
       </div>
       {/* TV Focus Ring: clean solid white border matching BaseContentCard */}
       {focused && (
