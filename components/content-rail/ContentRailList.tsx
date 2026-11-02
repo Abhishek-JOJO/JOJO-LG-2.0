@@ -4,6 +4,7 @@ import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
 import { useDragScroll } from "@/hooks/useDragScroll";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { appConfig } from "@/lib/config/app.config";
+import { titleArtURL } from "@/lib/config/imageRequest.config";
 import { minSwipeDistance, THUMB_CONFIG } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -212,7 +213,12 @@ export function ContentRailList({
   const { isDragging } = useDragScroll(listRef);
   const isAnyCardHovered = usePlayerStore((s) => s.isAnyCardHovered);
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
-  const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
+  // Only the spotlight (first content) rail and the hero rail act on these;
+  // the other rails select a constant so opening/closing asset detail doesn't
+  // re-render them.
+  const isAssetDetailOpen = useAssetDetailStore(
+    (s) => (Boolean(isFirstContentRail) || config?.variant === RailCardVariant.HERO) && s.isOpen
+  );
 
   // Hoisted above the isHeroVariant/isExpanded early-returns below (a hook
   // can't be called conditionally) and memoized so every card downstream
@@ -368,7 +374,7 @@ export function ContentRailList({
     });
   }, [items]);
 
-  const returnAssetId = useAssetDetailStore((s) => s.returnAssetId);
+  const returnAssetId = useAssetDetailStore((s) => (isFirstContentRail ? s.returnAssetId : null));
 
   // Reset spotlightIndex synchronously when the rail's items change (e.g. switching
   // rails on ArrowUp/Down). If returning to a specific asset, prioritize its index.
@@ -392,11 +398,19 @@ export function ContentRailList({
     }
   }, [isSpotlightRail, isAssetDetailOpen, returnAssetId, items, spotlightIndex]);
 
+  // Spotlight slots swap items in place; the row itself never scrolls. Undo a
+  // scroll (e.g. a focus scrollIntoView) only when one happens — writing
+  // scrollLeft on every step forced a synchronous layout (~18ms per key on Tizen).
   useEffect(() => {
-    if (isSpotlightRail && listRef?.current) {
-      listRef.current.scrollLeft = 0;
-    }
-  }, [isSpotlightRail, spotlightIndex, listRef]);
+    const list = listRef?.current;
+    if (!isSpotlightRail || !list) return;
+    const reset = () => {
+      if (list.scrollLeft !== 0) list.scrollLeft = 0;
+    };
+    reset();
+    list.addEventListener("scroll", reset, { passive: true });
+    return () => list.removeEventListener("scroll", reset);
+  }, [isSpotlightRail, listRef]);
 
   // On TV the visible cards load their own images. Do not compete with a new
   // tab's hero/API by decoding 12 cards' three image variants on every mount.
@@ -410,8 +424,8 @@ export function ContentRailList({
     if (!isSpotlightRail || !railActive || !items?.length) return;
     const count = Math.min(items.length, isTizenRuntime ? 3 : 16);
     for (let i = 0; i < count; i++) {
-      // Original URL: title art is never CDN-resized (see TitleLogoImage).
-      preloadImageUrl(items[i]?.title_image);
+      // Same URL TitleLogoImage renders.
+      preloadImageUrl(titleArtURL(items[i]?.title_image));
     }
   }, [isSpotlightRail, railActive, items, isTizenRuntime]);
 
@@ -422,7 +436,7 @@ export function ContentRailList({
     const si = spotlightIndex;
     const len = items.length;
     const lookaheadIndices = isTizenRuntime
-      ? [(si + 1) % len, (si - 1 + len) % len]
+      ? [(si + 1) % len, (si + 2) % len, (si + 3) % len, (si - 1 + len) % len]
       : [
           (si + 1) % len,
           (si + 2) % len,
@@ -440,6 +454,15 @@ export function ContentRailList({
     // its portrait-size poster — warm it so that slot doesn't flash dark.
     if (isTizenRuntime) {
       preloadRailItemImages(items[si], { lead: false, portrait: true });
+      // Each Right press slides a portrait in from the off-screen slot 4. A
+      // held Right (a step every ~150ms) outran a short lookahead on a slow
+      // connection (~1s per poster) and slid cards in still empty. Warm the
+      // next 8 beyond it (~40KB each at the Tizen image quality); these are
+      // low priority, so the on-screen cards still load first. Already
+      // preloaded URLs are skipped.
+      for (let ahead = 5; ahead <= 12; ahead++) {
+        preloadRailItemImages(items[(si + ahead) % len], { lead: false, portrait: true });
+      }
     }
   }, [isSpotlightRail, items, spotlightIndex, isTvFileRuntime, railActive, isTizenRuntime]);
 

@@ -190,11 +190,13 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
   // Tizen: the asset-detail modal fully covers everything below it, but its
   // AVPlay preview needs every layer above the hardware video plane to be
   // see-through — the browse page (or search) underneath would otherwise
-  // paint over the video. visibility (not display) keeps their layout,
-  // scroll position and focus targets intact for the return, and spares the
-  // TV rastering a page nobody can see.
+  // paint over the video. opacity (not display) keeps their layout, scroll
+  // position and focus targets intact for the return. Not visibility: it is
+  // inherited, and flipping it restyled the whole page — 116-150ms on every
+  // open and close on a Tizen 8 TV, vs 2-4ms for opacity (no pointer on Tizen,
+  // so the invisible page can't be clicked).
   const hideUnderAssetDetail = isTizen() && isAssetDetailOpen;
-  const underAssetDetailStyle = hideUnderAssetDetail ? { visibility: "hidden" as const } : undefined;
+  const underAssetDetailStyle = hideUnderAssetDetail ? { opacity: 0 } : undefined;
 
   let mainClassName = "min-h-screen flex flex-col max-lg:pb-20";
   if (isMobileLegalPage) {

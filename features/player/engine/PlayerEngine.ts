@@ -115,9 +115,9 @@ export class PlayerEngine {
     this.adapter?.pause();
   }
 
-  seek(seconds: number): void {
+  seek(seconds: number, options?: { immediate?: boolean }): void {
     const from = this.getCurrentTime();
-    this.adapter?.seek(seconds);
+    this.adapter?.seek(seconds, options);
     this.eventBus.emit('SEEK', { from, to: seconds });
   }
 

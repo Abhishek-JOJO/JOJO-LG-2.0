@@ -27,12 +27,21 @@ const TIZEN_LOGICAL_WIDTH = 1920;
 const TIZEN_LOGICAL_HEIGHT = 1080;
 // Long enough for a slow manifest + DRM license; past it, prepareAsync is
 // treated as never reporting back (see load()).
-const PREPARE_ASYNC_TIMEOUT_MS = 10000;
+// Measured on a slow connection: prepareAsync took longer than the old 10s,
+// the fallback then froze the page for 25s in a synchronous prepare() and
+// restarted the download. Buffering events restart the countdown, so only a
+// prepare that shows no activity at all for this long falls back.
+const PREPARE_ASYNC_TIMEOUT_MS = 30000;
 // Time updates reach the UI at the HTML5 timeupdate cadence (~4/s); more
 // often only re-renders the whole player for no visible gain.
 const TIME_UPDATE_INTERVAL_MS = 250;
 // A seekTo whose callbacks never arrive must not block every later seek.
 const SEEK_SETTLE_TIMEOUT_MS = 5000;
+// seekTo/jumpForward block the page for 0.4-4.7s on a Tizen 8 TV (measured;
+// it waits on the fetch at the new position). A burst of FF/RW presses lands
+// as one native seek to the newest target once the presses pause this long
+// (a press can take ~0.4s to process on the TV, so shorter split bursts).
+const SEEK_COALESCE_MS = 500;
 
 class PrepareTimeoutError extends Error {
   constructor() {
@@ -95,6 +104,14 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
   private seekInFlight = false;
   private queuedSeekMs: number | null = null;
   private seekSettleTimer: ReturnType<typeof setTimeout> | null = null;
+  private seekCoalesceTimer: ReturnType<typeof setTimeout> | null = null;
+  private playbackSpeed: PlaybackSpeed = 1;
+  /** Last native buffering event: a prepare still making progress isn't timed out. */
+  private nativeActivityAt = 0;
+  /** A seek is waiting to run or running: the native clock still reads the pre-seek position. */
+  private get seeking(): boolean {
+    return this.seekInFlight || this.seekCoalesceTimer !== null;
+  }
   private lastTimeUpdateAt = 0;
   /** suspend() was called for the app going to the background; restore() on return. */
   private suspendedForBackground = false;
@@ -195,6 +212,8 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
       this.syncSelectedTracks();
       this.handlers?.onDurationChange(this.durationSeconds);
 
+      // Not seekTo before prepare: faster when it works, but on a Tizen 8 TV
+      // prepareAsync then failed to report back in 2 of 4 tries (up to 23s).
       const startTime = options?.startTime ?? 0;
       if (startTime > 0) this.seek(startTime);
 
@@ -237,7 +256,7 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     }
   }
 
-  seek(seconds: number): void {
+  seek(seconds: number, options?: { immediate?: boolean }): void {
     if (!this.avplay || !Number.isFinite(seconds) || seconds < 0) return;
     const target = this.durationSeconds > 0
       ? Math.min(seconds, Math.max(0, this.durationSeconds - 0.1))
@@ -261,7 +280,20 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
       this.queuedSeekMs = targetMs;
       return;
     }
-    this.runSeek(targetMs);
+    // Before playback reports (load-time resume, the resume prompt, start
+    // over) the seek must land before the play() that follows it.
+    if (this.lastTimeUpdateAt === 0 || options?.immediate) {
+      this.runSeek(targetMs);
+      return;
+    }
+    this.queuedSeekMs = targetMs;
+    if (this.seekCoalesceTimer) clearTimeout(this.seekCoalesceTimer);
+    this.seekCoalesceTimer = setTimeout(() => {
+      this.seekCoalesceTimer = null;
+      const next = this.queuedSeekMs;
+      this.queuedSeekMs = null;
+      if (next !== null) this.runSeek(next);
+    }, SEEK_COALESCE_MS);
   }
 
   private runSeek(targetMs: number): void {
@@ -356,8 +388,13 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     if (!this.avplay?.setSpeed || !TIZEN_AVPLAY_CAPABILITIES.playbackSpeeds.includes(speed)) {
       return false;
     }
+    // A new session already plays at 1x. The player re-applies the saved
+    // speed on every start, and that native call blocked ~4s on a Tizen 8 TV
+    // right before play().
+    if (speed === this.playbackSpeed) return true;
     try {
       this.avplay.setSpeed(speed);
+      this.playbackSpeed = speed;
       return true;
     } catch (error) {
       logger.warn('[TizenAVPlayAdapter] Playback speed is unsupported on this TV', { speed, error });
@@ -397,7 +434,7 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
 
   getCurrentTime(): number {
     // Mid-seek the native clock still reads the pre-seek position.
-    if (!this.avplay || this.seekInFlight) return this.currentTimeSeconds;
+    if (!this.avplay || this.seeking) return this.currentTimeSeconds;
     try {
       const state = this.avplay.getState();
       if (state !== 'NONE' && state !== 'IDLE') {
@@ -438,6 +475,8 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     if (this.seekSettleTimer) clearTimeout(this.seekSettleTimer);
     this.seekSettleTimer = null;
+    if (this.seekCoalesceTimer) clearTimeout(this.seekCoalesceTimer);
+    this.seekCoalesceTimer = null;
     this.seekInFlight = false;
     this.queuedSeekMs = null;
     this.suspendedForBackground = false;
@@ -454,12 +493,8 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     this.changedTvMute = false;
 
     if (this.avplay) {
-      try {
-        const state = this.avplay.getState();
-        if (state === 'PLAYING' || state === 'PAUSED' || state === 'READY') this.avplay.stop();
-      } catch (error) {
-        logger.warn('[TizenAVPlayAdapter] AVPlay stop failed during cleanup', { error });
-      }
+      // close() stops playback itself. A separate stop() first measured
+      // 0.7-1.2s of extra blocking on a Tizen 8 TV — on every exit from the player.
       try {
         if (this.avplay.getState() !== 'NONE') this.avplay.close();
       } catch (error) {
@@ -540,7 +575,13 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
 
   private prepareAsync(avplay: SamsungAVPlay): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const prepareTimeout = setTimeout(() => reject(new PrepareTimeoutError()), PREPARE_ASYNC_TIMEOUT_MS);
+      this.nativeActivityAt = Date.now();
+      const check = () => {
+        const idleMs = Date.now() - this.nativeActivityAt;
+        if (idleMs >= PREPARE_ASYNC_TIMEOUT_MS) reject(new PrepareTimeoutError());
+        else prepareTimeout = setTimeout(check, PREPARE_ASYNC_TIMEOUT_MS - idleMs);
+      };
+      let prepareTimeout = setTimeout(check, PREPARE_ASYNC_TIMEOUT_MS);
       avplay.prepareAsync(
         () => {
           clearTimeout(prepareTimeout);
@@ -612,15 +653,22 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
 
   private createListener() {
     return {
-      onbufferingstart: () => this.handlers?.onBufferingStart(this.getCurrentTime()),
+      onbufferingstart: () => {
+        this.nativeActivityAt = Date.now();
+        this.handlers?.onBufferingStart(this.getCurrentTime());
+      },
       onbufferingprogress: (percent: number) => {
+        this.nativeActivityAt = Date.now();
         this.bufferedSeconds = this.durationSeconds * Math.max(0, Math.min(100, percent)) / 100;
       },
-      onbufferingcomplete: () => this.handlers?.onBufferingEnd(this.getCurrentTime()),
+      onbufferingcomplete: () => {
+        this.nativeActivityAt = Date.now();
+        this.handlers?.onBufferingEnd(this.getCurrentTime());
+      },
       oncurrentplaytime: (milliseconds: number) => {
         // While a native seek runs AVPlay still reports pre-seek positions;
         // passing them on made the seek bar jump back, then forward again.
-        if (this.seekInFlight) return;
+        if (this.seeking) return;
         this.currentTimeSeconds = milliseconds / 1000;
         const now = Date.now();
         if (now - this.lastTimeUpdateAt < TIME_UPDATE_INTERVAL_MS) return;

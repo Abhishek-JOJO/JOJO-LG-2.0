@@ -30,6 +30,40 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useProfileStore } from '@/store/useProfileStore';
 import { getDeviceProfile } from '@/src/platform/deviceProfile';
 
+// Provider SDKs (Meta Pixel especially) did ~120ms of synchronous work per
+// event on a Samsung TV — inside the remote keypress that opens a page, ahead
+// of its render. Events are still built at call time; sending waits for idle
+// after the next frame, and anything pending is flushed when the page goes away.
+const pendingSends: Array<() => void> = [];
+
+function flushPendingSends(): void {
+  while (pendingSends.length) {
+    try {
+      pendingSends.shift()!();
+    } catch (error) {
+      analyticsLogger.error('Analytics: Failed to send event', error);
+    }
+  }
+}
+
+function scheduleSend(send: () => void): void {
+  if (typeof window === 'undefined') return send();
+  pendingSends.push(send);
+  if (pendingSends.length > 1) return;
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(flushPendingSends, { timeout: 2000 });
+  } else {
+    setTimeout(flushPendingSends, 0);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushPendingSends);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) flushPendingSends();
+  });
+}
+
 class AnalyticsService {
   private isInitialized = false;
   private isEnabled = true;
@@ -172,25 +206,27 @@ class AnalyticsService {
       }
 
       // Send to providers
-      if (providers.includes(AnalyticsProvider.CLEVERTAP)) {
-        cleverTapClient.trackEvent(enrichedEvent);
-      }
+      scheduleSend(() => {
+        if (providers.includes(AnalyticsProvider.CLEVERTAP)) {
+          cleverTapClient.trackEvent(enrichedEvent);
+        }
 
-      if (providers.includes(AnalyticsProvider.FIREBASE)) {
-        firebaseClient.trackEvent(enrichedEvent);
-      }
+        if (providers.includes(AnalyticsProvider.FIREBASE)) {
+          firebaseClient.trackEvent(enrichedEvent);
+        }
 
-      if (providers.includes(AnalyticsProvider.BACKEND)) {
-        backendClient.trackEvent(enrichedEvent);
-      }
+        if (providers.includes(AnalyticsProvider.BACKEND)) {
+          backendClient.trackEvent(enrichedEvent);
+        }
 
-      if (providers.includes(AnalyticsProvider.META_PIXEL)) {
-        metaPixelClient.trackEvent(enrichedEvent);
-      }
+        if (providers.includes(AnalyticsProvider.META_PIXEL)) {
+          metaPixelClient.trackEvent(enrichedEvent);
+        }
 
-      if (providers.includes(AnalyticsProvider.GOOGLE_TAG)) {
-        googleTagClient.trackEvent(enrichedEvent);
-      }
+        if (providers.includes(AnalyticsProvider.GOOGLE_TAG)) {
+          googleTagClient.trackEvent(enrichedEvent);
+        }
+      });
     } catch (error) {
       analyticsLogger.error('Analytics: Failed to track event', error);
     }

@@ -230,8 +230,14 @@ function SettingsSelector({
     focusable: open,
   });
 
+  // Only a menu that was actually open hands focus back to its trigger. This
+  // effect also re-runs when the controls reappear or the track lists update
+  // (on load), and restoring then pulled focus off the seek bar / Skip Intro
+  // onto Speed — OK then opened the Speed menu.
+  const wasOpenRef = useRef(false);
   useEffect(() => {
     if (open) {
+      wasOpenRef.current = true;
       setTimeout(() => {
         if (view === 'quality' && qualities.length > 0) setFocus(`opt-quality-${qualities[0].id}`);
         else if (view === 'audio' && audioTracks.length > 0) setFocus(`opt-audio-${audioTracks[0].id}`);
@@ -240,6 +246,8 @@ function SettingsSelector({
         }
       }, 50);
     } else {
+      if (!wasOpenRef.current) return;
+      wasOpenRef.current = false;
       setTimeout(() => {
         if (!isVisible) return;
         if (qualitySelection === 'auto-only' && lastTriggerKeyRef.current === 'menu-trigger-quality') {

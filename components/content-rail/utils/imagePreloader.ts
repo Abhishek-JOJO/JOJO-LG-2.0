@@ -10,7 +10,7 @@
  */
 
 import { ContentRailItem } from "../config/contentRail.types";
-import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
+import { jojoResizedImageURL, JOJOImageFit, titleArtURL } from "@/lib/config/imageRequest.config";
 import { markImageUrlLoaded } from "@/lib/utils/loadedImageCache";
 import { getLandscapeCardImageUrl, getPortraitCardImageUrl } from "./cardImageUrls";
 
@@ -75,19 +75,27 @@ export function preloadImageUrl(
 
 /**
  * Warms exactly what the cards render for one item: the lead landscape
- * poster, the title logo (always its original URL — title art is never
- * resized, see jojoResizedImageURL / TitleLogoImage), and optionally the
+ * poster, the title logo (titleArtURL, the URL TitleLogoImage renders), and
+ * optionally the
  * portrait poster.
  */
+// Which images each item already had requested. The spotlight rail re-warms the
+// same window of items on every step; rebuilding their resized URLs (URL
+// parsing) each time cost ~9ms per key press on a Samsung TV.
+const warmedItems = new WeakMap<ContentRailItem, { lead: boolean; portrait: boolean }>();
+
 export function preloadRailItemImages(
   item: ContentRailItem | undefined,
   options: { lead?: boolean; portrait?: boolean } = {}
 ): void {
   if (!item) return;
   const { lead = true, portrait = false } = options;
-  if (lead) preloadImageUrl(getLandscapeCardImageUrl(item), LEAD_IMAGE_SIZE);
-  preloadImageUrl(item.title_image);
-  if (portrait) preloadImageUrl(getPortraitCardImageUrl(item), PORTRAIT_IMAGE_SIZE);
+  const warmed = warmedItems.get(item);
+  if (warmed && (!lead || warmed.lead) && (!portrait || warmed.portrait)) return;
+  if (lead && !warmed?.lead) preloadImageUrl(getLandscapeCardImageUrl(item), LEAD_IMAGE_SIZE);
+  if (!warmed) preloadImageUrl(titleArtURL(item.title_image));
+  if (portrait && !warmed?.portrait) preloadImageUrl(getPortraitCardImageUrl(item), PORTRAIT_IMAGE_SIZE);
+  warmedItems.set(item, { lead: lead || !!warmed?.lead, portrait: portrait || !!warmed?.portrait });
 }
 
 /**

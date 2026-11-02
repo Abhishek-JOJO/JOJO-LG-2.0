@@ -102,9 +102,13 @@ export function SubtitleSelector({
 
   const allOptions = useMemo(() => [OFF_TRACK, ...tracks], [tracks]);
 
-  // Stable focus handling when opening/closing
+  // Stable focus handling when opening/closing. Only a menu that was open
+  // hands focus back to its trigger: this also re-runs when the controls
+  // reappear, and restoring then stole focus from the seek bar / Skip Intro.
+  const wasOpenRef = useRef(false);
   useEffect(() => {
     if (open) {
+      wasOpenRef.current = true;
       const targetId = activeTrackId !== undefined && activeTrackId !== null ? activeTrackId : allOptions[0]?.id;
       const targetKey = `sub-track-${targetId}`;
       const timer = setTimeout(() => {
@@ -114,6 +118,8 @@ export function SubtitleSelector({
       }, 50);
       return () => clearTimeout(timer);
     } else {
+      if (!wasOpenRef.current) return;
+      wasOpenRef.current = false;
       if (isVisible) {
         const timer = setTimeout(() => {
           try {

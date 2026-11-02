@@ -40,7 +40,10 @@ export interface JOJOCGSize {
 }
 
 export class JOJOImageRequestConfiguration {
-  static quality: number = 100;
+  // Samsung TVs: q100 WebP is near-lossless — a 326x490 card poster was 196KB
+  // vs 40KB at q80 (871x490 lead: 406KB vs 71KB), 3-5x slower to arrive, which
+  // left cards black while scrolling. q80 is indistinguishable at TV card sizes.
+  static quality: number = process.env.NEXT_PUBLIC_TV_PLATFORM === "tizen" ? 80 : 100;
   static format: string = "webp";
   static maximumPixelDimension: number = 1600;
   static minimumTargetDimension: number = 40;
@@ -136,7 +139,8 @@ function isTransparentOrTitleAsset(pathname: string): boolean {
  * Generates an optimized, resized CDN image URL with sanitized target size, fit, quality, and format.
  *
  * IMPORTANT: For transparent assets (title images, logos, badges, PNGs, etc.),
- * the original URL is returned untouched to prevent the CDN from flattening transparency to black.
+ * the original URL is returned untouched to prevent the CDN from flattening transparency to black —
+ * unless fit is `inside` (see titleArtURL).
  */
 export function jojoResizedImageURL(
   url: string | null | undefined,
@@ -157,10 +161,13 @@ export function jojoResizedImageURL(
 
   try {
     const parsedUrl = new URL(url);
+    const fit = options?.fit ?? JOJOImageFit.Cover;
+    const transparent = isTransparentOrTitleAsset(parsedUrl.pathname);
 
-    // Title images, logos, and transparent formats must NEVER have CDN resize
-    // parameters added because the CDN resizer fills the background with solid black.
-    if (isTransparentOrTitleAsset(parsedUrl.pathname)) {
+    // Title images, logos, and transparent formats must not be cover/contain
+    // resized: the CDN pads/fills them with solid black. `inside` only scales
+    // them down and keeps the alpha (verified against cdn.thesupercms.com).
+    if (transparent && fit !== JOJOImageFit.Inside) {
       return url;
     }
 
@@ -171,8 +178,8 @@ export function jojoResizedImageURL(
     const quality = JOJOImageRequestConfiguration.sanitizedQuality(
       options?.quality ?? JOJOImageRequestConfiguration.quality
     );
-    const format = options?.format ?? JOJOImageRequestConfiguration.format;
-    const fit = options?.fit ?? JOJOImageFit.Cover;
+    // Transparent sources keep their own format.
+    const format = transparent ? "" : options?.format ?? JOJOImageRequestConfiguration.format;
 
     const reservedKeys = new Set(["width", "height", "fit", "quality", "format"]);
 
@@ -202,4 +209,17 @@ export function jojoResizedImageURL(
   } catch {
     return url;
   }
+}
+
+// Bounds every title-art box (home hero 720x168, asset detail 600x200, cards):
+// one URL per logo, so cards, hero, asset detail and the preloaders share a
+// single download and decode.
+const TITLE_ART_SIZE: JOJOCGSize = { width: 720, height: 240 };
+
+/**
+ * Title art scaled down to what the TV draws. Originals run up to ~2100px
+ * (3.4MP); decoding one blocked a Samsung TV's frame for 300-900ms.
+ */
+export function titleArtURL(url: string | null | undefined): string {
+  return jojoResizedImageURL(url, { targetSize: TITLE_ART_SIZE, fit: JOJOImageFit.Inside, quality: 90 });
 }

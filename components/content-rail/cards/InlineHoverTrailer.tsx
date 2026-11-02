@@ -17,10 +17,12 @@ import {
 // hardware decoder for its preview.
 const VIDEO_PREVIEW_DWELL_MS = 1200;
 // Tizen splits that wait: AVPlay starts preparing (manifest + first segments,
-// most of the start-up time) once the card is clearly settled on — held keys
-// repeat every ~120ms — and starts playing at the full dwell. The download
-// then overlaps the dwell instead of only starting after it.
-const TIZEN_PREPARE_AFTER_MS = 300;
+// most of the start-up time) once the card is clearly settled on, and starts
+// playing at the full dwell. The download then overlaps the dwell instead of
+// only starting after it. Not sooner: closing a session that got prepared
+// blocks the TV's main thread for 0.5-0.75s, so a preview opened while the
+// user is still stepping through rails (~0.3-0.6s per press) costs a stall.
+const TIZEN_PREPARE_AFTER_MS = 600;
 const TIZEN_PLAY_AFTER_MS = 800;
 
 interface InlineHoverTrailerProps {
@@ -200,15 +202,6 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
     }
   }, [isMuted]);
 
-  // The poster stays up (with this loader over it) for the whole time the
-  // preview loads, and only fades once real frames are showing (videoReady).
-  // Not shown when no preview will start: Tizen keeps the poster for a muted
-  // user (AVPlay has no per-stream mute).
-  // Tizen counts from the play gate — before it the preview is only warming up
-  // in the background, with no reason to show a loader yet.
-  const isPreviewLoading =
-    shouldPlayVideo && !videoReady && !videoError && !(tizenPreviewEnabled && isMuted);
-
   const titleText = item?.title ? (
     <h3 className={`text-white font-extrabold line-clamp-1 drop-shadow-lg mb-2 text-left ${
       isLandscape ? "text-3xl" : "text-xl sm:text-2xl"
@@ -237,14 +230,6 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
         />
       )}
       
-      {isPreviewLoading && (
-        // Fades in only after 300ms (preview-loader-in), so a preview that
-        // starts promptly never flashes a spinner at all.
-        <div className="preview-loader-in absolute inset-0 z-30 flex items-center justify-center pointer-events-none" aria-hidden="true">
-          <div className="w-12 h-12 rounded-full border-4 border-white/25 border-t-white animate-spin" />
-        </div>
-      )}
-
       {/* Shadow overlay for text */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 via-35% to-transparent pointer-events-none" />
       
@@ -255,8 +240,7 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
           ? "bottom-8 left-8 right-8"
           : "bottom-6 left-6 right-6 sm:bottom-8 sm:left-8 sm:right-8"
       }`}>
-        {/* Original URL, same as the preloader warms: title art is never
-            CDN-resized (jojoResizedImageURL returns it untouched anyway). */}
+        {/* TitleLogoImage resizes via titleArtURL, the URL the preloader warms. */}
         {item?.title_image ? (
           <TitleLogoImage
             src={item.title_image}

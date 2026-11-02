@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect } from "react";
+import { isTizen } from "@/src/platform/detectPlatform";
 
 // Track scroll locks globally (to support multiple nested overlays correctly)
 let lockCount = 0;
@@ -29,7 +30,19 @@ export function useBodyScrollLock(lock: boolean) {
     if (typeof window === "undefined" || typeof document === "undefined") return;
     if (!lock) return;
 
-    if (lockCount === 0) {
+    // Samsung TV: no touch, wheel or scrollbar to guard against, and the
+    // remote's arrows don't scroll the page under the overlay (checked on a
+    // Tizen 8 TV). Pinning <body> there re-laid-out and CPU-rasterized the
+    // whole page underneath — ~245ms of every asset-detail open. Only the
+    // scroll position is kept, for the restore below.
+    const pinBody = !isTizen();
+
+    if (lockCount === 0 && !pinBody) {
+      // openAssetDetail recorded it at click time. Reading scrollY here, right
+      // after React's DOM changes, forced a ~100ms style/layout pass.
+      const recorded = (window as unknown as { __returnScrollY?: number | null }).__returnScrollY;
+      savedScrollY = typeof recorded === "number" ? recorded : window.scrollY;
+    } else if (lockCount === 0) {
       // Calculate scrollbar width to prevent visual layout shifting when hidden
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       const scrollY = window.scrollY;
@@ -60,12 +73,14 @@ export function useBodyScrollLock(lock: boolean) {
       lockCount = Math.max(0, lockCount - 1);
 
       if (lockCount === 0) {
-        // Restore original body styles
-        document.body.style.position = savedBodyStyles.position;
-        document.body.style.top = savedBodyStyles.top;
-        document.body.style.width = savedBodyStyles.width;
-        document.body.style.overflow = savedBodyStyles.overflow;
-        document.body.style.paddingRight = savedBodyStyles.paddingRight;
+        if (pinBody) {
+          // Restore original body styles
+          document.body.style.position = savedBodyStyles.position;
+          document.body.style.top = savedBodyStyles.top;
+          document.body.style.width = savedBodyStyles.width;
+          document.body.style.overflow = savedBodyStyles.overflow;
+          document.body.style.paddingRight = savedBodyStyles.paddingRight;
+        }
 
         // Restore exact scroll position
         const assetReturnScrollY = (typeof window !== "undefined" && (window as any)?.__returnScrollY) ?? null;

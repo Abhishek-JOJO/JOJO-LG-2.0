@@ -140,8 +140,9 @@ test("page goes see-through only once playback has advanced, and is restored on 
   preview.stop();
   for (const el of [targetEl, page, html]) assert.equal(el.classList.contains(PASSTHROUGH), false);
   assert.equal(targetEl.children.length, 0, "<object> host removed");
+  assert.equal(avplay.calls.at(-1), "pause", "silenced at once; the blocking close waits");
   stopTizenPreview(); // flush the deferred native close
-  assert.deepEqual(avplay.calls.slice(-2), ["stop", "close"]);
+  assert.deepEqual(avplay.calls.slice(-2), ["pause", "close"], "close() without a separate stop()");
 });
 
 test("a stop defers the native close past the keypress; reusing AVPlay flushes it first", async () => {

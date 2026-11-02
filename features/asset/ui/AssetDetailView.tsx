@@ -56,6 +56,7 @@ import { mapApiRailItem, getPortraitFallbackImages } from "@/components/content-
 import { isBackEvent, isTizen } from "@/src/platform";
 import { focusScrollBehavior } from "@/src/navigation/focusUtils";
 import { preloadImageUrl } from "@/components/content-rail/utils/imagePreloader";
+import { isImageUrlLoaded, markImageUrlLoaded } from "@/lib/utils/loadedImageCache";
 import { TitleLogoImage } from "@/components/ui/TitleLogoImage";
 import {
   isTizenPreviewAvailable,
@@ -208,6 +209,49 @@ const resolveId = (item: any): string => {
   return String(asset?.id || asset?.asset_id || item?.item_id || item?.id || "");
 };
 
+
+function isBackdropReady(url: string): boolean {
+  if (isImageUrlLoaded(url)) return true;
+  // Painted by app/layout.tsx's early-asset-restore once fully loaded.
+  if ((window as unknown as { __assetBackdropReady?: string }).__assetBackdropReady === url) return true;
+  const probe = new Image();
+  probe.src = url;
+  return probe.complete && probe.naturalWidth > 0;
+}
+
+/**
+ * The backdrop URL to paint: the newest one that has fully downloaded and
+ * decoded. A CSS background pointing at a still-downloading image is painted
+ * top-down as bytes arrive on Samsung TVs (half a poster, then the rest) —
+ * worst when returning from the player, where the page reloads cold. Until the
+ * first is ready the banner keeps its dark background; later slides keep the
+ * previous image up until theirs is ready.
+ */
+function useFullyLoadedImageUrl(url: string): string {
+  const [shownUrl, setShownUrl] = useState(() =>
+    url && typeof window !== "undefined" && isBackdropReady(url) ? url : ""
+  );
+  useEffect(() => {
+    if (!url || url === shownUrl) return;
+    // A cached image reports load within a task; the previous one stays up until then.
+    let cancelled = false;
+    const img = new Image();
+    const show = () => {
+      if (cancelled) return;
+      markImageUrlLoaded(url);
+      setShownUrl(url);
+    };
+    img.onload = () => {
+      if (typeof img.decode === "function") img.decode().then(show, show);
+      else show();
+    };
+    img.src = url;
+    return () => {
+      cancelled = true;
+    };
+  }, [url, shownUrl]);
+  return shownUrl;
+}
 
 interface AssetDetailViewProps {
   assetId: string;
@@ -749,6 +793,14 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     (a) => Number(a.asset_id ?? a.assetId) === Number(asset?.assetId ?? assetId)
   );
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string | null>(null);
+  // The hero's slideshow/preview hold still while anything covers it. The cast
+  // popup takes focus out of the content sheet (contentOverlayOpen goes false),
+  // which used to resume the preview behind the popup.
+  const heroMediaPaused = contentOverlayOpen || selectedProfessionalId !== null;
+  const heroMediaPausedRef = useRef(heroMediaPaused);
+  useEffect(() => {
+    heroMediaPausedRef.current = heroMediaPaused;
+  }, [heroMediaPaused]);
   const lastFocusedCastKeyRef = useRef<string | null>(null);
   const [lastFocusedCastKey, setLastFocusedCastKey] = useState<string | null>(null);
   const handleCastFocused = useCallback((key: string) => {
@@ -818,6 +870,13 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     if (previewsList.length <= 1) return;
     setCurrentSlideIndex((prev) => (prev + 1) % previewsList.length);
   }, [previewsList]);
+  // The Tizen preview effect calls the latest one: previewsList is rebuilt when
+  // the fresh asset arrives, and a new callback restarted the AVPlay preview
+  // mid-prepare (a ~0.3s native close plus a second start-up).
+  const autoNextSlideRef = useRef(autoNextSlide);
+  useEffect(() => {
+    autoNextSlideRef.current = autoNextSlide;
+  }, [autoNextSlide]);
 
   // Handle slide progress and auto-advancing for image / fallback slides.
   //
@@ -843,7 +902,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     // The content sheet fully covers the hero while it's open. Advancing
     // slides nobody can see only re-rendered this view every 2s while the
     // user was navigating the episodes/cast underneath — a periodic hitch.
-    if (contentOverlayOpen) return;
+    if (heroMediaPaused) return;
 
     const isImage = activePreview?.type === "image" || !activePreview?.videoUrl || videoError;
 
@@ -852,7 +911,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       const timer = setTimeout(autoNextSlide, duration);
       return () => clearTimeout(timer);
     }
-  }, [currentSlideIndex, activePreview, previewsList, videoError, autoNextSlide, contentOverlayOpen]);
+  }, [currentSlideIndex, activePreview, previewsList, videoError, autoNextSlide, heroMediaPaused]);
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
@@ -899,12 +958,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoStarted || videoError) return;
-    if (contentOverlayOpen) {
+    if (heroMediaPaused) {
       video.pause();
     } else {
       video.play().catch(() => { });
     }
-  }, [contentOverlayOpen, videoStarted, videoError]);
+  }, [heroMediaPaused, videoStarted, videoError]);
 
   // Tizen: AVPlay preview into the full-screen banner once the poster delay
   // elapses. Mirrors the <video> path: timeupdate drives the slide indicator,
@@ -919,13 +978,13 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       url: activePreview.videoUrl,
       target,
       onReady: () => {
-        if (contentOverlayOpenRef.current) preview.pause();
+        if (heroMediaPausedRef.current) preview.pause();
         setVideoReady(true);
       },
       onTimeUpdate: (currentMs, durationMs) => {
         if (durationMs > 0) slideProgressListenerRef.current?.((currentMs / durationMs) * 100);
       },
-      onEnded: () => autoNextSlide(),
+      onEnded: () => autoNextSlideRef.current(),
       onStop: () => setVideoError(true),
     });
     tizenPreviewRef.current = preview;
@@ -933,14 +992,14 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       preview.stop();
       tizenPreviewRef.current = null;
     };
-  }, [tizenPreviewEnabled, videoStarted, activePreview?.videoUrl, videoError, isMuted, autoNextSlide]);
+  }, [tizenPreviewEnabled, videoStarted, activePreview?.videoUrl, videoError, isMuted]);
 
   useEffect(() => {
     const preview = tizenPreviewRef.current;
     if (!preview) return;
-    if (contentOverlayOpen) preview.pause();
+    if (heroMediaPaused) preview.pause();
     else preview.resume();
-  }, [contentOverlayOpen]);
+  }, [heroMediaPaused]);
 
   // Load and play HLS video if needed
   useEffect(() => {
@@ -1428,12 +1487,29 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     contentOverlayRef,
   ]);
 
+  const bgPosterUrl =
+    (currentSlideIndex === 0 ? initialHeroPosterUrl : "") ||
+    activePreview?.poster ||
+    asset?.landscape?.url ||
+    (typeof asset?.landscape === "string" ? asset.landscape : "") ||
+    asset?.heroImage ||
+    asset?.landscapeImage ||
+    asset?.poster?.url ||
+    (typeof asset?.poster === "string" ? asset.poster : "") ||
+    asset?.posterImage ||
+    asset?.image ||
+    asset?.thumbnailUrl ||
+    (asset?.poster as any)?.path ||
+    (asset?.landscape as any)?.path ||
+    "";
+  const shownPosterUrl = useFullyLoadedImageUrl(bgPosterUrl);
+
   if (showSkeleton) {
     // Cosmetic only (see currentAsset above) — already-known poster/title from
     // the card the user just clicked, painted instantly behind the shimmer
     // placeholders instead of a flat gray box, while the real fetch is still
     // in flight. Never used for anything but this background/heading.
-    const previewImage = initialHeroPosterUrl;
+    const previewImage = shownPosterUrl;
     const previewTitle = initialAsset?.title || initialAsset?.asset_title || "";
     const previewTitleImage =
       initialAsset?.titleImage ||
@@ -1637,22 +1713,6 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     Array.isArray(asset.asset_tags) &&
     asset.asset_tags.some((tag: any) => typeof tag === "string" && tag.toLowerCase().includes("coming soon"));
 
-  const bgPosterUrl =
-    (currentSlideIndex === 0 ? initialHeroPosterUrl : "") ||
-    activePreview?.poster ||
-    asset.landscape?.url ||
-    (typeof asset.landscape === "string" ? asset.landscape : "") ||
-    asset.heroImage ||
-    asset.landscapeImage ||
-    asset.poster?.url ||
-    (typeof asset.poster === "string" ? asset.poster : "") ||
-    asset.posterImage ||
-    asset.image ||
-    asset.thumbnailUrl ||
-    (asset.poster as any)?.path ||
-    (asset.landscape as any)?.path ||
-    "";
-
   const effectiveTitleImage =
     asset.titleImage ||
     (typeof (asset as any).title_image === "string"
@@ -1727,7 +1787,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             : "relative w-full h-[230px] sm:h-[320px] overflow-hidden group bg-neutral-950"
         }
         style={{
-          backgroundImage: bgPosterUrl ? `url("${bgPosterUrl}")` : undefined,
+          backgroundImage: shownPosterUrl ? `url("${shownPosterUrl}")` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center top",
           backgroundRepeat: "no-repeat",
@@ -1741,12 +1801,12 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         {/* Tizen: AVPlay draws behind the page and the preview passthrough
             wipes this banner's own background, so this copy of the poster is
             what fades out (data-tizen-video-cover) once frames are showing. */}
-        {tizenPreviewEnabled && activePreview?.videoUrl && bgPosterUrl && (
+        {tizenPreviewEnabled && activePreview?.videoUrl && shownPosterUrl && (
           <div
             data-tizen-video-cover
             className="absolute inset-0 pointer-events-none"
             style={{
-              backgroundImage: `url("${bgPosterUrl}")`,
+              backgroundImage: `url("${shownPosterUrl}")`,
               backgroundSize: "cover",
               backgroundPosition: "center top",
               backgroundRepeat: "no-repeat",
@@ -1761,7 +1821,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
             playsInline
             onTimeUpdate={handleTimeUpdate}
             onEnded={handleVideoEnded}
-            className={`absolute inset-0 w-full h-full bg-black object-cover object-top transition-opacity duration-1000 ${videoReady && !contentOverlayOpen ? "opacity-100" : "opacity-0"
+            className={`absolute inset-0 w-full h-full bg-black object-cover object-top transition-opacity duration-1000 ${videoReady && !heroMediaPaused ? "opacity-100" : "opacity-0"
               }`}
             onCanPlay={() => setVideoReady(true)}
             onError={() => setVideoError(true)}
@@ -1771,32 +1831,22 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         {/* The poster is the banner's single CSS background layer. Keeping one
             renderer avoids the original image being replaced after load by a
             separately optimized <Image> with a slightly different crop. */}
-        {/* Figma Left Horizontal Vignette: matches Rectangle 1439 (924px width on 1920px screen = ~52% width) */}
+        {/* Text shade, like the home hero: a left gradient behind the title/
+            info block plus a bottom-left vignette behind the tabs. Solid
+            black bands across the whole width and bottom half used to darken
+            the entire artwork (and preview video); the right side and top
+            now stay clear. app/layout.tsx's early-asset-restore paints the
+            same two layers — keep them in sync. */}
         <div
           className="absolute inset-y-0 left-0 w-full sm:w-[65%] lg:w-[55%] z-10 pointer-events-none"
           style={{
-            background: "linear-gradient(to right, #050505 0%, #050505 32%, rgba(5, 5, 5, 0.92) 55%, rgba(5, 5, 5, 0.45) 80%, transparent 100%)",
+            background: "linear-gradient(to right, rgba(5, 5, 5, 0.85) 0%, rgba(5, 5, 5, 0.6) 35%, rgba(5, 5, 5, 0.25) 65%, transparent 100%)",
           }}
         />
-        {/* Soft full-width horizontal gradient to soften highlights on wide viewports */}
         <div
-          className="absolute inset-0 z-10 pointer-events-none"
+          className="absolute bottom-0 left-0 w-[75%] h-[60%] z-10 pointer-events-none"
           style={{
-            background: "linear-gradient(to right, rgba(5, 5, 5, 0.95) 0%, rgba(5, 5, 5, 0.6) 40%, transparent 75%)",
-          }}
-        />
-        {/* Figma Bottom Fade: deep black foundation for bottom tabs and smooth fade upwards */}
-        <div
-          className="absolute inset-x-0 bottom-0 h-[48%] z-10 pointer-events-none"
-          style={{
-            background: "linear-gradient(to top, #050505 0%, #050505 20%, rgba(5, 5, 5, 0.85) 50%, rgba(5, 5, 5, 0.25) 80%, transparent 100%)",
-          }}
-        />
-        {/* Top subtle vignette for header integration */}
-        <div
-          className="absolute inset-x-0 top-0 h-28 sm:h-36 z-10 pointer-events-none"
-          style={{
-            background: "linear-gradient(to bottom, rgba(5, 5, 5, 0.75) 0%, rgba(5, 5, 5, 0.2) 60%, transparent 100%)",
+            background: "radial-gradient(ellipse at 0% 100%, rgba(5, 5, 5, 0.85) 0%, rgba(5, 5, 5, 0.5) 40%, transparent 72%)",
           }}
         />
         {!isStandalone && (
@@ -1839,7 +1889,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                       isActive={currentSlideIndex === idx}
                       isPast={idx < currentSlideIndex}
                       isTimedByCss={activePreview?.type === "image" || !activePreview?.videoUrl || videoError}
-                      isRunning={!contentOverlayOpen}
+                      isRunning={!heroMediaPaused}
                       slideKey={currentSlideIndex}
                       subscribe={subscribeSlideProgress}
                     />

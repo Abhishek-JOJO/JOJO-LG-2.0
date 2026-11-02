@@ -16,6 +16,13 @@ import { useSeekBar } from '../hooks/useSeekBar';
 import { formatPlayerTime } from '../utils/formatPlayerTime';
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import type { ThumbnailCue } from '../model/types';
+import { isTizen } from '@/src/platform/detectPlatform';
+
+// How long the seek bar waits after the last arrow press before seeking. On
+// Samsung each AVPlay seek freezes the page for 1-4s, so taps 400-500ms apart
+// each started their own frozen seek; the thumbnail already shows the target,
+// so it waits for the presses to stop.
+const SEEK_COMMIT_DELAY_MS = isTizen() ? 900 : 350;
 
 interface ProgressBarProps {
   currentTime: number;
@@ -125,10 +132,11 @@ export function ProgressBar({
 
       setIsActivelySeeking(true);
       if (activeSeekingTimerRef.current) clearTimeout(activeSeekingTimerRef.current);
+      // Keep the thumbnail up until the seek actually happens.
       activeSeekingTimerRef.current = setTimeout(() => {
         setIsActivelySeeking(false);
         activeSeekingTimerRef.current = null;
-      }, 500);
+      }, SEEK_COMMIT_DELAY_MS + 150);
 
       // Throttle: silently ignore repeat events arriving faster than
       // MIN_STEP_INTERVAL_MS since the last *accepted* step. This is the
@@ -154,7 +162,7 @@ export function ProgressBar({
         }
         pendingSeekTimeRef.current = null;
         seekDebounceRef.current = null;
-      }, 350);
+      }, SEEK_COMMIT_DELAY_MS);
 
       return false;
     },

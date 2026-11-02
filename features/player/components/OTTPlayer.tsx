@@ -38,6 +38,7 @@ import { usePlayerAnalytics } from '../hooks/usePlayerAnalytics';
 import { usePlayerControls } from '../hooks/usePlayerControls';
 import { usePlayerHeartbeat } from '../hooks/usePlayerHeartbeat';
 import { fetchAndParseVttThumbnails } from '../utils/parseVttThumbnails';
+import { preloadThumbnailSprites } from './ThumbnailPreview';
 import { useAuthStore } from '@store/useAuthStore';
 import { useGeoAvailability } from '@/features/geo/hooks/useGeoAvailability';
 import { useVerifySubscription } from '@/hooks/useVerifySubscription';
@@ -63,6 +64,9 @@ import type { AssetSeason, AssetEpisode } from '@features/asset/model/types';
 import { logger } from '@lib/logger/logger';
 import { analyticsService } from '@/shared/analytics';
 import { EVENT_NAMES } from '@/shared/analytics/constants/analytics.constants';
+
+// Delay before warming the seek-bar thumbnail sprite (see the VTT effect below).
+const THUMBNAIL_PRELOAD_DELAY_MS = 15000;
 
 const DEFAULT_PLAYER_CAPABILITIES: PlayerCapabilities = {
   playbackSpeeds: [0.5, 0.75, 1, 1.25, 1.5, 2],
@@ -235,6 +239,10 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMenuOpenRef = useRef(false);
+  // Focus key of the Skip Intro/Recap button while one is on screen. Focus
+  // rests there (like other OTT apps) instead of on the player background,
+  // where OK pauses — set during render below, read by the focus handlers.
+  const skipFocusKeyRef = useRef<string | null>(null);
   const focusToControlsRef = useRef(false);
   const isPlayerFocusedRef = useRef(true);
   const seekForwardRef = useRef<(() => void) | null>(null);
@@ -259,7 +267,8 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
 
     hideTimerRef.current = setTimeout(() => {
       setControlsVisible(false);
-      setFocus('ott-player-main'); // Guarantee focus returns to the player background
+      // Back to the player background — or to Skip Intro while it's showing.
+      setFocus(skipFocusKeyRef.current ?? 'ott-player-main');
     }, 3000);
   }, []);
 
@@ -299,6 +308,15 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
 
       // When controls are hidden, handle directional TV remote navigation:
       if (!controlsVisibleRef.current) {
+        // Skip Intro/Recap showing: an arrow only brings the controls up and
+        // leaves focus on the button (no seek, no jump to the seek bar).
+        if (skipFocusKeyRef.current && e.key.startsWith('Arrow')) {
+          e.preventDefault();
+          e.stopPropagation();
+          showControls();
+          return;
+        }
+
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
           e.preventDefault();
           e.stopPropagation();
@@ -1191,7 +1209,19 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     if (!PLAYER_FEATURE_FLAGS.thumbnailPreview) return;
     if (!video.thumbnailVttUrl) return;
 
-    fetchAndParseVttThumbnails(video.thumbnailVttUrl).then(setThumbnailCues);
+    let preloadTimer: ReturnType<typeof setTimeout> | null = null;
+    fetchAndParseVttThumbnails(video.thumbnailVttUrl).then((cues) => {
+      setThumbnailCues(cues);
+      // Warm the (often multi-MB) sprite sheet once playback has had the
+      // bandwidth to itself for a while, so the first scrub has frames ready.
+      preloadTimer = setTimeout(
+        () => preloadThumbnailSprites(cues, engineRef.current?.getCurrentTime() ?? 0),
+        THUMBNAIL_PRELOAD_DELAY_MS,
+      );
+    });
+    return () => {
+      if (preloadTimer) clearTimeout(preloadTimer);
+    };
   }, [video.thumbnailVttUrl]);
 
   // ── Next episode detection ─────────────────────────────────────────────────
@@ -1405,7 +1435,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   useEffect(() => {
     if (controlsVisible) {
       const timer = setTimeout(() => {
-        setFocus('player-seekbar');
+        setFocus(skipFocusKeyRef.current ?? 'player-seekbar');
       }, 50);
       focusToControlsRef.current = false;
       return () => clearTimeout(timer);
@@ -1455,7 +1485,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
 
         if (controlsVisibleRef.current) {
           setControlsVisible(false);
-          setFocus('ott-player-main');
+          setFocus(skipFocusKeyRef.current ?? 'ott-player-main');
           return;
         }
 
@@ -1551,7 +1581,9 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
       seekingGraceTimerRef.current = null;
     }, 2000);
 
-    engine.seek(clamped);
+    // The seek bar already batches arrow presses (350ms); without immediate
+    // the AVPlay adapter waited another 500ms before seeking.
+    engine.seek(clamped, { immediate: true });
   }, []);
 
   const handleSkipAd = useCallback(() => {
@@ -1902,12 +1934,13 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     currentTime < video.skipRecap.visibleEndSeconds &&
     !adState.isPlaying &&
     !error;
+  skipFocusKeyRef.current = isSkipIntroVisible ? 'skip-intro-btn' : isSkipRecapVisible ? 'skip-recap-btn' : null;
 
   const handleSkipIntro = useCallback(() => {
     if (!video.skipIntro) return;
     const target = video.skipIntro.durationSeconds;
     logger.info('[OTTPlayer] Skipping intro, seeking to', { target });
-    engineRef.current?.seek(target);
+    engineRef.current?.seek(target, { immediate: true });
     engineRef.current?.play();
     analyticsService.track(EVENT_NAMES.SKIP_INTRO_CLICKED, {
       asset_id: String(video.contentId),
@@ -1921,7 +1954,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     if (!video.skipRecap) return;
     const target = video.skipRecap.durationSeconds;
     logger.info('[OTTPlayer] Skipping recap, seeking to', { target });
-    engineRef.current?.seek(target);
+    engineRef.current?.seek(target, { immediate: true });
     engineRef.current?.play();
     analyticsService.track(EVENT_NAMES.SKIP_RECAP_CLICKED, {
       asset_id: String(video.contentId),
@@ -1931,15 +1964,23 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     });
   }, [video.skipRecap, video.contentId, video.title, currentTime]);
 
+  // The button floats above the control bar: Down/Left lead into the
+  // controls; Up/Right have nowhere to go and keep focus on it.
+  const leaveSkipButton = useCallback((direction: string) => {
+    if (direction === 'down' || direction === 'left') setFocus('player-seekbar');
+    return false;
+  }, []);
   const { ref: skipIntroRef, focused: skipIntroFocused } = useFocusable({
     focusKey: 'skip-intro-btn',
     focusable: isSkipIntroVisible,
     onEnterPress: handleSkipIntro,
+    onArrowPress: leaveSkipButton,
   });
   const { ref: skipRecapRef, focused: skipRecapFocused } = useFocusable({
     focusKey: 'skip-recap-btn',
     focusable: isSkipRecapVisible,
     onEnterPress: handleSkipRecap,
+    onArrowPress: leaveSkipButton,
   });
 
   // Land the D-pad on the button the moment it actually appears — it's an
@@ -2149,7 +2190,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
             <button
               ref={skipIntroRef}
               onClick={handleSkipIntro}
-              className={`absolute bottom-28 right-8 z-50 px-8 py-4 bg-black/85 hover:bg-black border-2 text-theme_1 rounded-xl text-lg sm:text-xl font-bold tracking-wide transition-all duration-200 active:scale-95 shadow-2xl overflow-hidden ${
+              className={`absolute ${controlsVisible ? 'bottom-48' : 'bottom-28'} right-8 z-50 px-8 py-4 bg-black/85 hover:bg-black border-2 text-theme_1 rounded-xl text-lg sm:text-xl font-bold tracking-wide transition-all duration-200 active:scale-95 shadow-2xl overflow-hidden ${
                 skipIntroFocused
                   ? 'border-white ring-[3px] ring-white bg-black scale-[1.06]'
                   : 'border-theme_1/20 hover:border-theme_1/40'
@@ -2170,7 +2211,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
             <button
               ref={skipRecapRef}
               onClick={handleSkipRecap}
-              className={`absolute bottom-28 right-8 z-50 px-8 py-4 bg-black/85 hover:bg-black border-2 text-theme_1 rounded-xl text-lg sm:text-xl font-bold tracking-wide transition-all duration-200 active:scale-95 shadow-2xl overflow-hidden ${
+              className={`absolute ${controlsVisible ? 'bottom-48' : 'bottom-28'} right-8 z-50 px-8 py-4 bg-black/85 hover:bg-black border-2 text-theme_1 rounded-xl text-lg sm:text-xl font-bold tracking-wide transition-all duration-200 active:scale-95 shadow-2xl overflow-hidden ${
                 skipRecapFocused
                   ? 'border-white ring-[3px] ring-white bg-black scale-[1.06]'
                   : 'border-theme_1/20 hover:border-theme_1/40'

@@ -35,8 +35,10 @@ export function stagePlatformBuild(platform: BuildPlatform, version: string): st
     fs.rmSync(path.join(targetDir, "appinfo.json"), { force: true });
     fs.rmSync(path.join(targetDir, "webOSTV.js"), { force: true });
 
-    // Smart Hub app icon (config.xml <icon src="icon.png">): the 512x423 JOJO
-    // brand tile. The exported public/icon.png is the transparent play-circle
+    // Smart Hub app icon (config.xml <icon src="icon.png">): the square 512x512
+    // JOJO brand tile. The launcher tile is square — a 512x423 icon (Samsung's
+    // store-listing size) was squeezed into it and stretched the logo.
+    // The exported public/icon.png is the transparent play-circle
     // favicon, which is what the Samsung launcher showed before. largeIcon.png
     // belongs to webOS's icon pair (appinfo.json) only.
     fs.copyFileSync(path.resolve("platforms/tizen/icon.png"), path.join(targetDir, "icon.png"));

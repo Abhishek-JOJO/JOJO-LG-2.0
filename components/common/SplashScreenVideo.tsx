@@ -5,6 +5,7 @@ import { setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navi
 import { useRouter } from "next/navigation";
 import { ROUTES } from "@/lib/constants/routes";
 import { isTizenWebSimulator } from "@/src/platform/detectPlatform";
+import { BOOT_SPLASH_CONTAINER_ID, BOOT_SPLASH_VIDEO_ID, SPLASH_FAILED_EVENT } from "@/lib/boot/splash";
 
 declare global {
   interface Window {
@@ -27,6 +28,10 @@ export function SplashScreenVideo() {
 
   const [isFadingOut, setIsFadingOut] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  // The splash the inline boot script started at first paint (lib/boot/splash.ts).
+  // When present it is adopted rather than rendered; the React-rendered splash
+  // below is only the fallback for when that script didn't run.
+  const bootSplashRef = useRef<{ container: HTMLElement; video: HTMLVideoElement } | null>(null);
   const dismissedRef = useRef(false);
   const playRequestedRef = useRef(false);
 
@@ -60,19 +65,27 @@ export function SplashScreenVideo() {
     } catch {}
 
     // Release TV hardware video decoder pipeline
-    if (videoRef.current) {
+    const splashVideo = videoRef.current ?? bootSplashRef.current?.video ?? null;
+    if (splashVideo) {
       try {
-        videoRef.current.pause();
-        videoRef.current.removeAttribute("src");
-        videoRef.current.load();
+        splashVideo.pause();
+        splashVideo.removeAttribute("src");
+        splashVideo.load();
       } catch {}
     }
 
     if (isAuthenticated) {
       // User is authenticated: fade out smoothly (350ms) to reveal Home screen
-      setIsFadingOut(true);
+      const bootSplash = bootSplashRef.current;
+      if (bootSplash) {
+        bootSplash.container.style.opacity = "0";
+        bootSplash.container.style.pointerEvents = "none";
+      } else {
+        setIsFadingOut(true);
+      }
       setTimeout(() => {
-        setShouldRender(false);
+        if (bootSplash) bootSplash.container.remove();
+        else setShouldRender(false);
         try {
           document.dispatchEvent(new CustomEvent("tv-splash-finished"));
         } catch {}
@@ -138,6 +151,29 @@ export function SplashScreenVideo() {
       if (typeof window !== "undefined") {
         window.__SPLASH_VIDEO_ACTIVE__ = true;
       }
+
+      // Adopt the boot splash: it has been playing since first paint, and
+      // has already ended (or failed) if the app took longer than the clip.
+      const bootVideo = document.getElementById(BOOT_SPLASH_VIDEO_ID) as HTMLVideoElement | null;
+      const bootContainer = document.getElementById(BOOT_SPLASH_CONTAINER_ID);
+      if (bootVideo && bootContainer) {
+        bootSplashRef.current = { container: bootContainer, video: bootVideo };
+        if (bootVideo.ended || bootVideo.error || window.__JOJO_SPLASH_FAILED__) {
+          dismissSplash();
+          return;
+        }
+        bootVideo.addEventListener("ended", dismissSplash);
+        bootVideo.addEventListener("error", dismissSplash);
+        document.addEventListener(SPLASH_FAILED_EVENT, dismissSplash);
+        const bootEmergencyTimer = setTimeout(dismissSplash, EMERGENCY_FALLBACK_TIMEOUT_MS);
+        return () => {
+          clearTimeout(bootEmergencyTimer);
+          bootVideo.removeEventListener("ended", dismissSplash);
+          bootVideo.removeEventListener("error", dismissSplash);
+          document.removeEventListener(SPLASH_FAILED_EVENT, dismissSplash);
+        };
+      }
+
       setShouldRender(true);
     } catch {
       // If storage is unavailable, still play the splash once for this mount.

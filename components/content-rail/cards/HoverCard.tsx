@@ -305,7 +305,7 @@ export function HoverCard({
     (a) => Number(a.asset_id ?? a.assetId) === Number(item?.id)
   );
 
-  const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
+  const isAssetDetailOpen = useAssetDetailStore((s) => visible && s.isOpen);
   const isActuallyVisible = visible && !isAssetDetailOpen;
 
   // Reset then re-trigger TVOD animation every time card becomes visible

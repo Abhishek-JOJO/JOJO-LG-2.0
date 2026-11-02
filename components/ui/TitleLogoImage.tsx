@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, type ReactNode } from "react";
+import { titleArtURL } from "@/lib/config/imageRequest.config";
 
 interface TitleLogoImageProps {
   src: string;
@@ -18,8 +19,9 @@ interface TitleLogoImageProps {
 /**
  * Title-art logo for rail cards, the home hero and asset detail.
  *
- * Title art is a transparent PNG served at full size (the CDN resizer would
- * flatten its alpha — see jojoResizedImageURL), so it is the slowest image on
+ * Title art is transparent and its originals run up to ~2100px, so it is
+ * requested through titleArtURL (CDN `fit=inside`, alpha kept) — the full-size
+ * decode blocked whole frames on Samsung TVs. It is still the slowest image on
  * a card. Through JOJOCommonImage / next/image it was lazy-loaded, hidden
  * until onLoad, and drawn over an opaque placeholder: the black box seen
  * while scrolling fast. This is a plain eager <img> instead — nothing is
@@ -35,8 +37,11 @@ export const TitleLogoImage = React.memo(function TitleLogoImage({
   fallback = null,
   highPriority = false,
 }: TitleLogoImageProps) {
+  const resizedSrc = titleArtURL(src);
   // Keyed by URL so a new item's logo gets a fresh attempt automatically.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  // A failed resized URL falls back to the original once.
+  const activeSrc = failedSrc === resizedSrc ? src : resizedSrc;
 
   if (failedSrc === src) return <>{fallback}</>;
 
@@ -44,15 +49,15 @@ export const TitleLogoImage = React.memo(function TitleLogoImage({
     <div className={wrapperClassName}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        key={src}
-        src={src}
+        key={activeSrc}
+        src={activeSrc}
         alt={alt}
         className={className}
         loading="eager"
         decoding="async"
         fetchPriority={highPriority ? "high" : undefined}
         draggable={false}
-        onError={() => setFailedSrc(src)}
+        onError={() => setFailedSrc(activeSrc)}
       />
     </div>
   );

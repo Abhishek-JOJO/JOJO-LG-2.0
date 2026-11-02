@@ -85,7 +85,8 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
   const toggleMuted = usePlayerStore((s) => s.toggleMuted);
   const isAnyCardHovered = usePlayerStore((s) => s.isAnyCardHovered);
   const isSearchOpen = usePlayerStore((s) => s.isSearchOpen);
-  const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
+  // Only read by the focused slide (shouldPlay below).
+  const isAssetDetailOpen = useAssetDetailStore((s) => isFocused && s.isOpen);
   const isSessionExpiredVisible = useSessionExpiredStore((s) => s.isVisible);
   const [activeLikeState, setActiveLikeState] = useState<"none" | LikeLovePartHerocarousel.LIKE | LikeLovePartHerocarousel.LOVE | LikeLovePartHerocarousel.DISLIKE>("none");
   const [showLikeTooltip, setShowLikeTooltip] = useState(false);

@@ -1228,6 +1228,10 @@ input.bg-transparent-forced {
      already sit on dark gradients, so legibility is unchanged.
    - The browse tab slide animates the whole page as one layer
      while the incoming tab is still mounting and decoding its hero.
+   - Rails dim (opacity-35) while another rail has focus. Samsung
+     rasterizes on the CPU, so flipping a plain section's opacity
+     re-painted two ~1MP rails of posters on every Up/Down. As
+     their own layers the flip is a compositor-only change.
 ============================================================ */
 html.tv-tizen *,
 html.tv-tizen *::before,
@@ -1243,6 +1247,10 @@ html.tv-tizen [class*="drop-shadow"] {
 html.tv-tizen .browse-page-enter-layer {
   animation: none;
   will-change: auto;
+}
+
+html.tv-tizen section[data-section-index] {
+  will-change: opacity;
 }
 
 /* ============================================================
@@ -1300,15 +1308,4 @@ html.tv-tizen .tizen-video-passthrough[data-tizen-video-frame] {
   /* Applied instantly: the plane shows in the corners the moment the
      parent goes transparent, so an animated mask would let them flash. */
   transition: none !important;
-}
-
-/* Card preview loader (InlineHoverTrailer): only appears once a wait is
-   actually noticeable, so a preview that starts promptly shows no spinner. */
-@keyframes previewLoaderIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.preview-loader-in {
-  animation: previewLoaderIn 150ms ease-out 300ms both;
 }

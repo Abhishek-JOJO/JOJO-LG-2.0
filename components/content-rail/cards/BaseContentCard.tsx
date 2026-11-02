@@ -3,11 +3,13 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useFocusable, setFocus } from "@noriginmedia/norigin-spatial-navigation";
 import { useTranslations } from "next-intl";
-import JOJOCommonImage, { JOJOImageContentMode } from "@/components/ui/JOJOCommonImage";
 import { ContentRailItem, RailCardVariant } from "../config/contentRail.types";
 import { RailCardDesignConfig, RailCardWidth } from "../config/contentRail.config";
 import { LOGOS } from "@/lib/constants/assets";
 import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
+import { isImageUrlLoaded, markImageUrlLoaded } from "@/lib/utils/loadedImageCache";
+import { getLandscapeCardImageUrl, getPortraitCardImageUrl } from "../utils/cardImageUrls";
+import { LEAD_IMAGE_SIZE, PORTRAIT_IMAGE_SIZE } from "../utils/imagePreloader";
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { tvSoundManager } from "@/src/platform/audio/tvSoundManager";
@@ -219,7 +221,9 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       onClick?.(item);
     }
   });
-  const isAssetDetailOpen = useAssetDetailStore((s) => s.isOpen);
+  // Only the expanded card reads it. Selecting it for every card re-rendered
+  // the whole home page each time asset detail opened or closed.
+  const isAssetDetailOpen = useAssetDetailStore((s) => isFocusExpanded && s.isOpen);
 
   // Hoisted above cardInner's definition (below) so it can gate transform-gpu
   // there too — moved up, not duplicated or recomputed differently.
@@ -348,6 +352,20 @@ export const BaseContentCard = React.memo(function BaseContentCard({
       })
     : "";
 
+  // Tizen paints a still-downloading image top-down (half a poster, then the
+  // rest). Show it only once loaded; a preloaded poster is visible at once.
+  const [loadedImageUrl, setLoadedImageUrl] = useState<string | null>(null);
+  const imageVisible = !isTizenRuntime || loadedImageUrl === resizedImageUrl || isImageUrlLoaded(resizedImageUrl);
+  // Meanwhile, this item's poster in the other card shape if it's already
+  // loaded — on a fast spotlight scroll the new lead's portrait was on screen
+  // a moment ago (and the reverse on Left) — instead of an empty dark card.
+  const placeholderUrl = !imageVisible && item
+    ? [
+        jojoResizedImageURL(getPortraitCardImageUrl(item), { targetSize: PORTRAIT_IMAGE_SIZE, fit: JOJOImageFit.Cover }),
+        jojoResizedImageURL(getLandscapeCardImageUrl(item), { targetSize: LEAD_IMAGE_SIZE, fit: JOJOImageFit.Cover }),
+      ].find((url) => url && url !== resizedImageUrl && isImageUrlLoaded(url)) ?? ""
+    : "";
+
   const cardInner = (
     <div
       // transform-gpu only while this card is actually focused/transitioning
@@ -375,9 +393,20 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         <div
           // Fades out over a playing Tizen AVPlay preview (InlineHoverTrailer).
           data-tizen-video-cover
-          className="absolute inset-0 w-full h-full bg-neutral-900"
+          // Lighter tile while a poster is still on its way (nothing to stand in).
+          className={`absolute inset-0 w-full h-full ${imageVisible ? "bg-neutral-900" : "bg-neutral-800"}`}
           style={isTizenRuntime ? undefined : { transform: "translateZ(0)" }}
         >
+          {placeholderUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={placeholderUrl}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+              decoding="sync"
+            />
+          )}
           {/* Mounting is already visibility-gated on Tizen. Once mounted,
               request immediately instead of relying on inconsistent native
               lazy-loading implementations in older Samsung browsers.
@@ -392,9 +421,16 @@ export const BaseContentCard = React.memo(function BaseContentCard({
             src={resizedImageUrl}
             alt={item?.title || ""}
             onError={handleImageError}
+            onLoad={() => {
+              markImageUrlLoaded(resizedImageUrl);
+              setLoadedImageUrl(resizedImageUrl);
+            }}
             className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{ width: "100%", height: "100%", objectFit: "cover", opacity: imageVisible ? 1 : 0 }}
             loading="eager"
+            // The on-screen cards jump the queue ahead of the low-priority
+            // lookahead preloads (imagePreloader) on a slow TV connection.
+            fetchPriority={index < 4 ? "high" : undefined}
             decoding={isTizenRuntime ? "sync" : "async"}
           />
         </div>
@@ -448,12 +484,14 @@ export const BaseContentCard = React.memo(function BaseContentCard({
             }`}
         >
           <div className={`relative ${isLandscapeCard ? "w-5.5 h-5.5 sm:w-6 sm:h-6" : "w-3 h-3"}`}>
-            <JOJOCommonImage
+            {/* Plain <img>: a static 12px icon re-rendered with every card on
+                every rail step; next/image's per-render work cost ~1ms each. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src={LOGOS.CROWN_LOGO}
               alt={t("premium_badge_alt")}
-              fill
-              contentMode={JOJOImageContentMode.Contain}
-              wrapperClassName="w-full h-full"
+              className="w-full h-full object-contain"
+              draggable={false}
             />
           </div>
         </div>

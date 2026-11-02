@@ -215,7 +215,8 @@ export interface PlayerAdapter {
   destroy(): void | Promise<void>;
   play(): void;
   pause(): void;
-  seek(seconds: number): void;
+  /** immediate: a single deliberate jump (skip intro) — adapters may otherwise coalesce bursts. */
+  seek(seconds: number, options?: { immediate?: boolean }): void;
   setQuality(qualityId: number): void;
   setAudioTrack(trackId: number): void;
   setSubtitleTrack(trackId: number): void;

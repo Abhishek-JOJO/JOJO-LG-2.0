@@ -37,6 +37,10 @@ const REVEAL_AFTER_ADVANCE_MS = 250;
 // A preview starts playing once this much is buffered instead of AVPlay's
 // default (sized for full playback), so the first frame comes sooner.
 const PREVIEW_START_BUFFER_SECONDS = 2;
+// A preview's native close() blocks the main thread for 0.5-0.75s once it has
+// prepared (stop() + close() ~1s; measured on a Tizen 8 TV). It waits until the
+// remote has been quiet this long, so it never lands on a focus move.
+const NATIVE_CLOSE_IDLE_MS = 400;
 // AVPlay's display rect is always in the TV's 1920x1080 logical space.
 const LOGICAL_WIDTH = 1920;
 const LOGICAL_HEIGHT = 1080;
@@ -85,6 +89,7 @@ interface Session {
 let current: Session | null = null;
 let lifecycleHooked = false;
 let nativeClosePending = false;
+let nativeCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
 const NOOP_HANDLE: TizenPreviewHandle = { play() {}, pause() {}, resume() {}, stop() {} };
 
@@ -98,16 +103,22 @@ export function isTizenPreviewAvailable(): boolean {
 
 function closeNativeSession(avplay: SamsungAVPlay): void {
   try {
-    const state = avplay.getState();
-    if (state === "PLAYING" || state === "PAUSED" || state === "READY") avplay.stop();
+    // close() stops playback itself; a separate stop() first only adds ~0.5s.
     if (avplay.getState() !== "NONE") avplay.close();
   } catch {
-    // Nothing open, or the TV rejected a redundant stop/close.
+    // Nothing open, or the TV rejected a redundant close.
   }
+}
+
+function scheduleNativeClose(): void {
+  if (nativeCloseTimer) clearTimeout(nativeCloseTimer);
+  nativeCloseTimer = setTimeout(flushNativeClose, NATIVE_CLOSE_IDLE_MS);
 }
 
 /** Runs a deferred close now — before AVPlay is reused, or the page goes away. */
 function flushNativeClose(): void {
+  if (nativeCloseTimer) clearTimeout(nativeCloseTimer);
+  nativeCloseTimer = null;
   if (!nativeClosePending) return;
   nativeClosePending = false;
   const avplay = getAVPlay();
@@ -127,15 +138,21 @@ function teardown(session: Session): void {
   for (const backdrop of getBackdrops()) backdrop.style.clipPath = "";
   window.removeEventListener("scroll", interruptPreview);
   session.objectEl.remove();
-  // stop()/close() are synchronous native calls that can take a visible
-  // slice of a frame on Samsung hardware, and a preview usually stops because
-  // the user just pressed a key. Let that keypress render first — the page is
+  // close() is a synchronous native call that blocks for up to 0.75s, and a
+  // preview usually stops because the user just pressed a key. Silence it now
+  // (pause() takes ~10ms) and close once the remote goes quiet — the page is
   // already opaque again, so the still-open plane can't be seen. Anything
   // that reuses AVPlay flushes this first (startTizenPreview/stopTizenPreview).
   if (!nativeClosePending) {
     nativeClosePending = true;
-    setTimeout(flushNativeClose, 0);
+    const avplay = getAVPlay();
+    try {
+      if (avplay?.getState() === "PLAYING") avplay.pause();
+    } catch {
+      // The deferred close stops it anyway.
+    }
   }
+  scheduleNativeClose();
 }
 
 function getViewport(): { width: number; height: number } {
@@ -238,6 +255,10 @@ function hookLifecycle(): void {
   // AVPlay is native: left open, its plane (and audio) would outlive the
   // page into the next document's startup.
   window.addEventListener("pagehide", stopTizenPreview);
+  // Each keypress pushes a pending close back: the user is still navigating.
+  window.addEventListener("keydown", () => {
+    if (nativeClosePending) scheduleNativeClose();
+  }, true);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) stopTizenPreview();
   });

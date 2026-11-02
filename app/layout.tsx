@@ -7,6 +7,7 @@ import { Poppins } from "next/font/google";
 import { Providers } from "./providers";
 import { LayoutClientWrapper } from "@/components/layout/LayoutClientWrapper";
 import { Suspense } from "react";
+import { BOOT_SPLASH_SCRIPT } from "@/lib/boot/splash";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -76,6 +77,9 @@ export default function RootLayout({
         suppressHydrationWarning
         style={{ background: "var(--theme_12)" }}
       >
+        {/* Starts the launch splash at first paint, before the app bundle —
+            see lib/boot/splash.ts. */}
+        <script id="boot-splash" dangerouslySetInnerHTML={{ __html: BOOT_SPLASH_SCRIPT }} />
         {/* Tizen paints the page background on this layer instead of
             html/body — see "AVPLAY PREVIEW PASSTHROUGH" in globals.css. */}
         {includeTizenWebApis && <div id="tizen-page-backdrop" data-tizen-video-backdrop />}
@@ -85,11 +89,14 @@ export default function RootLayout({
             getAssetDetailBackdropUrl), crop and gradient stack — so the real
             page takes over without anything moving. A hand-built copy of the
             page (different image, title and buttons in other places) made the
-            hand-off visibly jump. */}
+            hand-off visibly jump. The image goes up only once fully loaded:
+            Samsung TVs paint a downloading background top-down (half a
+            poster, then the rest); AssetDetailView reuses it via
+            __assetBackdropReady. */}
         <script
           id="early-asset-restore"
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var splashPlayed=sessionStorage.getItem("jojo_splash_video_played");if(splashPlayed==="1"){var sp=document.getElementById("jojo-splash-container");if(sp)sp.remove();}var raw=sessionStorage.getItem("jojo_pending_asset_detail");if(!raw)return;var data=JSON.parse(raw);if(!data||!data.id)return;var asset=data.cachedAsset;if(!asset){try{var c=sessionStorage.getItem("asset_cache_"+data.id);if(c)asset=JSON.parse(c);}catch(e){}}var style=document.createElement("style");style.id="early-asset-restore-style";style.textContent='header,[aria-hidden="true"]{display:none!important;}body{background:#050505!important;}';document.head.appendChild(style);var a=asset||{};var img=data.backdropUrl||a.heroImage||a.landscapeImage||(a.landscapeFallbackImages&&a.landscapeFallbackImages[0])||(a.landscape&&a.landscape.url)||(typeof a.landscape==="string"?a.landscape:"")||a.posterImage||(a.poster&&a.poster.url)||(typeof a.poster==="string"?a.poster:"")||a.image||a.thumbnailUrl||"";var overlay=document.createElement("div");overlay.id="early-asset-overlay";overlay.style.cssText="position:fixed;top:0;left:0;width:100vw;height:100vh;background-color:#0a0a0a;z-index:99998;overflow:hidden;pointer-events:none;";if(img){overlay.style.backgroundImage="url("+JSON.stringify(img)+")";overlay.style.backgroundSize="cover";overlay.style.backgroundPosition="center top";overlay.style.backgroundRepeat="no-repeat";}var g=function(css){return '<div style="position:absolute;'+css+'"></div>';};overlay.innerHTML=g("top:0;bottom:0;left:0;width:55%;background:linear-gradient(to right,#050505 0%,#050505 32%,rgba(5,5,5,0.92) 55%,rgba(5,5,5,0.45) 80%,transparent 100%)")+g("top:0;right:0;bottom:0;left:0;background:linear-gradient(to right,rgba(5,5,5,0.95) 0%,rgba(5,5,5,0.6) 40%,transparent 75%)")+g("left:0;right:0;bottom:0;height:48%;background:linear-gradient(to top,#050505 0%,#050505 20%,rgba(5,5,5,0.85) 50%,rgba(5,5,5,0.25) 80%,transparent 100%)")+g("left:0;right:0;top:0;height:144px;background:linear-gradient(to bottom,rgba(5,5,5,0.75) 0%,rgba(5,5,5,0.2) 60%,transparent 100%)");(document.body||document.documentElement).appendChild(overlay);}catch(e){}})();`,
+            __html: `(function(){try{var splashPlayed=sessionStorage.getItem("jojo_splash_video_played");if(splashPlayed==="1"){var sp=document.getElementById("jojo-splash-container");if(sp)sp.remove();}var raw=sessionStorage.getItem("jojo_pending_asset_detail");if(!raw)return;var data=JSON.parse(raw);if(!data||!data.id)return;var asset=data.cachedAsset;if(!asset){try{var c=sessionStorage.getItem("asset_cache_"+data.id);if(c)asset=JSON.parse(c);}catch(e){}}var style=document.createElement("style");style.id="early-asset-restore-style";style.textContent='header,[aria-hidden="true"]{display:none!important;}body{background:#050505!important;}';document.head.appendChild(style);var a=asset||{};var img=data.backdropUrl||a.heroImage||a.landscapeImage||(a.landscapeFallbackImages&&a.landscapeFallbackImages[0])||(a.landscape&&a.landscape.url)||(typeof a.landscape==="string"?a.landscape:"")||a.posterImage||(a.poster&&a.poster.url)||(typeof a.poster==="string"?a.poster:"")||a.image||a.thumbnailUrl||"";var overlay=document.createElement("div");overlay.id="early-asset-overlay";overlay.style.cssText="position:fixed;top:0;left:0;width:100vw;height:100vh;background-color:#0a0a0a;z-index:99998;overflow:hidden;pointer-events:none;";if(img){var pre=new Image();var show=function(){overlay.style.backgroundImage="url("+JSON.stringify(img)+")";overlay.style.backgroundSize="cover";overlay.style.backgroundPosition="center top";overlay.style.backgroundRepeat="no-repeat";window.__assetBackdropReady=img;};pre.onload=function(){if(pre.decode){pre.decode().then(show,show);}else{show();}};pre.src=img;}var g=function(css){return '<div style="position:absolute;'+css+'"></div>';};overlay.innerHTML=g("top:0;bottom:0;left:0;width:55%;background:linear-gradient(to right,rgba(5,5,5,0.85) 0%,rgba(5,5,5,0.6) 35%,rgba(5,5,5,0.25) 65%,transparent 100%)")+g("left:0;bottom:0;width:75%;height:60%;background:radial-gradient(ellipse at 0% 100%,rgba(5,5,5,0.85) 0%,rgba(5,5,5,0.5) 40%,transparent 72%)");(document.body||document.documentElement).appendChild(overlay);}catch(e){}})();`,
           }}
         />
         <Script
