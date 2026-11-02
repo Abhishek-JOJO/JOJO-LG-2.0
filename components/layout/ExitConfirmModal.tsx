@@ -95,12 +95,12 @@ export function ExitConfirmModal() {
   if (!isOpen) return null;
 
   return (
-    <JOJOModal isOpen={isOpen} onClose={close}>
-      <div className="space-y-3 text-center">
-        <h3 className="text-[22px] sm:text-2xl font-bold text-theme_1 tracking-tight leading-snug">
+    <JOJOModal isOpen={isOpen} onClose={close} className="max-w-[720px] sm:p-12 gap-8">
+      <div className="space-y-4 text-center">
+        <h3 className="text-[22px] sm:text-4xl font-bold text-theme_1 tracking-tight leading-snug">
           {t("exit_app_title")}
         </h3>
-        <p className="text-[14px] sm:text-[15px] text-theme_6 font-normal leading-relaxed">
+        <p className="text-[14px] sm:text-2xl text-theme_6 font-normal leading-relaxed">
           {t("exit_app_desc")}
         </p>
       </div>
@@ -152,7 +152,7 @@ function ExitConfirmButtons({ onCancel, onExit }: { onCancel: () => void; onExit
         // used to rest at bg-theme_13_samecolour (orange) by default — the
         // exact color Exit turns on focus — so focusing Exit made both
         // buttons look orange at once with nothing to tell them apart.
-        className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${cancelFocused
+        className={`flex-1 py-3 sm:py-4 px-6 rounded-full font-bold text-sm sm:text-2xl transition-all cursor-pointer outline-none ${cancelFocused
             ? "bg-theme_13_samecolour text-white scale-105 shadow-xl ring-4 ring-white z-50"
             : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
           }`}
@@ -164,7 +164,7 @@ function ExitConfirmButtons({ onCancel, onExit }: { onCancel: () => void; onExit
         ref={exitBtnRef as any}
         data-focuskey="exit-confirm-exit-btn"
         onClick={onExit}
-        className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${exitFocused
+        className={`flex-1 py-3 sm:py-4 px-6 rounded-full font-bold text-sm sm:text-2xl transition-all cursor-pointer outline-none ${exitFocused
             ? "bg-theme_13_samecolour text-white scale-105 shadow-xl ring-4 ring-white z-50"
             : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
           }`}

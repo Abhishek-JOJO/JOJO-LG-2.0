@@ -10,6 +10,7 @@ import { doesFocusableExist, useFocusable, FocusContext, setFocus } from "@norig
 
 import { restorePageFocus } from "@/src/navigation/focusUtils";
 import { isBackEvent } from "@/src/platform";
+import { isTizen } from "@/src/platform/detectPlatform";
 
 export function AssetDetailModal() {
   const { activeAssetId, isOpen, closeAssetDetail, resetAssetDetailModal, activePreviewItem } = useAssetDetailStore();
@@ -180,7 +181,10 @@ function AssetDetailModalBoundary({
           <motion.div
             initial={false}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            // No fade-out on Tizen: the opaque modal box stays mounted for the
+            // fade, see-through while the hero's AVPlay plane plays and black once
+            // it stops, so Back showed Home, then black, then Home again.
+            exit={isTizen() ? undefined : { opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="relative w-full min-h-screen m-0 z-10"
           >
