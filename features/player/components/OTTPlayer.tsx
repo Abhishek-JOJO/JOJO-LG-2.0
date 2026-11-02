@@ -29,7 +29,7 @@ import { NextEpisodeOverlay } from './NextEpisodeOverlay';
 import { NextEpisodeCard } from './NextEpisodeCard';
 import { PlayerEngine } from '../engine/PlayerEngine';
 import { PipManager } from '../engine/PipManager';
-import { ImaAdsEngine } from '../ads/ImaAdsEngine';
+import { ImaAdsEngine, preloadImaSdk } from '../ads/ImaAdsEngine';
 import { isLandingPageUrl } from '../utils/adUtils';
 import { PlayerContextProvider } from '../context/PlayerContext';
 import { usePlayerStore, PLAYER_FEATURE_FLAGS } from '@store/usePlayerStore';
@@ -981,6 +981,8 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         setAdCuePoints(cuePoints);
       })
     );
+    // The ad SDK is only set up once the content is ready; fetch it meanwhile.
+    if (PLAYER_FEATURE_FLAGS.ads && hasAds) preloadImaSdk();
     // Load the content
     engine
       .initialize(videoEl, video, {

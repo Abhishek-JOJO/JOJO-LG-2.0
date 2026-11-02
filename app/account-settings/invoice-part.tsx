@@ -54,11 +54,11 @@ export default function InvoicePart({ invoices, isError }: InvoicePartProps) {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between items-start">
                 <div>
                     <h1 className="text-3xl font-semibold text-theme_1">{tSettings("invoice_title")}</h1>
-                    <p className="mt-2 text-sm text-theme_5">{tSettings("invoice_desc")}</p>
+                    <p className="mt-2 text-xl text-theme_5">{tSettings("invoice_desc")}</p>
                 </div>
                 <div className="rounded-lg border border-theme_1/10 bg-theme_11/70 px-5 py-4 text-right">
                     <div className="text-4xl font-semibold text-theme_13_samecolour">{invoices.length}</div>
-                    <div className="text-xs text-theme_5 font-medium">
+                    <div className="text-lg text-theme_5 font-medium">
                         {tSettings("total_invoices")}
                     </div>
                 </div>
@@ -91,13 +91,13 @@ export default function InvoicePart({ invoices, isError }: InvoicePartProps) {
                             {visibleInvoices.map((invoice) => (
                                 <tr key={invoice.sInvoiceNumber} className="bg-theme_12/70 transition hover:bg-theme_11/70">
                                     <td className="px-6 py-4 align-top">
-                                        <div className="text-sm font-semibold text-theme_1 break-all">{invoice.sInvoiceNumber}</div>
+                                        <div className="text-xl font-semibold text-theme_1 break-all">{invoice.sInvoiceNumber}</div>
                                     </td>
                                     <td className="px-6 py-4 align-top">
-                                        <div className="text-sm font-semibold text-theme_1">{invoice.sPlanName}</div>
+                                        <div className="text-xl font-semibold text-theme_1">{invoice.sPlanName}</div>
                                     </td>
                                     <td className="px-6 py-4 align-top">
-                                        <div className="text-sm font-semibold text-theme_1">
+                                        <div className="text-xl font-semibold text-theme_1">
                                             {new Date(invoice.dCreatedAt).toLocaleDateString("en-GB", {
                                                 day: "2-digit",
                                                 month: "short",

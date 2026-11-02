@@ -111,7 +111,7 @@ function ToggleOption({
       }}
       animate={{ scale: focused ? 1.05 : 1 }}
       transition={{ type: "spring", stiffness: 450, damping: 30 }}
-      className="relative rounded-full px-8 py-3 text-lg font-bold outline-none cursor-pointer select-none whitespace-nowrap z-10 transition-all duration-200"
+      className="relative rounded-full px-10 py-4 text-2xl font-bold outline-none cursor-pointer select-none whitespace-nowrap z-10 transition-all duration-200"
     >
       {/* Netflix-style smooth sliding active tab pill */}
       {active && (

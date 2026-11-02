@@ -262,7 +262,7 @@ function FocusableProfileCard({ profile, isFailed, isDisabled, handleSelectProfi
             {/* Retry indicator for failed profile */}
             {isFailed && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-theme_14_samecolour text-theme_1 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs font-medium">
+                <div className="bg-theme_14_samecolour text-theme_1 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs lg:text-lg font-medium">
                   {t("retry_badge")}
                 </div>
               </div>
@@ -270,12 +270,12 @@ function FocusableProfileCard({ profile, isFailed, isDisabled, handleSelectProfi
           </div>
 
           {/* Profile Name and Kids Label */}
-          <div className="flex flex-col items-center gap-0.5 sm:gap-1 w-full max-w-[80px] sm:max-w-[112px] md:max-w-[144px] lg:max-w-[186px]">
-            <span className={`text-sm sm:text-base md:text-lg font-medium text-center break-words line-clamp-2 ${focused ? "text-theme_13_samecolour" : "text-theme_1"}`}>
+          <div className="flex flex-col items-center gap-0.5 sm:gap-1 lg:gap-2 w-full max-w-[80px] sm:max-w-[112px] md:max-w-[144px] lg:max-w-[220px]">
+            <span className={`text-sm sm:text-base md:text-lg lg:text-3xl font-medium text-center break-words line-clamp-2 ${focused ? "text-theme_13_samecolour" : "text-theme_1"}`}>
               {profile.profile_name}
             </span>
             {profile.is_kid && (
-              <span className="text-[10px] sm:text-xs text-theme_5">{t("kids_label")}</span>
+              <span className="text-[10px] sm:text-xs lg:text-xl text-theme_5">{t("kids_label")}</span>
             )}
           </div>
         </div>

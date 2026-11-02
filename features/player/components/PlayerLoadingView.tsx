@@ -2,9 +2,15 @@
 
 import { useEffect } from "react";
 import { isBackEvent } from "@/src/platform";
+import { LoadingScreen } from "./LoadingScreen";
 
-/** Player presentation while authorization and the signed stream URL load. */
-export function PlayerLoadingView({ title, onBack }: { title?: string; onBack?: () => void }) {
+/**
+ * Player presentation while authorization and the signed stream URL load.
+ * Same black screen and spinner as the player's own LoadingScreen, which
+ * takes over until the first frame: one loading state, straight into video
+ * (it used to show the title's poster first, then black, then video).
+ */
+export function PlayerLoadingView({ onBack }: { onBack?: () => void }) {
   useEffect(() => {
     if (!onBack) return;
 
@@ -20,23 +26,8 @@ export function PlayerLoadingView({ title, onBack }: { title?: string; onBack?: 
   }, [onBack]);
 
   return (
-    <div
-      className="fixed inset-0 z-[1000] w-screen h-screen overflow-hidden bg-black bg-cover bg-center"
-      style={{ backgroundImage: "var(--playback-startup-artwork, none)" }}
-      aria-busy="true"
-      aria-label="Preparing playback"
-    >
-      <div className="absolute inset-0 bg-black/40" />
-      <div
-        className="absolute inset-x-0 top-0 z-20 flex items-center gap-3 px-8 sm:px-12 lg:px-16 pt-10 sm:pt-12 lg:pt-14 pb-12"
-        style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)" }}
-      >
-        {title && (
-          <span className="text-theme_1 font-bold text-2xl sm:text-3xl lg:text-4xl tracking-wide truncate drop-shadow-md">
-            {title}
-          </span>
-        )}
-      </div>
+    <div className="fixed inset-0 z-[1000] w-screen h-screen bg-black" aria-busy="true">
+      <LoadingScreen />
     </div>
   );
 }

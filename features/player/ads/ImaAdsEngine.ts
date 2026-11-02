@@ -15,6 +15,16 @@ import { isLandingPageUrl } from '../utils/adUtils';
 
 const IMA_SDK_URL =
   'https://imasdk.googleapis.com/js/sdkloader/ima3.js';
+// Content start waits on the SDK (a download from Google). On a slow TV
+// network it had no limit; past this, the content plays without ads.
+const IMA_SDK_TIMEOUT_MS = 3000;
+
+/** Starts the SDK download early, so it overlaps the content's own start-up. */
+export function preloadImaSdk(): void {
+  loadScript(IMA_SDK_URL).catch(() => {
+    // initialize() retries and reports it.
+  });
+}
 
 function extractClickThroughUrlFromAd(ad: any): string | null {
   if (!ad) return null;
@@ -115,12 +125,24 @@ export class ImaAdsEngine implements AdManager {
     this.config = config;
 
     logger.info('[ImaAdsEngine] Loading IMA SDK');
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await loadScript(IMA_SDK_URL);
+      await Promise.race([
+        loadScript(IMA_SDK_URL),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            timedOut = true;
+            reject(new Error('IMA SDK load timed out'));
+          }, IMA_SDK_TIMEOUT_MS);
+        }),
+      ]);
     } catch (err) {
-      logger.warn('[ImaAdsEngine] IMA SDK script load failed. Adblocker likely active.', { err });
-      this.config.eventBus.emit('AD_BLOCKED', { reason: 'script_load_blocked' });
+      logger.warn('[ImaAdsEngine] IMA SDK script load failed. Adblocker likely active.', { err, timedOut });
+      this.config.eventBus.emit('AD_BLOCKED', { reason: timedOut ? 'script_load_timeout' : 'script_load_blocked' });
       throw new Error('IMA SDK failed to load (blocked)');
+    } finally {
+      clearTimeout(timer);
     }
 
     if (typeof google === 'undefined' || !google.ima) {

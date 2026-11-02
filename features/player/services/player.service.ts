@@ -209,49 +209,54 @@ export async function fetchVideoDetails(
     isTvodPurchased = false;
   }
 
-  // Live SVOD check — only fires when sessionStorage didn't provide isSvodSubscribed=true
-  if (!isSvodSubscribed && isAuthenticatedUser) {
-    try {
-      const { verifySubscription } = await import('@/lib/api/verify-subscription');
-      const { appConfig } = await import('@/lib/config/app.config');
-      const verifyRes = await verifySubscription(
-        appConfig.GEO_DEFAULT_COUNTRY_CODE,
-        authToken ?? undefined
-      );
-      if (verifyRes?.data?.planType === 'SVOD') {
-        isSvodSubscribed = true;
-        logger.info('[Player Service] Live SVOD check: user IS subscribed — suppressing ads', { contentId });
-      }
-    } catch (err) {
-      logger.warn('[Player Service] Live SVOD verify failed — proceeding with sessionStorage value', { err });
-    }
-  }
-
-  // Live TVOD purchase check — only fires when asset is TVOD and sessionStorage didn't mark it purchased
+  // The two live checks below are independent API round trips: run them together.
   const isTvodCategory = assetCategoryCode === ASSET_CATEGORY_CODE.TVOD;
-  if (!isTvodPurchased && isTvodCategory && isAuthenticatedUser) {
-    try {
-      const { getAssetPricing } = await import('@features/content/api/getAssetPricing');
-      const { appConfig } = await import('@/lib/config/app.config');
-      const pricingRes = await getAssetPricing(
-        contentId,
-        appConfig.GEO_DEFAULT_COUNTRY_CODE,
-        authToken ?? undefined
-      );
-      if (pricingRes?.data?.bIsUserPurchased === true) {
-        isTvodPurchased = true;
-        logger.info('[Player Service] Live TVOD check: asset IS purchased — suppressing ads', { contentId });
+  await Promise.all([
+    // Live SVOD check — only fires when sessionStorage didn't provide isSvodSubscribed=true
+    (async () => {
+      if (!isSvodSubscribed && isAuthenticatedUser) {
+        try {
+          const { verifySubscription } = await import('@/lib/api/verify-subscription');
+          const { appConfig } = await import('@/lib/config/app.config');
+          const verifyRes = await verifySubscription(
+            appConfig.GEO_DEFAULT_COUNTRY_CODE,
+            authToken ?? undefined
+          );
+          if (verifyRes?.data?.planType === 'SVOD') {
+            isSvodSubscribed = true;
+            logger.info('[Player Service] Live SVOD check: user IS subscribed — suppressing ads', { contentId });
+          }
+        } catch (err) {
+          logger.warn('[Player Service] Live SVOD verify failed — proceeding with sessionStorage value', { err });
+        }
       }
-    } catch (err) {
-      logger.warn('[Player Service] Live TVOD pricing check failed — proceeding with sessionStorage value', { err });
-    }
-  }
+    })(),
+
+    // Live TVOD purchase check — only fires when asset is TVOD and sessionStorage didn't mark it purchased
+    (async () => {
+      if (!isTvodPurchased && isTvodCategory && isAuthenticatedUser) {
+        try {
+          const { getAssetPricing } = await import('@features/content/api/getAssetPricing');
+          const { appConfig } = await import('@/lib/config/app.config');
+          const pricingRes = await getAssetPricing(
+            contentId,
+            appConfig.GEO_DEFAULT_COUNTRY_CODE,
+            authToken ?? undefined
+          );
+          if (pricingRes?.data?.bIsUserPurchased === true) {
+            isTvodPurchased = true;
+            logger.info('[Player Service] Live TVOD check: asset IS purchased — suppressing ads', { contentId });
+          }
+        } catch (err) {
+          logger.warn('[Player Service] Live TVOD pricing check failed — proceeding with sessionStorage value', { err });
+        }
+      }
+    })(),
+  ]);
 
   const isTvodNoAds = isTvodCategory && isTvodPurchased;
   const shouldShowAds = !isSvodSubscribed && !isTvodNoAds;
 
-
-  let vmapXml: string | null = null;
 
   if (shouldShowAds) {
     logger.info('[Player Service] User is AVOD/FVOD/guest — fetching VMAP for ads', {
@@ -259,7 +264,6 @@ export async function fetchVideoDetails(
       assetCategoryCode,
       isGuest: user?.isGuest ?? true,
     });
-    vmapXml = await fetchVmapXml(contentId);
   } else {
     logger.info('[Player Service] Ad-free playback (SVOD or TVOD purchased)', {
       contentId,
@@ -270,11 +274,12 @@ export async function fetchVideoDetails(
 
   const isSubscribeValue = isAuthenticated && isUserNotGuest && isSvodSubscribed;
 
-  // After VMAP eligibility, fetch playback configuration
-  const playbackResponse = await getPlayback(
-    { assetId: contentId, isSubscribe: isSubscribeValue },
-    sessionId
-  );
+  // VMAP and playback configuration don't depend on each other: fetch together.
+  // fetchVmapXml resolves null on failure, so it never fails the playback fetch.
+  const [vmapXml, playbackResponse] = await Promise.all([
+    shouldShowAds ? fetchVmapXml(contentId) : Promise.resolve(null),
+    getPlayback({ assetId: contentId, isSubscribe: isSubscribeValue }, sessionId),
+  ]);
 
   if (playbackResponse.metaData?.status !== 200) {
     const error = new Error(

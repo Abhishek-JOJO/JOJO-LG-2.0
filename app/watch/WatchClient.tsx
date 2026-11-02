@@ -280,10 +280,7 @@ function WatchContent() {
   // still mounts only after authorization and a successful playback response.
   if (gateStatus === "loading" || isError || !video) {
     return (
-      <PlayerLoadingView
-        title={video?.title || currentAsset?.title || currentAsset?.asset_title}
-        onBack={handleBack}
-      />
+      <PlayerLoadingView onBack={handleBack} />
     );
   }
 

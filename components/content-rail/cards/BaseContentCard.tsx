@@ -8,8 +8,6 @@ import { RailCardDesignConfig, RailCardWidth } from "../config/contentRail.confi
 import { LOGOS } from "@/lib/constants/assets";
 import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
 import { isImageUrlLoaded, markImageUrlLoaded } from "@/lib/utils/loadedImageCache";
-import { getLandscapeCardImageUrl, getPortraitCardImageUrl } from "../utils/cardImageUrls";
-import { LEAD_IMAGE_SIZE, PORTRAIT_IMAGE_SIZE } from "../utils/imagePreloader";
 import { useAssetDetailStore, slugify } from "@/features/asset/store/useAssetDetailStore";
 import { useActiveRailStore } from "@/store/useActiveRailStore";
 import { tvSoundManager } from "@/src/platform/audio/tvSoundManager";
@@ -198,12 +196,27 @@ export const BaseContentCard = React.memo(function BaseContentCard({
           // (avoids expensive getBoundingClientRect + scrollTo on every L/R keypress)
           if (sectionIdx >= 0 && store.activeSectionIndex !== sectionIdx) {
             store.setActiveSectionIndex(sectionIdx);
-            const sectionRect = currentSection.getBoundingClientRect();
-            if (Math.abs(sectionRect.top - 105) > 35) {
-              window.scrollTo({
-                top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105),
-                behavior: 'auto'
+            // On Tizen, defer the layout query + scroll to the next frame so the
+            // store update (which triggers re-renders across all sections) isn't
+            // interleaved with a synchronous reflow in the same microtask.
+            if (isTizenRuntime) {
+              requestAnimationFrame(() => {
+                const sectionRect = currentSection.getBoundingClientRect();
+                if (Math.abs(sectionRect.top - 105) > 35) {
+                  window.scrollTo({
+                    top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105),
+                    behavior: 'auto'
+                  });
+                }
               });
+            } else {
+              const sectionRect = currentSection.getBoundingClientRect();
+              if (Math.abs(sectionRect.top - 105) > 35) {
+                window.scrollTo({
+                  top: Math.max(0, (window.scrollY || window.pageYOffset) + sectionRect.top - 105),
+                  behavior: 'auto'
+                });
+              }
             }
           } else if (sectionIdx < 0 && currentSection.parentElement) {
             const allSections = Array.from(currentSection.parentElement.querySelectorAll('section'));
@@ -271,11 +284,15 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   const isMixedSeries = Boolean((config as any)?.isMixedSeries);
 
   // When card expands to landscape, center it in view (only for non-spotlight accordion cards)
+  // On Tizen, skip entirely — the spotlight rail swaps items in place (no physical scroll),
+  // and the vertical scroll is already handled by onFocus above. This scrollIntoView was
+  // triggering a second layout reflow 80ms after the first one, causing double-scroll jank.
   useEffect(() => {
+    if (isTizenRuntime) return;
     if (isFocusExpanded && cardRef.current && !isMixedSeries && config.variant !== RailCardVariant.LANDSCAPE && config.variant !== RailCardVariant.CONTINUE_WATCHING) {
       cardRef.current.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
     }
-  }, [isFocusExpanded, isMixedSeries, config.variant]);
+  }, [isFocusExpanded, isMixedSeries, config.variant, isTizenRuntime]);
 
 
   // In TV/webOS environment, mouse pointer hover does nothing so remote focus is never lost
@@ -355,16 +372,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
   // Tizen paints a still-downloading image top-down (half a poster, then the
   // rest). Show it only once loaded; a preloaded poster is visible at once.
   const [loadedImageUrl, setLoadedImageUrl] = useState<string | null>(null);
+  // Meanwhile the card is a plain tile. Standing in this item's poster in the
+  // other card shape (already loaded) looked zoomed: a 16:9 frame cropped to a
+  // 2:3 card, or the reverse, for the 1-2s until the real poster arrived.
   const imageVisible = !isTizenRuntime || loadedImageUrl === resizedImageUrl || isImageUrlLoaded(resizedImageUrl);
-  // Meanwhile, this item's poster in the other card shape if it's already
-  // loaded — on a fast spotlight scroll the new lead's portrait was on screen
-  // a moment ago (and the reverse on Left) — instead of an empty dark card.
-  const placeholderUrl = !imageVisible && item
-    ? [
-        jojoResizedImageURL(getPortraitCardImageUrl(item), { targetSize: PORTRAIT_IMAGE_SIZE, fit: JOJOImageFit.Cover }),
-        jojoResizedImageURL(getLandscapeCardImageUrl(item), { targetSize: LEAD_IMAGE_SIZE, fit: JOJOImageFit.Cover }),
-      ].find((url) => url && url !== resizedImageUrl && isImageUrlLoaded(url)) ?? ""
-    : "";
 
   const cardInner = (
     <div
@@ -397,16 +408,6 @@ export const BaseContentCard = React.memo(function BaseContentCard({
           className={`absolute inset-0 w-full h-full ${imageVisible ? "bg-neutral-900" : "bg-neutral-800"}`}
           style={isTizenRuntime ? undefined : { transform: "translateZ(0)" }}
         >
-          {placeholderUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={placeholderUrl}
-              alt=""
-              aria-hidden="true"
-              className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
-              decoding="sync"
-            />
-          )}
           {/* Mounting is already visibility-gated on Tizen. Once mounted,
               request immediately instead of relying on inconsistent native
               lazy-loading implementations in older Samsung browsers.

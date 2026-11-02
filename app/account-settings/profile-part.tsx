@@ -80,7 +80,7 @@ function FocusableProfileCard({ profile, isSelected, onSelect, onEdit }: any) {
                 </div>
             </div>
 
-            <span className={cn("text-lg font-medium text-center line-clamp-1 w-28 transition-colors duration-200", focused ? "text-theme_13_samecolour" : "")}>
+            <span className={cn("text-xl font-medium text-center line-clamp-1 w-36 transition-colors duration-200", focused ? "text-theme_13_samecolour" : "")}>
                 {profile.profile_name}
             </span>
         </div>
@@ -115,7 +115,7 @@ function FocusableAddProfile({ onAdd, tWatching }: any) {
                     <Plus className={cn("text-theme_7 w-8 h-8 sm:w-10 sm:h-10", focused ? "text-theme_1" : "")} strokeWidth={2} />
                 </div>
             </div>
-            <span className={cn("text-lg font-medium text-center line-clamp-1 w-28 text-theme_7", focused ? "text-theme_1" : "")}>
+            <span className={cn("text-xl font-medium text-center line-clamp-1 w-36 text-theme_7", focused ? "text-theme_1" : "")}>
                 {tWatching("add_profile")}
             </span>
         </div>
@@ -129,7 +129,7 @@ export default function ProfilePart() {
         <div className="space-y-8">
             <JOJOGoldRowSection />
             <div className="space-y-6 pt-2">
-                <h3 className="text-lg font-medium text-theme_1">
+                <h3 className="text-2xl font-medium text-theme_1">
                     {tSettings("all_profiles")}
                 </h3>
                 <ProfilesList />
@@ -202,11 +202,11 @@ function ProfilesList() {
     }, [editProfileId, profiles, editingProfile]);
 
     if (profilesQuery.isLoading) {
-        return <div className="text-theme_5 text-sm">Loading profiles...</div>;
+        return <div className="text-theme_5 text-xl">Loading profiles...</div>;
     }
 
     if (profilesQuery.isError) {
-        return <div className="text-theme_14 text-sm">Error loading profiles</div>;
+        return <div className="text-theme_14 text-xl">Error loading profiles</div>;
     }
 
     return (

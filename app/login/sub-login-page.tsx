@@ -628,7 +628,7 @@ function LoginPageContent() {
           {mode === "phone" ? (
             <QrPairingPanel />
           ) : (
-            <form id="login-form" onSubmit={handleSubmit} noValidate className="w-full max-w-[500px] mx-auto flex flex-col items-center gap-4">
+            <form id="login-form" onSubmit={handleSubmit} noValidate className="w-full max-w-[640px] mx-auto flex flex-col items-center gap-5">
               <div className="w-full flex flex-col items-center">
                 <div
                   ref={inputRef as any}
@@ -677,21 +677,21 @@ function LoginPageContent() {
                 {error && touched && (
                   <div
                     role="alert"
-                    className="m-0 text-xs text-red-400 pl-4 flex items-center gap-2 mt-2 self-start"
+                    className="m-0 text-lg text-red-400 pl-4 flex items-center gap-2 mt-2 self-start"
                   >
                     <JOJOCommonImage
                       src={LOGOS.ERROR_ICON}
                       altKey="img_jojo_logo"
-                      width={12}
-                      height={12}
+                      width={18}
+                      height={18}
                       preset={JOJOImagePreset.Logo}
-                      wrapperClassName="size-3 flex-shrink-0"
+                      wrapperClassName="size-[18px] flex-shrink-0"
                     />
                     {getErrorMessage(error, t)}
                   </div>
                 )}
 
-                <p className="text-xs font-normal text-white/40 text-left leading-relaxed max-w-[460px] mt-2 mb-0 self-start">
+                <p className="text-lg font-normal text-white/60 text-left leading-relaxed max-w-[620px] mt-3 mb-0 self-start">
                   {t("disclaimer") || "By proceeding with the login process, we might send a one-time verification code to the phone number linked to your account."}
                 </p>
               </div>
@@ -729,7 +729,7 @@ function LoginPageContent() {
                   type="submit"
                   disabled={!canSubmit || initiateOtp.isPending || checkUserExists.isPending}
                   className={cn(
-                    "w-full h-12 rounded-full font-bold text-base transition-all duration-200 flex items-center justify-center shadow-xl cursor-pointer outline-none",
+                    "w-full h-16 rounded-full font-bold text-2xl transition-all duration-200 flex items-center justify-center shadow-xl cursor-pointer outline-none",
                     canSubmit
                       ? "bg-[#ea580c] text-white hover:bg-[#f97316]"
                       : "bg-[#241e1a] text-white/30 cursor-not-allowed border border-white/5"

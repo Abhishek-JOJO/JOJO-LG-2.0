@@ -227,7 +227,7 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
 
                         {/* Name input */}
                         <div className="w-full">
-                            <label className="mb-2 block text-[15px] font-bold text-theme_1">
+                            <label className="mb-2 block text-xl font-bold text-theme_1">
                                 {t("full_name_label")}
                             </label>
                             <FocusableNameInput
@@ -244,7 +244,7 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
                                         <FieldError msg={t(nameError)} />
                                     )}
                                 </div>
-                                <span className={`text-xs ${name.length >= 25 ? "text-red-500" : "text-theme_5"}`}>
+                                <span className={`text-base ${name.length >= 25 ? "text-red-500" : "text-theme_5"}`}>
                                     {`${name.length}/25`}
                                 </span>
                             </div>
@@ -252,7 +252,7 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
 
                         {/* Age chips */}
                         <div className="flex flex-col gap-2">
-                            <label className="text-[15px] font-bold text-theme_1">
+                            <label className="text-xl font-bold text-theme_1">
                                 {t("age_label")}
                             </label>
                             <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
@@ -271,7 +271,7 @@ export default function EditProfileModal({ profile, onClose, onSaved }: EditProf
 
                         {/* Gender chips */}
                         <div className="flex flex-col gap-2.5">
-                            <label className="text-[15px] font-bold text-theme_1">
+                            <label className="text-xl font-bold text-theme_1">
                                 {t("gender_label")}
                             </label>
                             <div className="grid grid-cols-3 gap-2 sm:gap-2.5">

@@ -76,7 +76,7 @@ export default function JOJOGoldRowSection() {
                     <div className="text-left">
                         <div className="flex items-center gap-2">
                             <span
-                                className="text-sm font-bold tracking-wider uppercase"
+                                className="text-xl font-bold tracking-wider uppercase"
                                 style={{
                                     background: "var(--gold-text-gradient)",
                                     WebkitBackgroundClip: "text",
@@ -86,12 +86,12 @@ export default function JOJOGoldRowSection() {
                                 {tSettings("jojo_gold_premium")}
                             </span>
                         </div>
-                        <p className="text-xs text-theme_5 mt-0.5">
+                        <p className="text-lg text-theme_5 mt-1">
                             {tSettings("premium_welcome_message")}
                         </p>
                     </div>
                 </div>
-                <div className="text-xs font-semibold text-theme_1 px-4 py-1.5 rounded-full border border-theme_1/10 bg-theme_1/5 whitespace-nowrap">
+                <div className="text-lg font-semibold text-theme_1 px-5 py-2 rounded-full border border-theme_1/10 bg-theme_1/5 whitespace-nowrap">
                     {tSettings("premium_active")}
                 </div>
             </div>

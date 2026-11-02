@@ -322,6 +322,10 @@ export function ContentRailList({
     // decodes only a 64px CDN thumbnail into a 32x32 canvas (colorExtractor,
     // cached per URL), but Tizen still lets the visible poster land first.
     // It was skipped on Tizen entirely, which left the header untinted there.
+    // On Tizen, a longer delay (800ms) ensures rapid Left/Right presses on
+    // the hero carousel cancel all intermediate extractions — only the final
+    // slide's color is sampled, preventing a queue of canvas decode + pixel
+    // reads that compete with card rendering.
     let cancelled = false;
     const sample = () => {
       extractDominantAmbientColor(heroImageUrl).then((color) => {
@@ -329,7 +333,8 @@ export function ContentRailList({
         if (!cancelled) useAmbientTintStore.getState().setAmbientColor(color);
       });
     };
-    const timer = isTizenRuntime ? window.setTimeout(sample, 500) : null;
+    const delay = isTizenRuntime ? 800 : 0;
+    const timer = delay > 0 ? window.setTimeout(sample, delay) : null;
     if (timer === null) sample();
     return () => {
       cancelled = true;

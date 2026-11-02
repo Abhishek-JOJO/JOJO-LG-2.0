@@ -429,7 +429,7 @@ function ProfileDropdownMenu({
           transition: "opacity 200ms ease, transform 200ms ease",
           pointerEvents: isVisible ? "auto" : "none",
         }}
-        className="w-60 bg-theme_10_80 border-none rounded-[15px] shadow-2xl py-3 px-3.5 flex flex-col gap-1 mt-2"
+        className="w-80 bg-theme_10_80 border-none rounded-[15px] shadow-2xl py-4 px-4 flex flex-col gap-2 mt-2"
       >
         <div className="absolute right-[18px] -top-1.5 w-3 h-3 rotate-45 z-[1]" />
 
@@ -521,7 +521,7 @@ function ProfileMenuSwitchItem({
       ref={ref as any}
       onClick={onSwitch}
       className={cn(
-        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular transition-all duration-200 cursor-pointer",
+        "block w-full rounded-xl px-5 py-3 text-left text-2xl font-medium transition-all duration-200 cursor-pointer",
         focused
           ? "bg-theme_11_samecolour border-2 border-white text-theme_13_samecolour font-bold"
           : "border-2 border-transparent text-theme_5 hover:bg-theme_11_samecolour hover:text-theme_13_samecolour"
@@ -555,7 +555,7 @@ function ProfileMenuAction({
       ref={ref as any}
       onClick={onEnter}
       className={cn(
-        "block w-full rounded-xl px-3 py-2 text-left body_xs_regular transition-all duration-200 cursor-pointer",
+        "block w-full rounded-xl px-5 py-3 text-left text-2xl font-medium transition-all duration-200 cursor-pointer",
         focused
           ? "bg-theme_11_samecolour border-2 border-white text-theme_13_samecolour font-bold"
           : "border-2 border-transparent text-theme_5 hover:bg-theme_11_samecolour hover:text-theme_13_samecolour"

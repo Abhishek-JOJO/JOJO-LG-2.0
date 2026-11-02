@@ -206,7 +206,7 @@ export default function AccountSettingsPage() {
 
         {/* Watchlist */}
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-theme_1 mb-4">{t("watchlist_heading")}</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-theme_1 mb-5">{t("watchlist_heading")}</h2>
           {watchlistAssets.length > 0 ? (
             <div className="flex gap-4 sm:gap-5 overflow-x-auto pt-1 pb-4 scrollbar-none">
               {watchlistAssets.map((item: any, idx: number) => {
@@ -228,14 +228,14 @@ export default function AccountSettingsPage() {
               })}
             </div>
           ) : (
-            <p className="text-sm sm:text-base text-theme_5">{t("empty_watchlist")}</p>
+            <p className="text-lg sm:text-xl text-theme_5">{t("empty_watchlist")}</p>
           )}
 
         </div>
 
         {/* Change Language */}
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-theme_1 mb-4">{t("change_language")}</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-theme_1 mb-5">{t("change_language")}</h2>
           <div className="inline-flex items-center bg-white/10 rounded-full p-1.5 sm:p-2 gap-1">
             {SUPPORTED_LOCALES.map((code, idx) => (
               <FocusableLanguagePill
@@ -317,13 +317,13 @@ function FocusableWatchlistCard({ focusKey, title, img, onSelect, isFirst, isLas
       {img ? (
         <JOJOCommonImage src={img} alt={title} fill className="object-cover" wrapperClassName="w-full h-full" />
       ) : (
-        <div className="w-full h-full flex items-center justify-center p-2 text-center text-sm text-neutral-500">{title}</div>
+        <div className="w-full h-full flex items-center justify-center p-2 text-center text-lg text-neutral-500">{title}</div>
       )}
       <div className={cn(
         "absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent transition-opacity duration-300 flex items-end p-3",
         focused ? "opacity-100" : "opacity-0 group-hover:opacity-100"
       )}>
-        <span className={cn("text-sm font-semibold truncate w-full", focused ? "text-theme_13_samecolour" : "text-white")}>{title}</span>
+        <span className={cn("text-xl font-semibold truncate w-full", focused ? "text-theme_13_samecolour" : "text-white")}>{title}</span>
       </div>
       {/* Plain border overlay, not a ring — a ring-offset box-shadow here gets
           clipped by the horizontal-scroll container and occluded by
@@ -368,7 +368,7 @@ function FocusableLanguagePill({ focusKey, label, isActive, onClick, isFirst, is
       ref={ref as any}
       onClick={handleSelect}
       className={cn(
-        "px-5 py-2.5 sm:px-7 sm:py-3.5 rounded-full text-sm sm:text-base font-bold transition-all outline-none shrink-0",
+        "px-6 py-3 sm:px-9 sm:py-4 rounded-full text-lg sm:text-2xl font-bold transition-all outline-none shrink-0",
         isActive
           ? "bg-theme_13_samecolour text-white shadow-lg"
           : focused
@@ -402,7 +402,7 @@ function FocusableLogoutButton({ focusKey, label, onClick, upKey }: any) {
       ref={ref as any}
       onClick={onClick}
       className={cn(
-        "px-6 py-2.5 sm:px-8 sm:py-3 rounded-full text-sm sm:text-base font-semibold transition-all outline-none",
+        "px-7 py-3 sm:px-10 sm:py-4 rounded-full text-lg sm:text-2xl font-semibold transition-all outline-none",
         focused ? "ring-4 ring-white scale-105 bg-theme_13_samecolour text-white" : "bg-theme_10 text-theme_2_same_colour hover:bg-theme_13_samecolour hover:text-theme_1"
       )}
     >

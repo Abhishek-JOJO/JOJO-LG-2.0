@@ -484,9 +484,12 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   const [settledPreviewRailIndex, setSettledPreviewRailIndex] = useState(safeActiveRailIndex);
   useEffect(() => {
     if (!isTizenRuntime) return;
+    // 320ms exceeds Tizen remote key-repeat interval (~150ms), so a held-down
+    // Up/Down key cancels the pending timer before it fires — preview rows
+    // only re-render once navigation settles, not between repeat events.
     const timer = window.setTimeout(() => {
       setSettledPreviewRailIndex(safeActiveRailIndex);
-    }, 180);
+    }, 320);
     return () => window.clearTimeout(timer);
   }, [isTizenRuntime, safeActiveRailIndex]);
 
