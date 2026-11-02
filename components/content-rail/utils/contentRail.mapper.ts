@@ -133,6 +133,27 @@ export function getHeroPosterImage(imgArr: any[] | undefined): string | undefine
  *   7. PORTRAIT array crops (ratio 4, ratio 2, or default)
  *   8. Generic image / thumbnail
  */
+type RawImage = { ratio_id?: number | string; is_default?: boolean; url?: string };
+
+/** The asset's real portrait (2:3) poster art: [ratio 4, ratio 2, default]. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw API shapes, as in the helpers below
+function getPortraitArtImages(asset: any, cr_item?: any, rawPortraitArr?: RawImage[]): (string | undefined)[] {
+  const arr: RawImage[] | undefined =
+    rawPortraitArr ?? (Array.isArray(asset?.portrait) ? asset.portrait : Array.isArray(cr_item?.portrait) ? cr_item.portrait : undefined);
+  return [
+    arr?.find((img) => Number(img?.ratio_id) === 4)?.url,
+    arr?.find((img) => Number(img?.ratio_id) === 2)?.url,
+    arr?.find((img) => img?.is_default)?.url ||
+      arr?.[0]?.url ||
+      (typeof asset?.portrait === "object" && asset?.portrait !== null && "url" in asset.portrait ? asset.portrait.url : undefined) ||
+      (typeof asset?.portraitImage === "string" ? asset.portraitImage : undefined) ||
+      (typeof asset?.portrait_image === "string" ? asset.portrait_image : undefined) ||
+      (typeof asset?.portrait === "string" ? asset.portrait : undefined) ||
+      (typeof cr_item?.portraitImage === "string" ? cr_item.portraitImage : undefined) ||
+      (typeof cr_item?.portrait === "string" ? cr_item.portrait : undefined),
+  ];
+}
+
 export function getPortraitFallbackImages(asset: any, cr_item?: any): string[] {
   if (!asset && !cr_item) return [];
 
@@ -188,18 +209,8 @@ export function getPortraitFallbackImages(asset: any, cr_item?: any): string[] {
     (typeof cr_item?.landscapeImage === "string" ? cr_item.landscapeImage : undefined) ||
     (typeof cr_item?.landscape === "string" ? cr_item.landscape : undefined);
 
-  // 7. Additional fallback: portrait crops (ratio 4, ratio 2, or default)
-  const portraitRatio4 = rawPortraitArr?.find((img: any) => Number(img?.ratio_id) === 4)?.url;
-  const portraitRatio2 = rawPortraitArr?.find((img: any) => Number(img?.ratio_id) === 2)?.url;
-  const portraitDefault =
-    rawPortraitArr?.find((img: any) => img?.is_default)?.url ||
-    rawPortraitArr?.[0]?.url ||
-    (typeof asset?.portrait === "object" && asset?.portrait !== null && "url" in asset.portrait ? asset.portrait.url : undefined) ||
-    (typeof asset?.portraitImage === "string" ? asset.portraitImage : undefined) ||
-    (typeof asset?.portrait_image === "string" ? asset.portrait_image : undefined) ||
-    (typeof asset?.portrait === "string" ? asset.portrait : undefined) ||
-    (typeof cr_item?.portraitImage === "string" ? cr_item.portraitImage : undefined) ||
-    (typeof cr_item?.portrait === "string" ? cr_item.portrait : undefined);
+  // 7. Real portrait (2:3) poster art (ratio 4, ratio 2, or default)
+  const [portraitRatio4, portraitRatio2, portraitDefault] = getPortraitArtImages(asset, cr_item, rawPortraitArr);
 
   // 8. General fallback: image / thumbnail
   const genericImage =
@@ -208,16 +219,19 @@ export function getPortraitFallbackImages(asset: any, cr_item?: any): string[] {
     (typeof cr_item?.image === "string" ? cr_item.image : undefined) ||
     (typeof cr_item?.thumbnail === "string" ? cr_item.thumbnail : undefined);
 
+  // Real portrait art first: POSTER ratio 4 is a 16:9 frame (e.g.
+  // "preview-image-1920x1080"), and cropped to a 2:3 card it showed a zoomed
+  // middle slice. The poster-type images remain the fallback.
   const rawList: (string | undefined)[] = [
+    portraitRatio4,
+    portraitRatio2,
+    portraitDefault,
     posterRatio4,
     posterRatio3,
     posterRatio1,
     posterDefault,
     landscapeRatio1,
     landscapeDefault,
-    portraitRatio4,
-    portraitRatio2,
-    portraitDefault,
     genericImage,
   ];
 
@@ -499,6 +513,8 @@ export function mapApiRailItem(
     posterImageRatio4,
     portraitFallbackImages,
     landscapeFallbackImages,
+    // Portrait art carries its own title typography; portrait cards skip the logo overlay.
+    hasPortraitArt: getPortraitArtImages(asset, cr_item).some(Boolean),
     heroImage,
     thumbnailImage: image,
     title_image: (() => {

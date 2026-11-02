@@ -381,7 +381,7 @@
     "jojo_movies_logo_alt": "JOJO મૂવીઝ",
     "top10": "ટૉપ 10",
     "tvod_rental": "ભાડે",
-    "top": "ટૉપ {rank}",
+    "top": "#{rank} | ટૉપ 10",
     "cast_crew": "કલાકારો અને ક્રૂ",
     "new_arrivals": "નવીનતમ ઉમેરો",
     "more_like_this": "આના જેવા વધુ",

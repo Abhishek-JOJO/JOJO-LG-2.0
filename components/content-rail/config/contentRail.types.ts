@@ -52,6 +52,8 @@ export interface ContentRailItem {
    * 8. Generic image / thumbnail
    */
   portraitFallbackImages?: string[];
+  /** True when portraitFallbackImages starts with real 2:3 poster art (title printed on it). */
+  hasPortraitArt?: boolean;
   /** Ordered list of fallback image URLs for landscape cards matching client fallback cascade:
    * 1. POSTER Ratio 4
    * 2. POSTER Ratio 1

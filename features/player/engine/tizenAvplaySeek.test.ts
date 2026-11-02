@@ -106,6 +106,19 @@ test('a failed seek is not a playback error and does not block later seeks', () 
   seeks[1].ok();
 });
 
+test('a resume seek that fails before playback is retried once playback reports', () => {
+  const { adapter, internals, seeks, tick } = createSeekingAdapter();
+  internals.lastTimeUpdateAt = 0; // load-time resume: playback hasn't reported yet
+  adapter.seek(174.66);
+  assert.deepEqual(seeks.map((s) => s.ms), [174_660], 'runs at once, before play()');
+  seeks[0].fail(new Error('PLAYER_ERROR_SEEK_FAILED'));
+  tick(0); // playback started from 0
+  assert.deepEqual(seeks.map((s) => s.ms), [174_660, 174_660], 'retried');
+  seeks[1].fail(new Error('PLAYER_ERROR_SEEK_FAILED'));
+  tick(500);
+  assert.equal(seeks.length, 2, 'only once');
+});
+
 test('the seek bar shows the target at once and ignores stale positions mid-seek', () => {
   const { adapter, seeks, timeUpdates, tick } = createSeekingAdapter();
   adapter.seek(110);

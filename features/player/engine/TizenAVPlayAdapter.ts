@@ -103,6 +103,8 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
   /** A native seekTo is running; newer requests wait in queuedSeekMs (only the latest is kept). */
   private seekInFlight = false;
   private queuedSeekMs: number | null = null;
+  /** The resume seek failed before playback started; tried once more on the first time report. */
+  private resumeRetryMs: number | null = null;
   private seekSettleTimer: ReturnType<typeof setTimeout> | null = null;
   private seekCoalesceTimer: ReturnType<typeof setTimeout> | null = null;
   private playbackSpeed: PlaybackSpeed = 1;
@@ -300,6 +302,7 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     const avplay = this.avplay;
     if (!avplay || this.destroyed) return;
     this.seekInFlight = true;
+    const beforePlayback = this.lastTimeUpdateAt === 0;
     let settled = false;
     const settle = () => {
       if (settled) return;
@@ -316,6 +319,10 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     // reloading the whole session — a visible restart for a missed seek.
     const fail = (error: unknown) => {
       logger.warn('[TizenAVPlayAdapter] Seek failed; playback continues', { targetMs, error: errorMessage(error) });
+      // The resume seek fails when the target segment is slow to arrive
+      // (blocked 5.2s then failed on a Tizen 8 TV): the movie then restarted
+      // from 0. Retry once playback is running instead of losing the position.
+      if (beforePlayback) this.resumeRetryMs = targetMs;
       settle();
     };
     this.seekSettleTimer = setTimeout(settle, SEEK_SETTLE_TIMEOUT_MS);
@@ -479,6 +486,7 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     this.seekCoalesceTimer = null;
     this.seekInFlight = false;
     this.queuedSeekMs = null;
+    this.resumeRetryMs = null;
     this.suspendedForBackground = false;
 
     // The player's mute control can only reach the TV's global mute; leaving
@@ -669,6 +677,13 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
         // While a native seek runs AVPlay still reports pre-seek positions;
         // passing them on made the seek bar jump back, then forward again.
         if (this.seeking) return;
+        if (this.resumeRetryMs !== null) {
+          const retryMs = this.resumeRetryMs;
+          this.resumeRetryMs = null;
+          this.lastTimeUpdateAt = Date.now(); // playing now: a failed retry isn't retried again
+          this.seek(retryMs / 1000, { immediate: true });
+          return;
+        }
         this.currentTimeSeconds = milliseconds / 1000;
         const now = Date.now();
         if (now - this.lastTimeUpdateAt < TIME_UPDATE_INTERVAL_MS) return;

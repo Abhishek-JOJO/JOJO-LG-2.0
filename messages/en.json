@@ -381,7 +381,7 @@
     "jojo_movies_logo_alt": "JOJO Movies",
     "top10": "TOP 10",
     "tvod_rental": "Rental",
-    "top": "TOP {rank}",
+    "top": "#{rank} | TOP 10",
     "cast_crew": "Cast & Crew",
     "new_arrivals": "New Arrivals",
     "more_like_this": "More Like This",

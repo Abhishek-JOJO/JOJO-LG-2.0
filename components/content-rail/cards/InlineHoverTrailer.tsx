@@ -18,12 +18,12 @@ import {
 const VIDEO_PREVIEW_DWELL_MS = 1200;
 // Tizen splits that wait: AVPlay starts preparing (manifest + first segments,
 // most of the start-up time) once the card is clearly settled on, and starts
-// playing at the full dwell. The download then overlaps the dwell instead of
-// only starting after it. Not sooner: closing a session that got prepared
-// blocks the TV's main thread for 0.5-0.75s, so a preview opened while the
-// user is still stepping through rails (~0.3-0.6s per press) costs a stall.
-const TIZEN_PREPARE_AFTER_MS = 600;
-const TIZEN_PLAY_AFTER_MS = 800;
+// playing at the full dwell. Not sooner: at 600ms, browsing a rail at ~1 press
+// a second opened, downloaded and closed a trailer on every card (8 sessions
+// for 8 presses on a Tizen 8 TV) and doubled main-thread blocking (3.6-4.1s
+// vs 1.0-1.7s with previews off); each close alone blocks 0.1-0.75s.
+const TIZEN_PREPARE_AFTER_MS = 1500;
+const TIZEN_PLAY_AFTER_MS = 1700;
 
 interface InlineHoverTrailerProps {
   item: ContentRailItem;

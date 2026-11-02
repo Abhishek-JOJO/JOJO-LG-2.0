@@ -53,16 +53,17 @@ export function getLandscapeCardImageUrl(
 
 /**
  * Portrait card fallback cascade:
- * 1. POSTER Ratio 4 -> 2. POSTER Ratio 3 -> 3. POSTER Ratio 1 -> 4. POSTER (null)
- * -> 5. LANDSCAPE Ratio 1 -> 6. LANDSCAPE (null) -> 7. PORTRAIT -> 8. Generic
+ * 1. PORTRAIT (real 2:3 art) -> 2. POSTER Ratio 4 -> 3. POSTER Ratio 3 -> 4. POSTER Ratio 1
+ * -> 5. POSTER (null) -> 6. LANDSCAPE Ratio 1 -> 7. LANDSCAPE (null) -> 8. Generic
+ * (POSTER Ratio 4 is a 16:9 frame; cropped to 2:3 it looked zoomed in.)
  */
 export function getPortraitCardImages(item: ContentRailItem): string[] {
   if (item.portraitFallbackImages && item.portraitFallbackImages.length > 0) {
     return item.portraitFallbackImages;
   }
   return uniqueUrls([
-    item.posterImageRatio4,
     item.portraitImage,
+    item.posterImageRatio4,
     item.posterImage,
     item.landscapeImage,
     item.image,

@@ -1712,6 +1712,8 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     asset.isUpcomingScheduled === true &&
     Array.isArray(asset.asset_tags) &&
     asset.asset_tags.some((tag: any) => typeof tag === "string" && tag.toLowerCase().includes("coming soon"));
+  const showNewBadge = !isComingSoon && !!asset.asset_tags_badgeText?.toLowerCase().includes("new");
+  const showTop10Badge = isHomePage && !!asset.isInTop10;
 
   const effectiveTitleImage =
     asset.titleImage ||
@@ -1927,39 +1929,43 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         )}
       </div>
 
-      <div className={isStandalone ? `absolute inset-x-0 top-[46vh] -translate-y-1/2 z-20 px-6 sm:px-10 lg:px-16 flex flex-col gap-3.5 sm:gap-4 max-w-[820px] transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}` : "relative z-20 -mt-px px-6 pt-5 sm:pt-6 pb-10 sm:pb-12 bg-theme_10 flex flex-col gap-5"}>
+      <div className={isStandalone ? `absolute inset-x-0 top-[46vh] -translate-y-1/2 z-20 px-6 sm:px-10 lg:px-16 flex flex-col gap-3.5 sm:gap-4 max-w-[1000px] transition-opacity duration-300 ease-out ${contentOverlayOpen ? "opacity-0 pointer-events-none" : "opacity-100"}` : "relative z-20 -mt-px px-6 pt-5 sm:pt-6 pb-10 sm:pb-12 bg-theme_10 flex flex-col gap-5"}>
         {/* Title or Logo */}
         <div className="max-w-[85%] sm:max-w-[80%] lg:max-w-[700px] mb-0.5">
           {titleBlock}
         </div>
 
-        {/* Metadata Details Block: Badges, Rank, Genre, Description */}
-        <div className="flex flex-col items-start gap-2.5">
-          {/* Rank & Metadata Badges Row */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Show the "New" tag only when this is NOT a Coming Soon asset */}
-            {!isComingSoon && asset.asset_tags_badgeText && asset.asset_tags_badgeText.toLowerCase().includes("new") && (
-              <span className="px-4 py-1.5 rounded-full bg-white/15 text-white text-base font-bold uppercase tracking-wider">
-                {asset.asset_tags_badgeText}
-              </span>
-            )}
-            {isHomePage && asset.isInTop10 && (
-              <span className="px-4 py-1.5 rounded-full bg-[#FF8800]/15 border border-[#FF8800]/40 text-[#FF8800] text-base font-bold uppercase tracking-wider">
-                {t("top", { rank: asset?.numberintop10 || 10 })}
-              </span>
-            )}
+        {/* Metadata Details Block: Rank/New badge, Badges, Genre, Description */}
+        <div className="flex flex-col items-start gap-3.5">
+          {(showNewBadge || showTop10Badge) && (
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {showNewBadge && (
+                <span className="px-4 py-2.5 rounded-full bg-[#2A1407] text-[#FF6A00] text-[22px] leading-none font-bold uppercase tracking-wide">
+                  {asset.asset_tags_badgeText}
+                </span>
+              )}
+              {showTop10Badge && (
+                <span className="px-4 py-2.5 rounded-full bg-[#2A1407] text-[#FF6A00] text-[22px] leading-none font-bold tracking-wide">
+                  {t("top", { rank: asset?.numberintop10 || 10 })}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Metadata Badges Row */}
+          <div className="flex items-center gap-2.5 flex-wrap">
             {asset.certification && (
-              <span className="px-4 py-1.5 rounded-full bg-white/10 text-white/90 border border-white/15 text-base font-semibold uppercase tracking-wide">
+              <span className="px-4 py-3 rounded-full bg-white/15 text-white/75 text-2xl leading-none font-normal">
                 {asset.certification}
               </span>
             )}
             {(asset.releaseDate || asset.release_date || asset.asset_release_date) && (
-              <span className="px-4 py-1.5 rounded-full bg-white/10 text-white/90 border border-white/15 text-base font-semibold uppercase tracking-wide">
+              <span className="px-4 py-3 rounded-full bg-white/15 text-white/75 text-2xl leading-none font-normal">
                 {(asset.releaseDate || asset.release_date || asset.asset_release_date).split('-')[0]}
               </span>
             )}
             {(isShow ? (asset.seasons?.length || 0) > 0 : !!asset.durationSeconds) && (
-              <span className="px-4 py-1.5 rounded-full bg-white/10 text-white/90 border border-white/15 text-base font-semibold uppercase tracking-wide">
+              <span className="px-4 py-3 rounded-full bg-white/15 text-white/75 text-2xl leading-none font-normal">
                 {isShow
                   ? `${asset.seasons?.length || 1} Season${(asset.seasons?.length || 1) > 1 ? "s" : ""}`
                   : asset.durationSeconds
@@ -1971,10 +1977,10 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
 
           {/* Genre Line */}
           {asset.genres && asset.genres.length > 0 && (
-            <div className="flex flex-wrap items-center text-xl font-bold text-white tracking-wide mt-0.5">
+            <div className="flex flex-wrap items-center text-[28px] leading-tight font-medium text-white">
               {asset.genres.map((genre: string, i: number) => (
                 <span key={i} className="flex items-center">
-                  {i > 0 && <span className="mx-2 text-white/40 font-normal">•</span>}
+                  {i > 0 && <span className="mx-2.5">•</span>}
                   {genre}
                 </span>
               ))}
@@ -1982,10 +1988,10 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           )}
 
           {/* Description Paragraph */}
-          <div className="text-[22px] leading-relaxed text-white/80 max-w-[760px] font-normal line-clamp-3 sm:line-clamp-4 mt-0.5">
+          <div className="text-[22px] leading-relaxed text-white max-w-[900px] font-normal line-clamp-3 sm:line-clamp-4 mt-2">
             {asset.description ? (
               <div
-                className="[&>p]:mb-2 [&>p:last-child]:mb-0 [&_*]:!text-white/80"
+                className="[&>p]:mb-2 [&>p:last-child]:mb-0 [&_*]:!text-white"
                 dangerouslySetInnerHTML={{ __html: asset.description }}
               />
             ) : (
