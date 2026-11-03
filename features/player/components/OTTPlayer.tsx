@@ -244,6 +244,8 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   // rests there (like other OTT apps) instead of on the player background,
   // where OK pauses — set during render below, read by the focus handlers.
   const skipFocusKeyRef = useRef<string | null>(null);
+  // The resume prompt owns the D-pad while it shows (set during render below).
+  const resumePromptOpenRef = useRef(false);
   const focusToControlsRef = useRef(false);
   const isPlayerFocusedRef = useRef(true);
   const seekForwardRef = useRef<(() => void) | null>(null);
@@ -269,7 +271,8 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
     hideTimerRef.current = setTimeout(() => {
       setControlsVisible(false);
       // Back to the player background — or to Skip Intro while it's showing.
-      setFocus(skipFocusKeyRef.current ?? 'ott-player-main');
+      // Not while the resume prompt is up: that would pull focus off its buttons.
+      if (!resumePromptOpenRef.current) setFocus(skipFocusKeyRef.current ?? 'ott-player-main');
     }, 3000);
   }, []);
 
@@ -306,6 +309,8 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   useEffect(() => {
     const handleAnyKey = (e: KeyboardEvent) => {
       if (isBackEvent(e)) return;
+      // Arrows move between Resume / Start Over, not seek the paused video.
+      if (resumePromptOpenRef.current) return;
 
       // When controls are hidden, handle directional TV remote navigation:
       if (!controlsVisibleRef.current) {
@@ -453,6 +458,7 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
 
   // Resume prompt
   const [showResumePrompt, setShowResumePrompt] = useState(false);
+  resumePromptOpenRef.current = showResumePrompt;
   const [hasDismissedResume, setHasDismissedResume] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
   const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
@@ -1463,6 +1469,8 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   useEffect(() => {
     if (controlsVisible) {
       const timer = setTimeout(() => {
+        // Controls aren't mounted under the resume prompt; keep focus on its buttons.
+        if (resumePromptOpenRef.current) return;
         setFocus(skipFocusKeyRef.current ?? 'player-seekbar');
       }, 50);
       focusToControlsRef.current = false;
