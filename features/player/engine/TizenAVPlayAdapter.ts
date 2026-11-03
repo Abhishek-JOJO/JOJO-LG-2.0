@@ -37,6 +37,10 @@ const PREPARE_ASYNC_TIMEOUT_MS = 30000;
 const TIME_UPDATE_INTERVAL_MS = 250;
 // A seekTo whose callbacks never arrive must not block every later seek.
 const SEEK_SETTLE_TIMEOUT_MS = 5000;
+// After a seek (Skip Intro, FF/RW) or a subtitle switch AVPlay refills its
+// buffer before resuming: by default ~15s frozen on a ~1 Mbps TV connection
+// (measured on a Tizen 8 TV). Resume once this much is buffered.
+const RESUME_BUFFER_SECONDS = 4;
 // seekTo/jumpForward block the page for 0.4-4.7s on a Tizen 8 TV (measured;
 // it waits on the fetch at the new position). A burst of FF/RW presses lands
 // as one native seek to the newest target once the presses pause this long
@@ -51,10 +55,33 @@ class PrepareTimeoutError extends Error {
 
 const TIZEN_AVPLAY_CAPABILITIES: PlayerCapabilities = {
   playbackSpeeds: [1, 2],
-  qualitySelection: 'auto-only',
+  qualitySelection: 'manual',
   volumeControl: 'mute-only',
   captionStyling: false,
 };
+
+interface HlsVariant {
+  /** BANDWIDTH from the master playlist, in bps: what ADAPTIVE_INFO pins. */
+  bandwidth: number;
+  height: number;
+}
+
+/** One entry per resolution from an HLS master playlist, highest first; [] if not HLS/unreadable. */
+export async function fetchHlsVariants(manifestUrl: string): Promise<HlsVariant[]> {
+  try {
+    const text = await (await fetch(manifestUrl)).text();
+    const byHeight = new Map<number, number>();
+    for (const line of text.split('\n')) {
+      if (!line.startsWith('#EXT-X-STREAM-INF:')) continue;
+      const bandwidth = Number(/[:,]BANDWIDTH=(\d+)/.exec(line)?.[1]);
+      const height = Number(/RESOLUTION=\d+x(\d+)/.exec(line)?.[1]);
+      if (bandwidth > 0 && height > 0 && !byHeight.has(height)) byHeight.set(height, bandwidth);
+    }
+    return [...byHeight].map(([height, bandwidth]) => ({ height, bandwidth })).sort((a, b) => b.height - a.height);
+  } catch {
+    return [];
+  }
+}
 
 interface ParsedTrackInfo {
   language?: string;
@@ -88,6 +115,12 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
   private objectEl: HTMLObjectElement | null = null;
   private handlers: PlayerAdapterEventHandlers | null = null;
   private tracks: SamsungAVPlayTrack[] = [];
+  private manifestUrl = '';
+  private drmConfig: DrmConfig | null = null;
+  private variants: HlsVariant[] = [];
+  /** Variant pinned by a manual quality choice (bps), or null for Auto. */
+  private fixedBandwidth: number | null = null;
+  private qualitySwitch: Promise<void> = Promise.resolve();
   private currentTimeSeconds = 0;
   private durationSeconds = 0;
   private bufferedSeconds = 0;
@@ -143,6 +176,10 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     this.destroyed = false;
     this.avplay = avplay;
     this.videoEl = videoEl;
+    this.manifestUrl = manifestUrl;
+    this.drmConfig = drmConfig;
+    // Read alongside prepare (which takes far longer), for the quality menu.
+    const variantsPromise = fetchHlsVariants(manifestUrl);
     this.container = options?.videoContainer ?? videoEl.parentElement;
     if (!this.container) throw new Error('AVPlay requires a video container');
 
@@ -213,6 +250,10 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
       this.tracks = avplay.getTotalTrackInfo() ?? [];
       this.syncSelectedTracks();
       this.handlers?.onDurationChange(this.durationSeconds);
+      this.variants = await Promise.race([
+        variantsPromise,
+        new Promise<HlsVariant[]>((resolve) => setTimeout(() => resolve([]), 3000)),
+      ]);
 
       // Not seekTo before prepare: faster when it works, but on a Tizen 8 TV
       // prepareAsync then failed to report back in 2 of 4 tries (up to 23s).
@@ -334,10 +375,44 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
   }
 
   setQuality(qualityId: number): void {
-    // AVPlay performs native adaptive bitrate selection. A stable manual-quality
-    // API is not exposed across the supported Tizen generations.
-    if (qualityId !== -1) {
-      logger.warn('[TizenAVPlayAdapter] Manual quality selection is unavailable; keeping Auto');
+    const bandwidth = qualityId === -1
+      ? null
+      : this.variants.find((variant) => variant.bandwidth === qualityId)?.bandwidth ?? null;
+    if (!this.avplay || bandwidth === this.fixedBandwidth) return;
+    this.fixedBandwidth = bandwidth;
+    this.qualitySwitch = this.qualitySwitch.then(() => this.reopenAtCurrentPosition());
+  }
+
+  /**
+   * AVPlay fixes its bitrate range at prepare (ADAPTIVE_INFO, see openSession),
+   * so a quality change reopens the session where playback was.
+   */
+  private async reopenAtCurrentPosition(): Promise<void> {
+    const avplay = this.avplay;
+    if (!avplay || this.destroyed) return;
+    const position = this.getCurrentTime();
+    const wasPaused = this.isPaused();
+    this.handlers?.onBufferingStart(position);
+    try {
+      this.safeCloseExistingSession();
+      this.openSession(avplay, this.manifestUrl, this.drmConfig);
+      await this.prepareAsync(avplay);
+      if (this.destroyed) return;
+      this.tracks = avplay.getTotalTrackInfo() ?? [];
+      if (this.selectedTextIndex !== null) {
+        avplay.setSelectTrack('TEXT', this.selectedTextIndex);
+        avplay.setSilentSubtitle?.(false);
+      }
+      if (this.selectedAudioIndex !== null && this.tracks.filter((track) => track.type === 'AUDIO').length > 1) {
+        avplay.setSelectTrack('AUDIO', this.selectedAudioIndex);
+      }
+      // Before the first time report, seek() runs at once, ahead of play().
+      this.lastTimeUpdateAt = 0;
+      if (position > 0) this.seek(position);
+      if (!wasPaused) this.play();
+      this.handlers?.onBufferingEnd(position);
+    } catch (error) {
+      if (!this.destroyed) this.reportError('AVPLAY_QUALITY_SWITCH_FAILED', error, true);
     }
   }
 
@@ -353,20 +428,34 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
   }
 
   setSubtitleTrack(trackId: number): void {
-    if (!this.avplay) return;
+    const avplay = this.avplay;
+    if (!avplay) return;
+    let wasPlaying = false;
     try {
+      wasPlaying = avplay.getState() === 'PLAYING';
       if (trackId === -1) {
-        this.avplay.setSilentSubtitle?.(true);
+        avplay.setSilentSubtitle?.(true);
         this.selectedTextIndex = null;
-        return;
+      } else {
+        const track = this.tracks.find((item) => item.type === 'TEXT' && item.index === trackId);
+        if (!track) return;
+        avplay.setSelectTrack('TEXT', track.index);
+        avplay.setSilentSubtitle?.(false);
+        this.selectedTextIndex = track.index;
       }
-      const track = this.tracks.find((item) => item.type === 'TEXT' && item.index === trackId);
-      if (!track) return;
-      this.avplay.setSelectTrack('TEXT', track.index);
-      this.avplay.setSilentSubtitle?.(false);
-      this.selectedTextIndex = track.index;
     } catch (error) {
       logger.warn('[TizenAVPlayAdapter] Unable to select subtitle track', { trackId, error });
+    }
+    // A text-track switch can leave AVPlay paused (reported as "subtitles pause
+    // the video"); it never says so, so check and carry on playing.
+    if (wasPlaying) {
+      setTimeout(() => {
+        try {
+          if (this.avplay === avplay && !this.destroyed && avplay.getState() === 'PAUSED') avplay.play();
+        } catch {
+          // Session closed meanwhile.
+        }
+      }, 500);
     }
   }
 
@@ -410,7 +499,16 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
   }
 
   getQualities(): QualityOption[] {
-    return [{ id: -1, label: 'Auto', height: null, bitrate: null, isAuto: true }];
+    return [
+      { id: -1, label: 'Auto', height: null, bitrate: null, isAuto: true },
+      ...this.variants.map((variant) => ({
+        id: variant.bandwidth,
+        label: `${variant.height}p`,
+        height: variant.height,
+        bitrate: variant.bandwidth,
+        isAuto: false,
+      })),
+    ];
   }
 
   getAudioTracks(): AudioTrack[] {
@@ -577,6 +675,21 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
       avplay.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX');
     } catch (e) {
       logger.warn('[TizenAVPlayAdapter] setDisplayMethod failed', { error: e });
+    }
+    try {
+      // Must be set before prepare; optional on older firmware.
+      avplay.setBufferingParam?.('PLAYER_BUFFER_FOR_RESUME', 'PLAYER_BUFFER_SIZE_IN_SECOND', RESUME_BUFFER_SECONDS);
+    } catch (e) {
+      logger.warn('[TizenAVPlayAdapter] setBufferingParam failed', { error: e });
+    }
+    if (this.fixedBandwidth !== null) {
+      try {
+        // Pins one variant (bps; a Tizen 8 TV ignored the same values in kbps).
+        const bandwidth = this.fixedBandwidth;
+        avplay.setStreamingProperty?.('ADAPTIVE_INFO', `BITRATES=${bandwidth}~${bandwidth}|STARTBITRATE=${bandwidth}`);
+      } catch (e) {
+        logger.warn('[TizenAVPlayAdapter] Pinning quality failed; playing Auto', { error: e });
+      }
     }
     this.configureDrm(drmConfig);
   }

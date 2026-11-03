@@ -17,7 +17,7 @@ test('Tizen AVPlay exposes only controls it can safely apply', () => {
   const capabilities = adapter.getCapabilities();
 
   assert.deepEqual(capabilities.playbackSpeeds, [1, 2]);
-  assert.equal(capabilities.qualitySelection, 'auto-only');
+  assert.equal(capabilities.qualitySelection, 'manual');
   assert.equal(capabilities.volumeControl, 'mute-only');
   assert.equal(capabilities.captionStyling, false);
   assert.equal(adapter.setPlaybackSpeed(0.5), false);

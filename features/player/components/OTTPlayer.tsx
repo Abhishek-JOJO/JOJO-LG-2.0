@@ -64,6 +64,7 @@ import type { AssetSeason, AssetEpisode } from '@features/asset/model/types';
 import { logger } from '@lib/logger/logger';
 import { analyticsService } from '@/shared/analytics';
 import { EVENT_NAMES } from '@/shared/analytics/constants/analytics.constants';
+import { isTizen } from '@/src/platform/detectPlatform';
 
 // Delay before warming the seek-bar thumbnail sprite (see the VTT effect below).
 const THUMBNAIL_PRELOAD_DELAY_MS = 15000;
@@ -490,6 +491,31 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
   // reserved for stalls a viewer would actually perceive as "stuck."
   const BUFFERING_LOADER_DELAY_MS = 500;
   const bufferingLoaderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // AVPlay can sit on one frame for many seconds after a seek (Skip Intro,
+  // FF/RW) or a subtitle switch while it refills its buffer, still reporting
+  // PLAYING and no buffering (15s on a slow TV connection). Without a loader
+  // that read as "the video stopped". Show it while the clock isn't moving.
+  const [isStalled, setIsStalled] = useState(false);
+  useEffect(() => {
+    if (!activeEngine || !isTizen()) return;
+    let lastTime = -1;
+    let lastAdvanceAt = Date.now();
+    const id = setInterval(() => {
+      const time = activeEngine.getCurrentTime();
+      if (time !== lastTime) {
+        lastTime = time;
+        lastAdvanceAt = Date.now();
+        setIsStalled(false);
+        return;
+      }
+      setIsStalled(usePlayerStore.getState().status === 'playing' && Date.now() - lastAdvanceAt > 1200);
+    }, 400);
+    return () => {
+      clearInterval(id);
+      setIsStalled(false);
+    };
+  }, [activeEngine]);
   // State-based flag for JSX: latched true when the next-episode overlay
   // is triggered while a seek is active. Unlike the ref (which clears after
   // 3s), this stays true for the lifetime of the overlay so the countdown
@@ -2152,10 +2178,10 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
         )}
 
         {/* Loading */}
-        {(status === 'loading' || status === 'buffering' || adState.isLoading) && !error && (
+        {(status === 'loading' || status === 'buffering' || isStalled || adState.isLoading) && !error && (
           <LoadingScreen
-            message={status === 'buffering' ? 'Buffering...' : 'Loading...'}
-            isBuffering={status === 'buffering'}
+            message={status === 'buffering' || isStalled ? 'Buffering...' : 'Loading...'}
+            isBuffering={status === 'buffering' || isStalled}
           />
         )}
 
