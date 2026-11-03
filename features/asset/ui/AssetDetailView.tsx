@@ -1981,7 +1981,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
           </div>
 
           {/* Genre Line */}
-          {asset.genres && asset.genres.length > 0 && (
+          {asset.genres && asset.genres.length > 0 ? (
             <div className="flex flex-wrap items-center text-[28px] leading-tight font-medium text-white">
               {asset.genres.map((genre: string, i: number) => (
                 <span key={i} className="flex items-center">
@@ -1990,6 +1990,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 </span>
               ))}
             </div>
+          ) : !clientAsset && (
+            // Card data has no genres; hold the row until the full detail lands so the block doesn't jump.
+            <div aria-hidden="true" className="text-[28px] leading-tight">&nbsp;</div>
           )}
 
           {/* Description Paragraph */}
