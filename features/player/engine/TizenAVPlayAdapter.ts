@@ -64,20 +64,32 @@ interface HlsVariant {
   /** BANDWIDTH from the master playlist, in bps: what ADAPTIVE_INFO pins. */
   bandwidth: number;
   height: number;
+  /** Absolute URL of the variant's media playlist. */
+  url: string;
 }
 
 /** One entry per resolution from an HLS master playlist, highest first; [] if not HLS/unreadable. */
 export async function fetchHlsVariants(manifestUrl: string): Promise<HlsVariant[]> {
   try {
     const text = await (await fetch(manifestUrl)).text();
-    const byHeight = new Map<number, number>();
-    for (const line of text.split('\n')) {
-      if (!line.startsWith('#EXT-X-STREAM-INF:')) continue;
-      const bandwidth = Number(/[:,]BANDWIDTH=(\d+)/.exec(line)?.[1]);
-      const height = Number(/RESOLUTION=\d+x(\d+)/.exec(line)?.[1]);
-      if (bandwidth > 0 && height > 0 && !byHeight.has(height)) byHeight.set(height, bandwidth);
+    const byHeight = new Map<number, HlsVariant>();
+    let pending: { bandwidth: number; height: number } | null = null;
+    for (const raw of text.split('\n')) {
+      const line = raw.trim();
+      if (line.startsWith('#EXT-X-STREAM-INF:')) {
+        pending = {
+          bandwidth: Number(/[:,]BANDWIDTH=(\d+)/.exec(line)?.[1]),
+          height: Number(/RESOLUTION=\d+x(\d+)/.exec(line)?.[1]),
+        };
+      } else if (pending && line && !line.startsWith('#')) {
+        const { bandwidth, height } = pending;
+        pending = null;
+        if (bandwidth > 0 && height > 0 && !byHeight.has(height)) {
+          byHeight.set(height, { bandwidth, height, url: new URL(line, manifestUrl).href });
+        }
+      }
     }
-    return [...byHeight].map(([height, bandwidth]) => ({ height, bandwidth })).sort((a, b) => b.height - a.height);
+    return [...byHeight.values()].sort((a, b) => b.height - a.height);
   } catch {
     return [];
   }
@@ -120,6 +132,10 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
   private variants: HlsVariant[] = [];
   /** Variant pinned by a manual quality choice (bps), or null for Auto. */
   private fixedBandwidth: number | null = null;
+  /** Playing one variant playlist, not the master (see load: silent master fallback). */
+  private muxedAudioOnly = false;
+  /** Variant used for Auto while muxedAudioOnly (no adaptive switching then). */
+  private autoBandwidth: number | null = null;
   private qualitySwitch: Promise<void> = Promise.resolve();
   private currentTimeSeconds = 0;
   private durationSeconds = 0;
@@ -178,6 +194,8 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     this.videoEl = videoEl;
     this.manifestUrl = manifestUrl;
     this.drmConfig = drmConfig;
+    this.muxedAudioOnly = false;
+    this.autoBandwidth = null;
     // Read alongside prepare (which takes far longer), for the quality menu.
     const variantsPromise = fetchHlsVariants(manifestUrl);
     this.container = options?.videoContainer ?? videoEl.parentElement;
@@ -224,27 +242,7 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
       // On Tizen the page background is a backdrop layer, not html/body
       // (globals.css); this drops it so the video plane shows behind the player.
       document.documentElement.classList.add(TIZEN_VIDEO_FULLSCREEN_CLASS);
-      this.safeCloseExistingSession();
-      this.openSession(avplay, manifestUrl, drmConfig);
-
-      // prepareAsync keeps the page responsive while the manifest (and any
-      // DRM license) loads — prepare() blocks the whole UI, loading spinner
-      // and Back key included, for that entire time. prepare() stays as the
-      // fallback, on a fresh session, for firmware where prepareAsync never
-      // reports back at all.
-      try {
-        await this.prepareAsync(avplay);
-      } catch (error) {
-        if (this.destroyed || !(error instanceof PrepareTimeoutError)) throw error;
-        logger.warn('[TizenAVPlayAdapter] prepareAsync never reported; retrying with synchronous prepare');
-        this.safeCloseExistingSession();
-        this.openSession(avplay, manifestUrl, drmConfig);
-        avplay.prepare();
-      }
-
-      if (this.destroyed) {
-        throw new Error('AVPlay was destroyed while preparing');
-      }
+      await this.openAndPrepare(avplay, manifestUrl, drmConfig);
 
       this.durationSeconds = Math.max(0, avplay.getDuration() / 1000);
       this.tracks = avplay.getTotalTrackInfo() ?? [];
@@ -254,6 +252,22 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
         variantsPromise,
         new Promise<HlsVariant[]>((resolve) => setTimeout(() => resolve([]), 3000)),
       ]);
+
+      // Some packagings (FFmpeg: a TS audio rendition plus the same audio muxed
+      // into each video TS) play silent on AVPlay: the master lists the audio
+      // track but AVPlay never selects it, and setSelectTrack is refused (seen
+      // on a Tizen 8 TV). A variant playlist alone plays its muxed audio.
+      if (this.variants.length > 0 && this.isAudioMissing(avplay)) {
+        this.muxedAudioOnly = true;
+        this.autoBandwidth = this.pickStartBandwidth(avplay);
+        logger.warn('[TizenAVPlayAdapter] Master played no audio; reopening on a variant playlist', {
+          manifestUrl,
+          bandwidth: this.fixedBandwidth ?? this.autoBandwidth,
+        });
+        await this.openAndPrepare(avplay, this.sessionUrl(), drmConfig);
+        this.tracks = avplay.getTotalTrackInfo() ?? [];
+        this.syncSelectedTracks();
+      }
 
       // Not seekTo before prepare: faster when it works, but on a Tizen 8 TV
       // prepareAsync then failed to report back in 2 of 4 tries (up to 23s).
@@ -395,7 +409,7 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     this.handlers?.onBufferingStart(position);
     try {
       this.safeCloseExistingSession();
-      this.openSession(avplay, this.manifestUrl, this.drmConfig);
+      this.openSession(avplay, this.sessionUrl(), this.drmConfig);
       await this.prepareAsync(avplay);
       if (this.destroyed) return;
       this.tracks = avplay.getTotalTrackInfo() ?? [];
@@ -663,6 +677,63 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     }
   }
 
+  /**
+   * prepareAsync keeps the page responsive while the manifest (and any DRM
+   * license) loads — prepare() blocks the whole UI, loading spinner and Back
+   * key included, for that entire time. prepare() stays as the fallback, on a
+   * fresh session, for firmware where prepareAsync never reports back at all.
+   */
+  private async openAndPrepare(avplay: SamsungAVPlay, url: string, drmConfig: DrmConfig | null): Promise<void> {
+    this.safeCloseExistingSession();
+    this.openSession(avplay, url, drmConfig);
+    try {
+      await this.prepareAsync(avplay);
+    } catch (error) {
+      if (this.destroyed || !(error instanceof PrepareTimeoutError)) throw error;
+      logger.warn('[TizenAVPlayAdapter] prepareAsync never reported; retrying with synchronous prepare');
+      this.safeCloseExistingSession();
+      this.openSession(avplay, url, drmConfig);
+      avplay.prepare();
+    }
+    if (this.destroyed) {
+      throw new Error('AVPlay was destroyed while preparing');
+    }
+  }
+
+  /** The master, or while muxedAudioOnly the chosen variant's own playlist. */
+  private sessionUrl(): string {
+    if (!this.muxedAudioOnly) return this.manifestUrl;
+    const bandwidth = this.fixedBandwidth ?? this.autoBandwidth;
+    return this.variants.find((variant) => variant.bandwidth === bandwidth)?.url ?? this.manifestUrl;
+  }
+
+  /** An audio track exists but AVPlay selected none. */
+  private isAudioMissing(avplay: SamsungAVPlay): boolean {
+    if (!this.tracks.some((track) => track.type === 'AUDIO')) return false;
+    try {
+      const current = avplay.getCurrentStreamInfo?.();
+      return !!current && !current.some((track) => track.type === 'AUDIO');
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * shortcut: a variant playlist has no adaptive switching, so Auto takes the
+   * best variant within a third of AVPlay's first estimate (it read 3.2 Mbps
+   * on a ~1.2 Mbps TV link). Gone once that content is repackaged.
+   */
+  private pickStartBandwidth(avplay: SamsungAVPlay): number {
+    let estimate = 0;
+    try {
+      estimate = Number(avplay.getStreamingProperty?.('CURRENT_BANDWIDTH')) || 0;
+    } catch {
+      // Unknown estimate: lowest variant.
+    }
+    const fitting = this.variants.find((variant) => variant.bandwidth <= estimate / 3);
+    return (fitting ?? this.variants[this.variants.length - 1]).bandwidth;
+  }
+
   private openSession(avplay: SamsungAVPlay, manifestUrl: string, drmConfig: DrmConfig | null): void {
     avplay.open(manifestUrl);
     avplay.setListener(this.createListener());
@@ -682,7 +753,8 @@ export class TizenAVPlayAdapter implements PlayerAdapter {
     } catch (e) {
       logger.warn('[TizenAVPlayAdapter] setBufferingParam failed', { error: e });
     }
-    if (this.fixedBandwidth !== null) {
+    // A variant playlist (muxedAudioOnly) has one bitrate: nothing to pin.
+    if (this.fixedBandwidth !== null && !this.muxedAudioOnly) {
       try {
         // Pins one variant (bps; a Tizen 8 TV ignored the same values in kbps).
         const bandwidth = this.fixedBandwidth;
