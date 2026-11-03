@@ -8,17 +8,19 @@
  * splash restarted when hydration took it over on webOS); SplashScreenVideo
  * adopts it once mounted and dismisses it.
  *
- * Signed-in users land on Home behind the splash. If Home isn't ready by the
- * time the steady JOJO logo is on screen, the video waits on the logo and only
- * plays its zoom-through ending once Home has its content
- * (signalSplashAppReady) — so the splash hands over to the page, not to a
- * black or skeleton screen. Signed-out users go on to Login, so it never waits.
+ * Signed-in users land on Home behind the splash. The JOJO logo (the video's
+ * poster) stays on screen until Home has its content (signalSplashAppReady),
+ * and only then does the clip play its zoom-through — so the splash hands over
+ * to the page, not to a black or skeleton screen. Signed-out users go on to
+ * Login, so it plays at once.
  */
 
 declare global {
   interface Window {
     __JOJO_APP_READY__?: boolean;
     __JOJO_SPLASH_FAILED__?: boolean;
+    /** Set by BOOT_SPLASH_SCRIPT; found here even while momentarily detached. */
+    __JOJO_BOOT_SPLASH__?: { container: HTMLElement; video: HTMLVideoElement };
   }
 }
 
@@ -27,9 +29,12 @@ export const BOOT_SPLASH_VIDEO_ID = "jojo-splash-video";
 export const SPLASH_APP_READY_EVENT = "jojo-app-ready";
 export const SPLASH_FAILED_EVENT = "jojo-splash-failed";
 
-// The 3.6s clip shows the steady logo from ~1.8s to ~3.1s, then zooms through
-// the play icon. Hold mid-logo, leaving room for a late check to still land on it.
-const HOLD_AT_SECONDS = 2.6;
+// The 1.4s clip opens on the JOJO logo, zooms through its play icon and ends
+// on that bright frame (cut from the original 3.6s, whose first 1.4s and last
+// 0.1s were black). Its poster is that first frame, so the logo shows as soon
+// as the page paints — decoding the first frame took ~1.3s more on a Tizen 8 TV.
+export const SPLASH_VIDEO_SRC = "./video/APP_INTRO.mp4";
+export const SPLASH_POSTER_SRC = "./video/APP_INTRO_poster.jpg";
 // Never wait on the logo longer than this — the page's own loading states take over.
 const MAX_HOLD_MS = 4000;
 
@@ -50,30 +55,38 @@ export const BOOT_SPLASH_SCRIPT = `(function(){try{
 if(!window.__SPLASH_VIDEO_ACTIVE__)return;
 var c=document.createElement("div");
 c.id="${BOOT_SPLASH_CONTAINER_ID}";
-c.style.cssText="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;z-index:2147483647;transition:opacity 350ms ease-out;";
+// The poster is also the container background: drawn as a page layer, it shows
+// even where the video element (a TV media plane) has no frame yet.
+c.style.cssText="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000 url(${SPLASH_POSTER_SRC}) center/cover no-repeat;z-index:2147483647;transition:opacity 350ms ease-out;";
 var v=document.createElement("video");
 v.id="${BOOT_SPLASH_VIDEO_ID}";
 v.muted=true;v.setAttribute("muted","");v.setAttribute("playsinline","");
 v.preload="auto";v.disablePictureInPicture=true;
-v.style.cssText="width:100%;height:100%;object-fit:cover;background:#000;";
-v.src="./video/APP_INTRO.mp4";
+v.style.cssText="width:100%;height:100%;object-fit:cover;background:transparent;";
+v.poster="${SPLASH_POSTER_SRC}";
+v.src="${SPLASH_VIDEO_SRC}";
 c.appendChild(v);
-(document.body||document.documentElement).appendChild(c);
+var root=document.body||document.documentElement;
+root.appendChild(c);
+window.__JOJO_BOOT_SPLASH__={container:c,video:v};
 
 var signedIn=false;
 try{var tok=localStorage.getItem("ott_auth_token");var u=JSON.parse(localStorage.getItem("user")||"null");
 signedIn=!!(tok&&u&&!u.isGuest&&(u.id||u.user_id||u.email||u.phone||u.profiles));}catch(e){}
-var ready=!signedIn||window.__JOJO_APP_READY__===true;
-var holding=false;
-function release(){ready=true;if(holding){holding=false;var r=v.play();if(r&&r.catch)r.catch(function(){});}}
-document.addEventListener("${SPLASH_APP_READY_EVENT}",release);
-function watch(){
-  if(ready||v.ended||v.paused)return;
-  if(v.currentTime>=${HOLD_AT_SECONDS}){v.pause();holding=true;setTimeout(release,${MAX_HOLD_MS});return;}
-  requestAnimationFrame(watch);
-}
-v.addEventListener("playing",function(){if(!ready&&!holding)requestAnimationFrame(watch);});
 function fail(){window.__JOJO_SPLASH_FAILED__=true;document.dispatchEvent(new CustomEvent("${SPLASH_FAILED_EVENT}"));}
 v.addEventListener("error",fail);
-var p=v.play();if(p&&p.catch)p.catch(fail);
+// Held on the poster, not paused mid-clip: the page's startup work kept the
+// main thread too busy to stop the video at a set time.
+var started=false;
+function start(){if(started)return;started=true;var p=v.play();if(p&&p.catch)p.catch(fail);}
+document.addEventListener("${SPLASH_APP_READY_EVENT}",start);
+if(!signedIn||window.__JOJO_APP_READY__===true)start();else setTimeout(start,${MAX_HOLD_MS});
+// When hydration fails React rebuilds <body>, deleting every node it didn't
+// render (this splash included). Put it straight back and keep it playing.
+if(window.MutationObserver){var mo=new MutationObserver(function(){
+  if(!window.__SPLASH_VIDEO_ACTIVE__){mo.disconnect();return;}
+  if(root.contains(c))return;
+  root.appendChild(c);
+  if(started&&!v.ended){var r=v.play();if(r&&r.catch)r.catch(function(){});}
+});mo.observe(root,{childList:true});}
 }catch(e){}})();`;

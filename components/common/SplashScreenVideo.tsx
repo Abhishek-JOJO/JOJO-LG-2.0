@@ -5,7 +5,13 @@ import { setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navi
 import { useRouter } from "next/navigation";
 import { ROUTES } from "@/lib/constants/routes";
 import { isTizenWebSimulator } from "@/src/platform/detectPlatform";
-import { BOOT_SPLASH_CONTAINER_ID, BOOT_SPLASH_VIDEO_ID, SPLASH_FAILED_EVENT } from "@/lib/boot/splash";
+import {
+  BOOT_SPLASH_CONTAINER_ID,
+  BOOT_SPLASH_VIDEO_ID,
+  SPLASH_FAILED_EVENT,
+  SPLASH_POSTER_SRC,
+  SPLASH_VIDEO_SRC,
+} from "@/lib/boot/splash";
 
 declare global {
   interface Window {
@@ -15,7 +21,7 @@ declare global {
 }
 
 const SPLASH_SESSION_KEY = "jojo_splash_video_played";
-// Emergency safety cap: video is 3.6s; this 10s timeout ONLY fires if video decoder completely crashes
+// Emergency safety cap: video is 1.9s; this 10s timeout ONLY fires if video decoder completely crashes
 const EMERGENCY_FALLBACK_TIMEOUT_MS = 10000;
 
 export function SplashScreenVideo() {
@@ -66,13 +72,14 @@ export function SplashScreenVideo() {
 
     // Release TV hardware video decoder pipeline
     const splashVideo = videoRef.current ?? bootSplashRef.current?.video ?? null;
-    if (splashVideo) {
+    const releaseVideo = () => {
+      if (!splashVideo) return;
       try {
         splashVideo.pause();
         splashVideo.removeAttribute("src");
         splashVideo.load();
       } catch {}
-    }
+    };
 
     if (isAuthenticated) {
       // User is authenticated: fade out smoothly (350ms) to reveal Home screen
@@ -83,7 +90,10 @@ export function SplashScreenVideo() {
       } else {
         setIsFadingOut(true);
       }
+      // Released after the fade: clearing src first blanked the frame, so the
+      // logo handed over through a black flash instead of fading into Home.
       setTimeout(() => {
+        releaseVideo();
         if (bootSplash) bootSplash.container.remove();
         else setShouldRender(false);
         try {
@@ -105,6 +115,7 @@ export function SplashScreenVideo() {
         setTimeout(restoreFocus, 60);
       }, 350);
     } else {
+      releaseVideo();
       // Unauthenticated user: dispatch tv-splash-finished immediately so TV Auth Gate transitions to login.
       // We keep the splash curtain solid black to prevent any flash of home page content!
       try {
@@ -154,8 +165,10 @@ export function SplashScreenVideo() {
 
       // Adopt the boot splash: it has been playing since first paint, and
       // has already ended (or failed) if the app took longer than the clip.
-      const bootVideo = document.getElementById(BOOT_SPLASH_VIDEO_ID) as HTMLVideoElement | null;
-      const bootContainer = document.getElementById(BOOT_SPLASH_CONTAINER_ID);
+      // The global handle, not only the ids: React's rebuild of <body> after a
+      // hydration mismatch detaches it for a moment (the boot script re-adds it).
+      const bootVideo = window.__JOJO_BOOT_SPLASH__?.video ?? (document.getElementById(BOOT_SPLASH_VIDEO_ID) as HTMLVideoElement | null);
+      const bootContainer = window.__JOJO_BOOT_SPLASH__?.container ?? document.getElementById(BOOT_SPLASH_CONTAINER_ID);
       if (bootVideo && bootContainer) {
         bootSplashRef.current = { container: bootContainer, video: bootVideo };
         if (bootVideo.ended || bootVideo.error || window.__JOJO_SPLASH_FAILED__) {
@@ -220,7 +233,8 @@ export function SplashScreenVideo() {
     >
       <video
         ref={videoRef}
-        src="./video/APP_INTRO.mp4"
+        src={SPLASH_VIDEO_SRC}
+        poster={SPLASH_POSTER_SRC}
         muted
         playsInline
         preload="auto"
