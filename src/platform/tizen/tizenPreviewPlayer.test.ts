@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { SamsungAVPlayListener, SamsungAVPlayState } from "../types";
-import { computeCoverRect, startTizenPreview, stopTizenPreview } from "./tizenPreviewPlayer";
+import { computeCoverRect, holePoints, startTizenPreview, stopTizenPreview } from "./tizenPreviewPlayer";
 
 // Minimal DOM + AVPlay stand-ins: just the surface tizenPreviewPlayer touches.
 class FakeElement {
@@ -327,4 +327,18 @@ test("previews start on a short buffer, set before prepare", () => {
   const preview = startTizenPreview({ url: "https://cdn/p.m3u8", target });
   assert.ok(avplay.calls.includes("buffer:PLAYER_BUFFER_FOR_PLAY:PLAYER_BUFFER_SIZE_IN_SECOND:2"));
   preview.stop();
+});
+
+test("the backdrop hole follows a rounded frame's corners instead of painting a ring round it", () => {
+  const points = holePoints(0, 0, 200, 100, 32).split(", ");
+  assert.equal(points[0], "168px 0px", "top edge ends where the top-right curve starts");
+  assert.equal(points[8], "200px 32px", "a quarter turn later the curve meets the right edge");
+  assert.equal(points.at(-1), points[0], "outline closes");
+  for (const point of points) {
+    const [x, y] = point.split(" ").map((v) => parseFloat(v));
+    assert.ok(x >= 0 && x <= 200 && y >= 0 && y <= 100, `${point} stays inside the box`);
+  }
+  assert.ok(!points.includes("200px 0px"), "the square corner itself stays covered by the backdrop");
+  assert.equal(holePoints(0, 0, 40, 20, 32).split(", ")[0], "30px 0px", "radius clamps to half the shorter side");
+  assert.equal(holePoints(1, 2, 3, 4, 0), "1px 2px, 3px 2px, 3px 4px, 1px 4px, 1px 2px", "square box: plain rectangle");
 });

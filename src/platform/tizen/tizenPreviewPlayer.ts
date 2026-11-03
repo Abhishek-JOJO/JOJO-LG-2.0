@@ -7,11 +7,12 @@
  * movie player already uses — renders reliably, but on a hardware video plane
  * *behind* the web page, so the page has to be see-through wherever the video
  * shows. Once a preview's frames are on screen, its box and every ancestor
- * get `tizen-video-passthrough` (globals.css makes them transparent, fades
- * out artwork marked `data-tizen-video-cover`, and masks the rounded corners
- * of `data-tizen-video-frame` boxes), and every layer that sits behind the
- * page content (`data-tizen-video-backdrop`: the page backdrop, the ambient
- * tint) gets a hole cut exactly over the box. The video is sized like `object-fit: cover` —
+ * get `tizen-video-passthrough` (globals.css makes them transparent and fades
+ * out artwork marked `data-tizen-video-cover`), and every layer that sits
+ * behind the page content (`data-tizen-video-backdrop`: the page backdrop, the
+ * ambient tint) gets a hole cut exactly over the box — with the corner radius
+ * of the enclosing `data-tizen-video-frame`, so the backdrop itself fills the
+ * corners the square video would show in. The video is sized like `object-fit: cover` —
  * AVPlay can't crop, so its rect may overhang the box, and the opaque
  * backdrop around the hole hides the overhang.
  *
@@ -163,6 +164,42 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), Math.max(min, max));
 }
 
+const ARC_STEPS = 8;
+
+/**
+ * The inner outline of the backdrop hole, as `polygon()` points: the box,
+ * with corners rounded to `radius` (polygon() works on every Tizen engine;
+ * a rounded path() needs Chromium 88).
+ */
+export function holePoints(l: number, t: number, r: number, b: number, radius: number): string {
+  const R = Math.min(Math.max(radius, 0), (r - l) / 2, (b - t) / 2);
+  if (R <= 0) return `${l}px ${t}px, ${r}px ${t}px, ${r}px ${b}px, ${l}px ${b}px, ${l}px ${t}px`;
+  const round = (n: number) => Math.round(n * 10) / 10;
+  const points: string[] = [];
+  // Corner centres clockwise from top-right, each arc a quarter turn (y points down).
+  const corners: Array<[number, number, number]> = [
+    [r - R, t + R, -90],
+    [r - R, b - R, 0],
+    [l + R, b - R, 90],
+    [l + R, t + R, 180],
+  ];
+  for (const [cx, cy, start] of corners) {
+    for (let i = 0; i <= ARC_STEPS; i++) {
+      const angle = ((start + (90 * i) / ARC_STEPS) * Math.PI) / 180;
+      points.push(`${round(cx + R * Math.cos(angle))}px ${round(cy + R * Math.sin(angle))}px`);
+    }
+  }
+  points.push(points[0]);
+  return points.join(", ");
+}
+
+/** Corner radius of the rounded box the preview sits in, or 0. */
+function frameRadius(target: HTMLElement): number {
+  const frame = target.closest?.("[data-tizen-video-frame]");
+  if (!frame || typeof getComputedStyle !== "function") return 0;
+  return parseFloat(getComputedStyle(frame).borderTopLeftRadius) || 0;
+}
+
 function applyPassthrough(session: Session): void {
   for (let el: HTMLElement | null = session.options.target; el; el = el.parentElement) {
     el.classList.add(PASSTHROUGH_CLASS);
@@ -176,12 +213,13 @@ function applyPassthrough(session: Session): void {
   const { width, height } = getViewport();
   const left = clamp(box.left, 0, width), top = clamp(box.top, 0, height);
   const right = clamp(box.right, 0, width), bottom = clamp(box.bottom, 0, height);
+  const radius = frameRadius(session.options.target);
   for (const backdrop of getBackdrops()) {
     const origin = backdrop.getBoundingClientRect();
     const l = left - origin.left, t = top - origin.top;
     const r = right - origin.left, b = bottom - origin.top;
     backdrop.style.clipPath =
-      `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${l}px ${t}px, ${r}px ${t}px, ${r}px ${b}px, ${l}px ${b}px, ${l}px ${t}px)`;
+      `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${holePoints(l, t, r, b, radius)})`;
   }
   // Scrolling moves the box out from under the hole and the display rect.
   window.addEventListener("scroll", interruptPreview, { passive: true });

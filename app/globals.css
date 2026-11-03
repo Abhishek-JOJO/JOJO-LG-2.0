@@ -1261,10 +1261,11 @@ html.tv-tizen section[data-section-index] {
    .tizen-video-passthrough:
    - their backgrounds go transparent so the plane shows through
      (outside the video rect the plane is black, i.e. the page bg);
-   - poster artwork marked data-tizen-video-cover fades out;
-   - rounded boxes marked data-tizen-video-frame paint the page
-     colour just outside their curve, masking the video's square
-     corners (the spread covers the corner pocket of a 32px radius).
+   - poster artwork marked data-tizen-video-cover fades out.
+   The hole cut in the backdrop layers takes the corner radius of the
+   enclosing data-tizen-video-frame, so the backdrop fills the corners
+   the square video would show in (a 16px page-colour box-shadow did
+   that before, and drew a dark ring round the hero over the ambient tint).
 ============================================================ */
 html.tv-tizen.tizen-video-passthrough,
 html.tv-tizen .tizen-video-passthrough {
@@ -1303,9 +1304,3 @@ html.tv-tizen .tizen-video-passthrough > [data-tizen-video-cover] {
   transition: opacity 500ms ease-out;
 }
 
-html.tv-tizen .tizen-video-passthrough[data-tizen-video-frame] {
-  box-shadow: 0 0 0 16px var(--theme_12) !important;
-  /* Applied instantly: the plane shows in the corners the moment the
-     parent goes transparent, so an animated mask would let them flash. */
-  transition: none !important;
-}
