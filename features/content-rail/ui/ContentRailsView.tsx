@@ -285,6 +285,19 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     enabled: isAppReady,
   });
 
+  // handleWatch closes over the gating asset of the render it came from. Called
+  // right after setGatingAsset (even via setTimeout) it still saw the previous
+  // item (null on the first click), so the SVOD/TVOD gates were skipped: a Gold
+  // title went to the player for a non-Gold user and failed there. Run it once
+  // the clicked item's asset is in.
+  const pendingCwWatchRef = useRef<{ id: string; resumeTime: number } | null>(null);
+  useEffect(() => {
+    const pending = pendingCwWatchRef.current;
+    if (!pending || String(gatingAsset?.assetId) !== String(pending.id)) return;
+    pendingCwWatchRef.current = null;
+    handleWatch(pending.id, pending.resumeTime);
+  }, [gatingAsset, handleWatch]);
+
   const handleRailItemClick = useCallback((item: ContentRailItem) => {
     if (item?.redirectUrl) {
       router.push(item?.redirectUrl);
@@ -331,12 +344,10 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
       assetTypeCode: item.assetTypeCode || 1,
     } as any;
 
+    // handleWatch (run by the effect above) still guards mobile / auth /
+    // subscription gates and navigates.
+    pendingCwWatchRef.current = { id: item.id, resumeTime: item.progressSeconds || 0 };
     setGatingAsset(gatingPayload);
-
-    // handleWatch still guards mobile / auth / subscription gates and navigates
-    setTimeout(() => {
-      handleWatch(item.id, item.progressSeconds || 0);
-    }, 0);
   };
 
   // Retrieve Continue Watching items from store
