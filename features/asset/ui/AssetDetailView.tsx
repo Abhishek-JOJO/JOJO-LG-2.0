@@ -29,6 +29,10 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 
 const stripHtml = (html: string) => {
   if (!html) return "";
+  // textContent also decodes entities (&amp;, &nbsp;) that a tag regex left in the text.
+  if (typeof DOMParser !== "undefined") {
+    return new DOMParser().parseFromString(html, "text/html").body.textContent ?? "";
+  }
   return html.replace(/<[^>]*>/g, "");
 };
 
@@ -2256,7 +2260,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
                 <div className="flex items-start gap-6 sm:gap-8 pb-8">
                     {/* Left Column: Season List — stays fixed/sticky while scrolling episodes */}
                     {seasonsOption.length > 0 && (
-                      <div className="sticky top-0 z-10 flex flex-col gap-2.5 w-[220px] sm:w-[260px] shrink-0 self-start max-h-[calc(100vh-140px)] overflow-y-auto scrollbar-none">
+                      <div className="sticky top-0 z-10 flex flex-col gap-2.5 w-[220px] sm:w-[300px] shrink-0 self-start max-h-[calc(100vh-140px)] overflow-y-auto scrollbar-none">
                         {seasonsOption.map((s: any, idx: number) => (
                           <FocusableSeasonListItem
                             key={s.assetId || idx}
@@ -2605,13 +2609,13 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
       {/* Episode Details — no focus highlight, stays neutral */}
       <div className="flex flex-col flex-1 justify-center min-w-0">
         <h4
-          className={`text-2xl font-bold line-clamp-1 mb-1.5 transition-colors duration-150 ${
+          className={`text-[32px] leading-tight font-bold line-clamp-1 mb-2 transition-colors duration-150 ${
             focused ? "text-theme_13_samecolour" : "text-white group-hover:text-theme_13_samecolour"
           }`}
         >
           {ep.title}
         </h4>
-        <div className="text-lg font-semibold text-neutral-400 mb-2 flex items-center gap-2">
+        <div className="text-2xl font-semibold text-neutral-300 mb-2.5 flex items-center gap-2.5">
           <span>S{selectedSeasonIndex + 1} EP{ep.episodeNumber || index + 1}</span>
           {durationText && (
             <>
@@ -2620,7 +2624,7 @@ function FocusableEpisodeItem({ ep, index, episodes, asset, selectedSeasonIndex,
             </>
           )}
         </div>
-        <p className="text-lg leading-relaxed line-clamp-2 text-neutral-400">
+        <p className="text-[22px] leading-snug line-clamp-2 text-neutral-400">
           {stripHtml(ep.description) || t("no_description_episode")}
         </p>
       </div>
@@ -3108,10 +3112,10 @@ function FocusableSeasonListItem({ idx, isSelected, label, subtitle, onClick, se
             : "bg-white/10 text-white/80 font-semibold border-transparent hover:bg-white/15"
       }`}
     >
-      <span className="text-xl truncate">{label}</span>
+      <span className="text-2xl truncate">{label}</span>
       {subtitle && (
         <span
-          className={`text-base font-medium shrink-0 ${
+          className={`text-lg font-medium shrink-0 ${
             focused && isSelected
               ? "text-neutral-700"
               : isSelected

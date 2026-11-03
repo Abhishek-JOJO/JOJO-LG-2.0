@@ -54,6 +54,8 @@ class PrepareTimeoutError extends Error {
 }
 
 const TIZEN_AVPLAY_CAPABILITIES: PlayerCapabilities = {
+  // Whole speeds only. AVPlay's setSpeed is trick play: on a Tizen 8 TV it
+  // accepted 0.5/1.5 but froze, jumped the position back, then the app died.
   playbackSpeeds: [1, 2],
   qualitySelection: 'manual',
   volumeControl: 'mute-only',
