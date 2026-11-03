@@ -256,7 +256,7 @@ const CountryWithEMailInput = forwardRef<
                         aria-expanded={dropdownOpen}
                         onClick={handleDropdownOpen}
                         hoverColor="none"
-                        className="h-full border-none bg-transparent text-2xl font-bold text-[#ea580c] px-5 flex items-center gap-1.5 cursor-pointer border-r border-white/10 rounded-none"
+                        className="h-full border-none bg-transparent !text-2xl !font-bold text-[#ea580c] px-5 flex items-center gap-1.5 cursor-pointer border-r border-white/10 rounded-none"
                     >
                         <ChevronDown
                             size={20}
@@ -273,6 +273,7 @@ const CountryWithEMailInput = forwardRef<
                 </div>
             )}
 
+            {/* "!": the input's base .body-sm-regular is unlayered CSS and outranks Tailwind utilities. */}
             <JOJOCustomInput
                 ref={ref}
                 state={JOJOInput.State.DEFAULT}
@@ -282,7 +283,7 @@ const CountryWithEMailInput = forwardRef<
                 aria-invalid={error}
                 data-normalized-phone={normalizedPhone?.international ?? ""}
                 className={cn(
-                    `flex-1 h-full border-none outline-none bg-transparent px-5 min-w-0 text-2xl font-medium placeholder:text-white/50 text-white ${shouldShowCountrySelector ? "pl-3" : ""
+                    `flex-1 h-full border-none outline-none bg-transparent px-5 min-w-0 !text-2xl !font-medium placeholder:text-white/50 text-white ${shouldShowCountrySelector ? "pl-3" : ""
                     }`,
                     className
                 )}

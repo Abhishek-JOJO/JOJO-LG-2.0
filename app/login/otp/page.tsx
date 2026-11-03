@@ -426,7 +426,8 @@ function OtpPageContent() {
   const hasError = !!(error && touched);
 
   const boxClass = cn(
-    "w-full h-12 rounded-full text-center text-2xl font-bold outline-none caret-transparent",
+    // "!": the input's base .body-sm-regular is unlayered CSS and outranks Tailwind utilities.
+    "w-full h-[72px] rounded-full text-center !text-4xl !font-bold outline-none caret-transparent",
     "bg-theme_10 text-theme_1 transition-[border-color,box-shadow] duration-150",
     "border-0"
   );
@@ -501,14 +502,14 @@ function OtpPageContent() {
         </div>
 
         <div className="flex flex-1 items-start justify-center px-4 pt-14 sm:pt-16">
-        <form onSubmit={handleOtpSubmit as any} noValidate className="w-full max-w-sm sm:max-w-md">
+        <form onSubmit={handleOtpSubmit as any} noValidate className="w-full max-w-sm sm:max-w-[640px]">
             <div className="flex flex-col items-center text-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-semibold text-theme_1">
+              <h1 className="text-xl sm:text-4xl font-semibold text-theme_1">
                 {isRegister ? t("verify_registration") : t("title_login")}
               </h1>
-              <p className="body-md-regular text-theme_5">
+              <p className="text-lg sm:text-2xl text-theme_5">
                 <span className="mr-1">{isEmail ? t("sent_to_email") : t("sent_to")}</span>
-                <span className="body-md-regular break-all text-theme_1">{` ${displayIdentifier}`}</span>
+                <span className="break-all text-theme_1">{` ${displayIdentifier}`}</span>
               </p>
             </div>
 
@@ -537,14 +538,14 @@ function OtpPageContent() {
 
               {/* Error */}
               {!otpSecurity.isLocked && error && touched && !verifyOtp.isPending && (
-                <div role="alert" className="text-sm leading-snug text-theme_14_samecolour flex items-center gap-2">
+                <div role="alert" className="text-sm sm:text-xl leading-snug text-theme_14_samecolour flex items-center gap-2">
                   <JOJOCommonImage
                     src={LOGOS.ERROR_ICON}
                     altKey="img_jojo_logo"
                     width={14}
                     height={14}
                     preset={JOJOImagePreset.Logo}
-                    wrapperClassName="size-3.5 flex-shrink-0"
+                    wrapperClassName="size-3.5 sm:size-5 flex-shrink-0"
                   />
                   {t(error as any)}
                 </div>
@@ -552,14 +553,14 @@ function OtpPageContent() {
 
               {/* Rate Limit Warning */}
               {otpSecurity.isLocked && (
-                <div role="alert" className="text-sm leading-snug text-theme_14_samecolour flex items-center gap-2 mt-2">
+                <div role="alert" className="text-sm sm:text-xl leading-snug text-theme_14_samecolour flex items-center gap-2 mt-2">
                   <JOJOCommonImage
                     src={LOGOS.ERROR_ICON}
                     altKey="img_jojo_logo"
                     width={14}
                     height={14}
                     preset={JOJOImagePreset.Logo}
-                    wrapperClassName="size-3.5 flex-shrink-0"
+                    wrapperClassName="size-3.5 sm:size-5 flex-shrink-0"
                   />
                   {t("too_many_attempts_lockout", { time: formatTime(otpSecurity.getRemainingLockTime()) })}
                 </div>
@@ -567,28 +568,28 @@ function OtpPageContent() {
 
               {/* Attempts Remaining (show when > 0 attempts but not locked) */}
               {!otpSecurity.isLocked && otpSecurity.attempts > 0 && (
-                <div className="text-sm leading-snug text-orange-500 flex items-center gap-2 mt-2">
+                <div className="text-sm sm:text-xl leading-snug text-orange-500 flex items-center gap-2 mt-2">
                   ⚠️ {t("attempts_remaining", { count: otpSecurity.attemptsRemaining })}
                 </div>
               )}
 
               {/* Expiration Warning */}
               {!otpSecurity.isLocked && otpExpiration.showWarning && !otpExpiration.isExpired && (
-                <div className="text-sm leading-snug text-orange-500 flex items-center gap-2 mt-2">
+                <div className="text-sm sm:text-xl leading-snug text-orange-500 flex items-center gap-2 mt-2">
                   {t("otp_expires_in", { time: otpExpiration.formattedTime })}
                 </div>
               )}
 
               {/* Expiration Error */}
               {!otpSecurity.isLocked && otpExpiration.isExpired && (
-                <div role="alert" className="text-sm leading-snug text-theme_14_samecolour flex items-center gap-2 mt-2">
+                <div role="alert" className="text-sm sm:text-xl leading-snug text-theme_14_samecolour flex items-center gap-2 mt-2">
                   <JOJOCommonImage
                     src={LOGOS.ERROR_ICON}
                     altKey="img_jojo_logo"
                     width={14}
                     height={14}
                     preset={JOJOImagePreset.Logo}
-                    wrapperClassName="size-3.5 flex-shrink-0"
+                    wrapperClassName="size-3.5 sm:size-5 flex-shrink-0"
                   />
                   {t("otp_expired_msg")}
                 </div>
@@ -596,7 +597,7 @@ function OtpPageContent() {
 
               {/* Resend */}
               <div className="flex flex-col items-center w-full text-center py-5">
-                <div className="m-0 flex min-h-[48px] items-center justify-center text-sm text-theme_5">
+                <div className="m-0 flex min-h-[48px] items-center justify-center text-sm sm:text-xl text-theme_5">
                   {countdown > 0 && !otpSecurity.isLocked ? (
                     <>{t("resend_in")} <span className="text-theme_13_samecolour font-semibold tabular-nums">{formatTime(countdown)}</span></>
                   ) : (
@@ -608,7 +609,7 @@ function OtpPageContent() {
                       onClick={() => { if (!isDisabled) handleResend(OtpDeliveryMethod.SMS); }}
                       onKeyDown={(e) => { if (!isDisabled && (e.key === "Enter" || e.key === " ")) handleResend(OtpDeliveryMethod.SMS); }}
                       className={cn(
-                        "body-sm-medium min-w-[220px] rounded-full border px-8 py-3 transition-all duration-150 outline-none",
+                        "text-base sm:text-xl font-medium min-w-[220px] sm:min-w-[300px] rounded-full border px-8 py-3 sm:py-4 transition-all duration-150 outline-none",
                         isDisabled
                           ? "cursor-not-allowed border-white/10 bg-white/5 text-white/35"
                           : "cursor-pointer border-theme_13_samecolour bg-black/40 text-white shadow-lg shadow-black/20",
@@ -663,7 +664,7 @@ function OtpPageContent() {
                 hoverColor={themeColors.theme_13_samecolour}
                 disabled={!canSubmitOtp || verifyOtp.isPending || otpSecurity.isLocked || otpExpiration.isExpired}
                 isLoading={verifyOtp.isPending}
-                className="rounded-[100px] hover:opacity-90 body-sm-medium mx-auto flex border-none w-full"
+                className="rounded-[100px] hover:opacity-90 sm:h-16 !text-base sm:!text-2xl !font-semibold mx-auto flex border-none w-full"
               >
                 {isRegister ? t("submit_register") : t("submit_login")}
               </JOJOCustomButton>

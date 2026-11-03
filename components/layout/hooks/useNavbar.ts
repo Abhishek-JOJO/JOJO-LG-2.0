@@ -14,6 +14,7 @@ import { localStorageManager } from "@/lib/localStorage/localStorage.manager";
 import { StorageKey } from "@/enums/storage.enum";
 import { useSubscriptionStore } from "@/store/useSubscriptionStore";
 import { normalizePathname } from "@/lib/utils/pathname";
+import { useAssetDetailStore } from "@/features/asset/store/useAssetDetailStore";
 
 export function useNavbar() {
   const pathname = useActivePathname();
@@ -85,6 +86,13 @@ export function useNavbar() {
   }, []);
 
   useEffect(() => {
+    // Opening/closing the asset-detail modal changes the reported path (its
+    // original path vs the browse tab, settling a render later) without a page
+    // change. Scrolling to top then showed the hero for ~0.7s on Back before
+    // focus restore scrolled back to the card. The return markers stay set
+    // from open until restorePageFocus has focused that card.
+    const { isOpen, returnAssetId, returnFocusKey } = useAssetDetailStore.getState();
+    if (isOpen || returnAssetId || returnFocusKey) return;
     setIsMobileMenuOpen(false);
     setIsScrolled(false);
     if (typeof window !== "undefined" && window.scrollY > 0) {

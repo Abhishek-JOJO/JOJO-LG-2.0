@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, setFocus, doesFocusableExist, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 import { useBootstrap } from "@/lib/bootstrap/BootstrapContext";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useWatchlistStore } from "@/store/useWatchlistStore";
@@ -133,6 +133,17 @@ export default function AccountSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Opened from the profile menu this page is an overlay: Home stays mounted
+  // (display: none) under it and its focusables stay registered. Arrow keys
+  // with no target here (Left/Right on Logout) jumped onto those hidden
+  // buttons, leaving focus invisible and only Back working. Rows move between
+  // each other with explicit setFocus calls, which a boundary doesn't block.
+  const { ref: pageBoundaryRef, focusKey: pageBoundaryKey } = useFocusable({
+    focusKey: "account-settings-page",
+    isFocusBoundary: true,
+    saveLastFocusedChild: false,
+  });
+
   const handleLogoutClick = () => {
     analyticsService.track(EVENT_NAMES.HELP_AND_SETTING_OPTION_SELECTED, {
       option_name: "logout",
@@ -142,7 +153,8 @@ export default function AccountSettingsPage() {
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden -mt-15 lg:-mt-25">
+    <FocusContext.Provider value={pageBoundaryKey}>
+    <main ref={pageBoundaryRef} className="relative min-h-screen overflow-hidden -mt-15 lg:-mt-25">
       {/* Full-screen fixed background matching watching screen, extending seamlessly behind the navbar */}
       <div
         aria-hidden="true"
@@ -277,6 +289,7 @@ export default function AccountSettingsPage() {
         }}
       />
     </main>
+    </FocusContext.Provider>
   );
 }
 

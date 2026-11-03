@@ -115,19 +115,19 @@ export function AssetDetailModal() {
     }
   }, [activeAssetId]);
 
-  return (
-    <AnimatePresence>
-      {isOpen && activeAssetId && (
-        <AssetDetailModalBoundary
-          activeAssetId={activeAssetId}
-          closeAssetDetail={closeAssetDetail}
-          scrollContainerRef={scrollContainerRef}
-          onBackdropClick={handleBackdropClick}
-          initialAsset={activePreviewItem}
-        />
-      )}
-    </AnimatePresence>
+  const modal = isOpen && activeAssetId && (
+    <AssetDetailModalBoundary
+      activeAssetId={activeAssetId}
+      closeAssetDetail={closeAssetDetail}
+      scrollContainerRef={scrollContainerRef}
+      onBackdropClick={handleBackdropClick}
+      initialAsset={activePreviewItem}
+    />
   );
+  // Tizen: no fade-out. AnimatePresence keeps a closed modal on screen for its
+  // exit, over a page made see-through for the hero's AVPlay plane, so Back
+  // showed Home, then black, then Home. It goes in the same render as Home.
+  return isTizen() ? modal : <AnimatePresence>{modal}</AnimatePresence>;
 }
 
 /**
@@ -181,10 +181,7 @@ function AssetDetailModalBoundary({
           <motion.div
             initial={false}
             animate={{ opacity: 1 }}
-            // No fade-out on Tizen: the opaque modal box stays mounted for the
-            // fade, see-through while the hero's AVPlay plane plays and black once
-            // it stops, so Back showed Home, then black, then Home again.
-            exit={isTizen() ? undefined : { opacity: 0 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="relative w-full min-h-screen m-0 z-10"
           >

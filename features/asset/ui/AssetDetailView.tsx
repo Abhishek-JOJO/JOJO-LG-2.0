@@ -25,7 +25,7 @@ import { logger } from "@/lib/logger/logger";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { safeNavigate } from "@/src/platform/navigation/safeNavigate";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 const stripHtml = (html: string) => {
   if (!html) return "";
@@ -993,6 +993,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
       tizenPreviewRef.current = null;
     };
   }, [tizenPreviewEnabled, videoStarted, activePreview?.videoUrl, videoError, isMuted]);
+
+  // Closing: make the page opaque again before the frame without this view
+  // paints. The effect above only cleans up after that paint, so Home flashed
+  // over a still see-through page (the black AVPlay plane behind it).
+  useLayoutEffect(() => () => tizenPreviewRef.current?.stop(), []);
 
   useEffect(() => {
     const preview = tizenPreviewRef.current;
