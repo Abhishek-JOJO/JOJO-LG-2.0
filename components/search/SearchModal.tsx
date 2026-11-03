@@ -53,13 +53,15 @@ const SEARCH_POSTER_IMAGE_SIZE = { width: 326, height: 490 } as const;
 // Use the same mapped fallback order as Home's PortraitCard. Search results are
 // raw API items while Recently Added items are already mapped, so normalize only
 // when needed and keep one image-selection path for both states.
+function toSearchMappedItem(item: any) {
+  return Array.isArray(item?.portraitFallbackImages) ? item : mapApiRailItem(item, 0);
+}
+
 function resolveSearchPosterCandidates(item: any): string[] {
   if (!item) return [];
   if (item?.genre?.image) return [item.genre.image];
 
-  const mappedItem = Array.isArray(item?.portraitFallbackImages)
-    ? item
-    : mapApiRailItem(item, 0);
+  const mappedItem = toSearchMappedItem(item);
 
   const candidates = mappedItem.portraitFallbackImages?.length > 0
     ? mappedItem.portraitFallbackImages
@@ -187,13 +189,13 @@ function FocusableSearchInput({
     <div
       ref={ref as any}
       data-focuskey={focusKey}
-      className={`relative flex items-center gap-3 px-4 h-[52px] rounded-xl shrink-0 shadow-lg cursor-default ${
+      className={`relative flex items-center gap-3 px-5 h-[64px] rounded-xl shrink-0 shadow-lg cursor-default ${
         focused
           ? "bg-[#222222] text-white z-30 shadow-2xl ring-4 ring-white ring-offset-2 ring-offset-[#140a04]"
           : "bg-[#161616] text-white/80 border border-white/10"
       }`}
     >
-      <Search className={`w-5 h-5 shrink-0 transition-colors ${focused ? "text-white" : "text-white/60"}`} />
+      <Search className={`w-6 h-6 shrink-0 transition-colors ${focused ? "text-white" : "text-white/60"}`} />
       <div className="flex-1 min-w-0">
         <JOJOCustomInput
           ref={inputRef}
@@ -213,7 +215,7 @@ function FocusableSearchInput({
             caretColor: "transparent",
             placeholderColor: "theme_5",
           }}
-          className="!bg-transparent !rounded-none !h-auto !px-0 border-none body-sm-regular w-full cursor-default text-white"
+          className="!bg-transparent !rounded-none !h-auto !px-0 border-none !text-2xl w-full cursor-default text-white"
         />
       </div>
 
@@ -322,6 +324,12 @@ const PosterCard = memo(function PosterCard({
     ? fallbackState.index
     : 0;
   const activeUrl = candidates[fallbackIndex] || "";
+  // The real portrait poster (first candidate) has the title printed on it;
+  // the title logo on top only duplicated it. Shown again if that art fails.
+  const showsPortraitArt = useMemo(
+    () => !item?.genre && !!toSearchMappedItem(item)?.hasPortraitArt,
+    [item]
+  ) && fallbackIndex === 0;
 
   const handleImageError = useCallback(() => {
     setFallbackState((previous) => {
@@ -387,11 +395,11 @@ const PosterCard = memo(function PosterCard({
           onError={handleImageError}
         />
       ) : (
-        <div className="w-full h-full bg-theme_1/8 flex items-center justify-center p-2 text-center caption-xs-regular text-theme_5">
+        <div className="w-full h-full bg-theme_1/8 flex items-center justify-center p-2 text-center text-lg text-theme_5">
           {title}
         </div>
       )}
-      {titleImage && (
+      {titleImage && !showsPortraitArt && (
         <div className="absolute bottom-0 left-0 right-0 z-20 p-3 pb-3.5 sm:p-4 sm:pb-4.5 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center justify-end text-center pointer-events-none">
           <div className="relative w-[200px] sm:w-[250px] max-w-[90%] h-[56px] sm:h-[70px] flex justify-center items-end mx-auto">
             <JOJOCommonImage
@@ -541,7 +549,7 @@ function ClearAllButton({ onClick, label, recentsCount }: { onClick: () => void;
       data-focuskey={focusKey}
       role="button"
       onClick={onClick}
-      className={`caption-xs-regular rounded-full px-2 py-1 transition-colors cursor-pointer ${focused ? "bg-white text-black scale-105" : "text-theme_5 hover:text-theme_1"}`}
+      className={`text-lg rounded-full px-3 py-1.5 transition-colors cursor-pointer ${focused ? "bg-white text-black scale-105" : "text-theme_5 hover:text-theme_1"}`}
     >
       {label}
     </div>
@@ -585,7 +593,7 @@ function GenreRow({
               />
             )}
             <div className="absolute inset-0 flex items-center justify-center p-2">
-              <span className="body-sm-semibold text-theme_1 tracking-wide text-center drop-shadow-md">
+              <span className="text-xl font-semibold text-theme_1 tracking-wide text-center drop-shadow-md">
                 {title}
               </span>
             </div>
@@ -625,7 +633,7 @@ function RecentlyAddedGrid({
 }) {
   return (
     <div className="mb-6">
-      <h3 className="title-xs-semibold text-white/90 mb-3">{title}</h3>
+      <h3 className="text-3xl font-semibold text-white/90 mb-4">{title}</h3>
       <div className={POSTER_GRID}>
         {items.map((item, idx) => (
           <PosterCard
@@ -1199,7 +1207,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
               <div aria-hidden="true" className="absolute inset-0 z-0 pointer-events-none bg-black/35" />
 
               {/* ── LEFT COLUMN: Search Input Bar + TV Keyboard ── */}
-              <div className="w-[420px] lg:w-[450px] shrink-0 flex flex-col justify-start gap-3.5 z-10">
+              <div className="w-[420px] lg:w-[500px] shrink-0 flex flex-col justify-start gap-3.5 z-10">
                 {/* Search Input Bar */}
                 <FocusableSearchInput
                   inputRef={inputRef}
@@ -1300,7 +1308,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                       recentRails.length === 0 && (
                         <div className="flex flex-col items-center py-16 gap-3 text-center">
                           <Search className="w-10 h-10 text-white/40 opacity-40" />
-                          <p className="body-sm-regular text-white/60">
+                          <p className="text-xl text-white/60">
                             {t("start_typing")}
                           </p>
                         </div>
@@ -1319,7 +1327,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                     {/* Error */}
                     {!showSpinner && error && (
                       <div className="flex flex-col items-center py-16 gap-3 text-center">
-                        <p className="body-sm-regular text-red-400">
+                        <p className="text-xl text-red-400">
                           {t("error")}
                         </p>
                       </div>
@@ -1333,7 +1341,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                     {/* Results grid + pagination */}
                     {!showSpinner && searchResults.length > 0 && (
                       <div>
-                        <h3 className="body-sm-semibold text-white/90 mb-4">
+                        <h3 className="text-3xl font-semibold text-white/90 mb-4">
                           {t("results_for")} &ldquo;{debouncedQuery}&rdquo;
                         </h3>
 

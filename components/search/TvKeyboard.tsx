@@ -4,6 +4,17 @@ import React, { useCallback, memo } from "react";
 import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { tvSoundManager } from "@/src/platform/audio/tvSoundManager";
 import { Delete, RotateCcw, Space } from "lucide-react";
+import { isTizen } from "@/src/platform/detectPlatform";
+
+// Focus look per key. Samsung TVs paint on the CPU: an animated shadow, ring
+// offset and scale on the focused key re-painted it for every frame of the
+// transition (15 long tasks / 1.6s for 12 presses on a Tizen 8 TV; 4 / 0.2s
+// without). There the focused key just turns white, instantly.
+const KEY_FOCUSED_CLASS = isTizen()
+  ? "bg-white text-black z-30"
+  : "bg-white text-black z-30 shadow-2xl ring-4 ring-white ring-offset-2 ring-offset-[#140a04] scale-105";
+const KEY_IDLE_CLASS = "bg-[#1c1c1c] text-white/90 hover:bg-[#282828] border border-white/10";
+const KEY_TRANSITION_CLASS = isTizen() ? "" : "transition-all";
 
 // ── Standard OTT TV 6-Column Grid Layout (Netflix / Hotstar / Prime pattern) ──
 const KEYBOARD_ROWS = [
@@ -91,13 +102,11 @@ const LetterKeyCell = memo(function LetterKeyCell({
       ref={ref as any}
       data-focuskey={focusKey}
       onClick={handleClick}
-      className={`relative select-none flex items-center justify-center h-[46px] rounded-xl font-bold cursor-pointer transition-all ${
-        focused
-          ? "bg-white text-black z-30 shadow-2xl ring-4 ring-white ring-offset-2 ring-offset-[#140a04] scale-105"
-          : "bg-[#1c1c1c] text-white/90 hover:bg-[#282828] border border-white/10"
+      className={`relative select-none flex items-center justify-center h-[58px] rounded-xl font-bold cursor-pointer ${KEY_TRANSITION_CLASS} ${
+        focused ? KEY_FOCUSED_CLASS : KEY_IDLE_CLASS
       }`}
     >
-      <span className="text-lg leading-none font-extrabold">{char}</span>
+      <span className="text-2xl leading-none font-extrabold">{char}</span>
       {focused && (
         <div
           className="absolute inset-0 z-40 pointer-events-none rounded-xl"
@@ -162,13 +171,11 @@ const ActionKeyCell = memo(function ActionKeyCell({
       ref={ref as any}
       data-focuskey={focusKey}
       onClick={handleClick}
-      className={`relative col-span-2 select-none flex items-center justify-center h-[46px] rounded-xl font-bold cursor-pointer transition-all ${
-        focused
-          ? "bg-white text-black z-30 shadow-2xl ring-4 ring-white ring-offset-2 ring-offset-[#140a04] scale-105"
-          : "bg-[#1c1c1c] text-white/90 hover:bg-[#282828] border border-white/10"
+      className={`relative col-span-2 select-none flex items-center justify-center h-[58px] rounded-xl font-bold cursor-pointer ${KEY_TRANSITION_CLASS} ${
+        focused ? KEY_FOCUSED_CLASS : KEY_IDLE_CLASS
       }`}
     >
-      <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider">
+      <div className="flex items-center justify-center gap-2 text-lg font-bold uppercase tracking-wider">
         {icon}
         <span>{label}</span>
       </div>
@@ -226,7 +233,7 @@ export const TvKeyboard = memo(function TvKeyboard({
           <ActionKeyCell
             focusKey={`${keyPrefix}-space`}
             label="Space"
-            icon={<Space className="w-4 h-4" />}
+            icon={<Space className="w-6 h-6" />}
             onClick={handleSpace}
             onLeftEdge={() => {}}
             onBottomEdge={onBottomEdge}
@@ -234,14 +241,14 @@ export const TvKeyboard = memo(function TvKeyboard({
           <ActionKeyCell
             focusKey={`${keyPrefix}-backspace`}
             label="Delete"
-            icon={<Delete className="w-4 h-4" />}
+            icon={<Delete className="w-6 h-6" />}
             onClick={onBackspace}
             onBottomEdge={onBottomEdge}
           />
           <ActionKeyCell
             focusKey={`${keyPrefix}-clear`}
             label="Clear"
-            icon={<RotateCcw className="w-3.5 h-3.5" />}
+            icon={<RotateCcw className="w-5 h-5" />}
             onClick={onClear}
             onRightEdge={onRightEdge}
             onBottomEdge={onBottomEdge}
