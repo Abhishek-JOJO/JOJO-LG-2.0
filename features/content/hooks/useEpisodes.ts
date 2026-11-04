@@ -45,6 +45,12 @@ export function useEpisodes({ seasons, initialSeasonIndex = 0 }: UseEpisodesOpti
   // stale within that same synchronous tick, so a ref closes that race window
   // immediately instead of one render late.
   const isLoadingRef = useRef(false);
+  // "seasonAssetId:page" for every page requested or loaded. isLoadingRef only
+  // covers one request at a time: a keypress handled by a stale closure right
+  // after a page landed still saw the old page count and fetched that page
+  // again. Appended twice, its episodes repeated (Season 2 listed 40 of 34),
+  // and the duplicate React keys left those rows on screen under Season 3.
+  const requestedPagesRef = useRef(new Set<string>());
   const locale = useLocaleStore((s) => s.locale);
 
   // Synchronize state when seasons list or locale changes (e.g. from empty to loaded, switching shows, or language change)
@@ -61,6 +67,7 @@ export function useEpisodes({ seasons, initialSeasonIndex = 0 }: UseEpisodesOpti
         }
       });
       setLoadedPages(initial);
+      requestedPagesRef.current.clear();
       setSelectedSeasonIndex(initialSeasonIndex);
       setIsLoading(false);
     }
@@ -124,22 +131,28 @@ export function useEpisodes({ seasons, initialSeasonIndex = 0 }: UseEpisodesOpti
     if (!hasMore || isLoadingRef.current) return;
 
     const nextPage = loadedPageCount + 1;
+    const requestKey = `${seasons[selectedSeasonIndex]?.assetId}:${nextPage}`;
+    if (requestedPagesRef.current.has(requestKey)) return;
+    requestedPagesRef.current.add(requestKey);
     isLoadingRef.current = true;
     setIsLoading(true);
 
     try {
       const episodes = await fetchPage(selectedSeasonIndex, nextPage);
-      setLoadedPages((prev) => ({
-        ...prev,
-        [selectedSeasonIndex]: [...(prev[selectedSeasonIndex] ?? []), episodes],
-      }));
+      setLoadedPages((prev) => {
+        const pages = prev[selectedSeasonIndex] ?? [];
+        // Pages land in order; one already at this position is a repeat.
+        if (pages.length >= nextPage) return prev;
+        return { ...prev, [selectedSeasonIndex]: [...pages, episodes] };
+      });
     } catch (err) {
+      requestedPagesRef.current.delete(requestKey); // let the next scroll retry it
       logger.error('[useEpisodes] Failed to load more', { selectedSeasonIndex, nextPage, err });
     } finally {
       isLoadingRef.current = false;
       setIsLoading(false);
     }
-  }, [hasMore, loadedPageCount, fetchPage, selectedSeasonIndex]);
+  }, [hasMore, loadedPageCount, fetchPage, selectedSeasonIndex, seasons]);
 
   return {
     selectedSeasonIndex,
