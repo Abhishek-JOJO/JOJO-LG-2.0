@@ -604,6 +604,17 @@ function GenreRow({
   );
 }
 
+// The CMS sends rail titles in the selected language, so matching only
+// "Recently Added" missed the Gujarati rail ("નવી પેશકશ") and it fell back to
+// a plain horizontal rail.
+// shortcut: keyed on the CMS titles; switch to a stable rail key once the API sends one.
+const RECENTLY_ADDED_TITLE = /recently added|નવી પેશકશ/i;
+
+function isRecentlyAddedRail(rawRail: { cr_name_analytics?: unknown; name_analytics?: unknown } | null | undefined, title?: string): boolean {
+  const analyticsName = rawRail?.cr_name_analytics ?? rawRail?.name_analytics;
+  return RECENTLY_ADDED_TITLE.test(String(analyticsName ?? "")) || RECENTLY_ADDED_TITLE.test(title ?? "");
+}
+
 // ─── Recently Added grid ────────────────────────────────────────────────────
 
 /**
@@ -1253,7 +1264,7 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                         const rail = mapApiRail(rawRail, idx);
                         if (!rail?.items || rail?.items?.length === 0) return null;
 
-                        if (/recently added/i.test(rail.title || "")) {
+                        if (isRecentlyAddedRail(rawRail, rail.title)) {
                           return (
                             <RecentlyAddedGrid
                               key={rail.id || idx}

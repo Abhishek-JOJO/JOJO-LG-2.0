@@ -293,10 +293,17 @@ export default function AccountSettingsPage() {
   );
 }
 
+// Up from the top row targets the navbar, which the TV overlay version of this
+// page doesn't render: setFocus on an unregistered key left focus nowhere
+// (only Back worked). Stay put instead.
+function focusIfExists(key: string) {
+  if (doesFocusableExist(key)) setFocus(key);
+}
+
 function FocusableWatchlistCard({ focusKey, title, img, onSelect, isFirst, isLast, upKey, downKey }: any) {
   const handleArrowPress = (direction: string) => {
     if (direction === "up") {
-      setFocus(upKey);
+      focusIfExists(upKey);
       return false;
     }
     if (direction === "down") {
@@ -351,7 +358,7 @@ function FocusableWatchlistCard({ focusKey, title, img, onSelect, isFirst, isLas
 function FocusableLanguagePill({ focusKey, label, isActive, onClick, isFirst, isLast, upKey, downKey }: any) {
   const handleArrowPress = (direction: string) => {
     if (direction === "up") {
-      setFocus(upKey);
+      focusIfExists(upKey);
       return false;
     }
     if (direction === "down") {

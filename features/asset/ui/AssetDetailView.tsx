@@ -57,7 +57,7 @@ import { buildPlanDetailAnalytics } from "@/features/asset/utils/buildPlanDetail
 import { useFocusable, setFocus, doesFocusableExist, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
 import { jojoResizedImageURL, JOJOImageFit } from "@/lib/config/imageRequest.config";
 import { mapApiRailItem, getPortraitFallbackImages } from "@/components/content-rail/utils/contentRail.mapper";
-import { isBackEvent, isTizen } from "@/src/platform";
+import { isBackEvent, isTizen, isWebOS } from "@/src/platform";
 import { focusScrollBehavior } from "@/src/navigation/focusUtils";
 import { preloadImageUrl } from "@/components/content-rail/utils/imagePreloader";
 import { isImageUrlLoaded, markImageUrlLoaded } from "@/lib/utils/loadedImageCache";
@@ -369,7 +369,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   // Without both guards the query can fire:
   //   a) before bootstrap completes (no token at all), OR
   //   b) with an empty/stale token if the Zustand store update hasn't propagated yet.
-  const { data: clientAsset, isLoading: assetLoading, isError, error, fetchStatus, status } = useAsset(
+  const { data: clientAsset, isLoading: assetLoading, isError, error, fetchStatus, status, refetch } = useAsset(
     assetId,
     !!assetId && isAppReady && !!sessionId
   );
@@ -1660,8 +1660,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     fetchStatus !== 'fetching' &&
     !isTransient403;
 
+  // On a TV a failed load is nearly always the network (the same title loads
+  // on retry), and the web 404 page is a dead end for a remote: offer a retry.
+  const isTvApp = isTizen() || isWebOS();
   if (queryFinishedWithNoData && (isError || !asset)) {
-    return <NotFound />;
+    return isTvApp ? <AssetLoadError onRetry={() => refetch()} /> : <NotFound />;
   }
 
   // While the query is still in any loading state, keep showing the skeleton.
@@ -1669,7 +1672,7 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   if (!asset) {
     // Should be unreachable if showSkeleton is true — safety net.
     if (showSkeleton) return null; // skeleton already rendered above
-    return <NotFound />;
+    return isTvApp ? <AssetLoadError onRetry={() => refetch()} /> : <NotFound />;
   }
 
   const isShow = asset.assetType === "SHOW" || asset.seasons?.length > 0;
@@ -2826,6 +2829,29 @@ function FocusableTrailerItem({ trailer, idx, asset, onWatch }: any) {
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+function AssetLoadError({ onRetry }: { onRetry: () => void }) {
+  const t = useTranslations("hoverCard");
+  const { ref, focused } = useFocusable<HTMLButtonElement>({ focusKey: "asset-load-retry", onEnterPress: onRetry });
+  useEffect(() => {
+    retrySetFocus("asset-load-retry");
+  }, []);
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-5 px-6 text-center bg-theme_12">
+      <h2 className="text-3xl sm:text-4xl font-bold text-theme_1 m-0">{t("load_error_title")}</h2>
+      <p className="text-lg sm:text-2xl text-theme_5 m-0">{t("load_error_desc")}</p>
+      <button
+        ref={ref}
+        onClick={onRetry}
+        className={`mt-4 px-10 py-4 rounded-full text-lg sm:text-2xl font-bold outline-none transition-transform ${
+          focused ? "bg-theme_13_samecolour text-white scale-105 ring-4 ring-white" : "bg-neutral-800 text-white/80"
+        }`}
+      >
+        {t("load_error_retry")}
+      </button>
     </div>
   );
 }

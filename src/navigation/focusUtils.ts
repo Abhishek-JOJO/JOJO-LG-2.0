@@ -194,7 +194,9 @@ export function restorePageFocus(preferredKey?: string | null) {
 
     // 3. If the active spotlight lead card exists on the page (spotlight-lead-fixed):
     // Prioritize the active spotlight rail lead card over hero carousel so we NEVER jump away from the active Content Rail!
-    if (document.querySelector('[data-focuskey="spotlight-lead-fixed"]')) {
+    // Only when coming back from somewhere: on a first load (launch, after
+    // login) there is no rail to return to, and this scrolled Home past the hero.
+    if ((returnAssetId || originKey) && document.querySelector('[data-focuskey="spotlight-lead-fixed"]')) {
       if (doesFocusableExist("spotlight-lead-fixed")) {
         setFocus("spotlight-lead-fixed");
         const leadEl = document.querySelector('[data-focuskey="spotlight-lead-fixed"]');

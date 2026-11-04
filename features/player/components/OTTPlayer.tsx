@@ -2166,18 +2166,18 @@ export function OTTPlayer({ video, seasons = [], currentEpisodeId, onEpisodeSele
 
         {/* Playback Certificate Badge (Top-Left overlay) */}
         {showCertificate && (video.certification || (video.classifications && video.classifications.length > 0)) && !error && (
-          <div className="absolute top-20 left-6 z-30 flex items-stretch select-none pointer-events-none animate-fadeIn drop-shadow-md">
+          <div className="absolute top-20 left-6 sm:top-24 sm:left-16 z-30 flex items-stretch select-none pointer-events-none animate-fadeIn drop-shadow-md">
             {/* Left indicator line (Orange) */}
-            <div className="w-[3px] bg-theme_13_samecolour rounded-full" />
+            <div className="w-[3px] sm:w-[5px] bg-theme_13_samecolour rounded-full" />
             {/* Text Container */}
-            <div className="ml-3 flex flex-col justify-center py-0.5">
+            <div className="ml-3 sm:ml-4 flex flex-col justify-center py-0.5 sm:py-1">
               {video.certification && (
-                <span className="text-sm sm:text-base font-bold text-white tracking-wide drop-shadow">
+                <span className="text-sm sm:text-3xl font-bold text-white tracking-wide drop-shadow">
                   Rated {video.certification}
                 </span>
               )}
               {video.classifications && video.classifications.length > 0 && (
-                <span className="text-xs sm:text-sm font-medium text-white/90 mt-0.5 max-w-sm drop-shadow">
+                <span className="text-xs sm:text-xl font-medium text-white/90 mt-0.5 sm:mt-1.5 max-w-sm sm:max-w-[720px] drop-shadow">
                   {video.classifications.join(', ')}
                 </span>
               )}

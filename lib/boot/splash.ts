@@ -66,6 +66,13 @@ v.style.cssText="width:100%;height:100%;object-fit:cover;background:transparent;
 v.poster="${SPLASH_POSTER_SRC}";
 v.src="${SPLASH_VIDEO_SRC}";
 c.appendChild(v);
+// While it holds on the logo: a CSS-only spinner keeps turning even while the
+// app's startup work blocks the main thread (a still logo for 6s read as frozen).
+var sp=document.createElement("div");
+sp.style.cssText="position:absolute;left:50%;top:70%;width:48px;height:48px;margin:-24px 0 0 -24px;box-sizing:border-box;border-radius:50%;border:4px solid rgba(255,255,255,.18);border-top-color:#f26e21;animation:jojoSplashSpin .9s linear infinite;";
+var ks=document.createElement("style");ks.textContent="@keyframes jojoSplashSpin{to{transform:rotate(360deg)}}";
+document.head.appendChild(ks);
+c.appendChild(sp);
 var root=document.body||document.documentElement;
 root.appendChild(c);
 window.__JOJO_BOOT_SPLASH__={container:c,video:v};
@@ -78,7 +85,7 @@ v.addEventListener("error",fail);
 // Held on the poster, not paused mid-clip: the page's startup work kept the
 // main thread too busy to stop the video at a set time.
 var started=false;
-function start(){if(started)return;started=true;var p=v.play();if(p&&p.catch)p.catch(fail);}
+function start(){if(started)return;started=true;if(sp.parentNode)sp.parentNode.removeChild(sp);var p=v.play();if(p&&p.catch)p.catch(fail);}
 document.addEventListener("${SPLASH_APP_READY_EVENT}",start);
 if(!signedIn||window.__JOJO_APP_READY__===true)start();else setTimeout(start,${MAX_HOLD_MS});
 // When hydration fails React rebuilds <body>, deleting every node it didn't

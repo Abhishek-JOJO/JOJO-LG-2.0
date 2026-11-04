@@ -372,6 +372,9 @@
     "retry": "Retry"
   },
   "hoverCard": {
+    "load_error_title": "Couldn't load this title",
+    "load_error_desc": "Check your internet connection and try again.",
+    "load_error_retry": "Try again",
     "play": "Play",
     "add_to_watchlist": "Add to Watchlist",
     "share": "Share",

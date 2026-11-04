@@ -77,6 +77,8 @@ export function LayoutClientWrapper({ children }: { children: React.ReactNode })
       let attempts = 0;
       const tryRestoreFocus = () => {
         attempts++;
+        // Left for Search (navbar search icon): its own keyboard takes focus.
+        if (usePlayerStore.getState().isSearchOpen) return;
         if (doesFocusableExist("nav-link-0")) {
           setFocus("nav-link-0");
         } else if (attempts < 20) {

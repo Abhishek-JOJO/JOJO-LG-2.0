@@ -127,6 +127,13 @@ function FocusableSearch({
   isSearchActive?: boolean;
 }) {
   const setSearchOpen = usePlayerStore((s) => s.setSearchOpen);
+  // Search renders only with no TV overlay up (LayoutClientWrapper), so from
+  // the Get Gold / account screens it opened nothing: leave the overlay first.
+  const openSearch = () => {
+    const overlay = useTvOverlayStore.getState();
+    if (overlay.screen) overlay.close();
+    setSearchOpen(true);
+  };
 
   const handleArrowPress = (direction: string) => {
     if (direction === 'up') return false;
@@ -170,7 +177,7 @@ function FocusableSearch({
   const { ref, focused } = useFocusable({
     focusKey: 'navbar-search',
     onArrowPress: handleArrowPress,
-    onEnterPress: () => setSearchOpen(true),
+    onEnterPress: openSearch,
   });
 
   return (
@@ -178,7 +185,7 @@ function FocusableSearch({
       ref={ref as any}
       tabIndex={0}
       data-focuskey="navbar-search"
-      onClick={() => setSearchOpen(true)}
+      onClick={openSearch}
       className={`p-3 rounded-full cursor-pointer flex items-center justify-center transition-all duration-200 shrink-0 ${
         focused
           ? "bg-white text-black scale-110 ring-4 ring-white ring-offset-2 ring-offset-black font-bold shadow-2xl"
