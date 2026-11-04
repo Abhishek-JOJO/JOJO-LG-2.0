@@ -60,6 +60,16 @@ interface SpotlightCommonProps {
 // that rail's next items. Longer than the remote's key repeat (~150ms).
 const RAIL_SETTLE_MS = 400;
 
+// Last remote keypress. On Tizen, cosmetic repaints of the hero (autoplay
+// slide, ambient tint) wait for the remote to rest: each one is a full-hero or
+// full-screen software raster (~0.3-0.7s), and one landing mid-navigation held
+// up the next keypress.
+let lastKeyAt = 0;
+if (typeof window !== "undefined") {
+  window.addEventListener("keydown", () => { lastKeyAt = Date.now(); }, true);
+}
+const msSinceLastKey = () => Date.now() - lastKeyAt;
+
 /**
  * Runs `work` at once while the user cycles a spotlight rail. Right after
  * landing on a rail (index 0) it waits for Up/Down to settle: a fast scroll
@@ -352,12 +362,23 @@ export function ContentRailList({
         if (!cancelled) useAmbientTintStore.getState().setAmbientColor(color);
       });
     };
-    const delay = isTizenRuntime ? 800 : 0;
-    const timer = delay > 0 ? window.setTimeout(sample, delay) : null;
-    if (timer === null) sample();
+    if (!isTizenRuntime) {
+      sample();
+      return () => {
+        cancelled = true;
+      };
+    }
+    // Tizen: 800ms after the slide and after the last keypress (see lastKeyAt).
+    let timer = 0;
+    const sampleWhenQuiet = () => {
+      const wait = 800 - msSinceLastKey();
+      if (wait > 0) timer = window.setTimeout(sampleWhenQuiet, wait);
+      else sample();
+    };
+    timer = window.setTimeout(sampleWhenQuiet, 800);
     return () => {
       cancelled = true;
-      if (timer !== null) window.clearTimeout(timer);
+      window.clearTimeout(timer);
     };
   }, [isHeroVariant, items, activeIndex, isTizenRuntime]);
 
@@ -533,10 +554,12 @@ export function ContentRailList({
   useEffect(() => {
     if (config.variant !== RailCardVariant.HERO || !items?.length || isAutoplayPaused || isAnyCardHovered || isSearchOpen || isAssetDetailOpen || isVideoPlaying) return;
     const interval = setInterval(() => {
+      // Tizen: skip this step while the remote is in use (see lastKeyAt).
+      if (isTizenRuntime && msSinceLastKey() < 2000) return;
       setVirtualIndex((prev) => prev + 1);
     }, appConfig.AUTOSCROLL_TIME);
     return () => clearInterval(interval);
-  }, [virtualIndex, items?.length, config?.variant, isAutoplayPaused, isAnyCardHovered, isSearchOpen, isAssetDetailOpen, isVideoPlaying]);
+  }, [virtualIndex, items?.length, config?.variant, isAutoplayPaused, isAnyCardHovered, isSearchOpen, isAssetDetailOpen, isVideoPlaying, isTizenRuntime]);
 
   const onTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null);

@@ -26,6 +26,10 @@ export function AmbientBackground() {
   // GPU surfaces at all times, even at opacity 0. Without it they're only
   // promoted while their crossfade actually runs.
   const isTizenRuntime = isTizen();
+  // Tizen swaps the tint without fading: each 1s fade (out on a tab switch,
+  // in once the hero's colour is sampled) promoted and re-rastered two
+  // full-viewport layers, about a third of a tab switch's main-thread time.
+  const fade = isTizenRuntime ? "" : "transition-opacity duration-1000 ease-out";
 
   return (
     <div
@@ -33,13 +37,13 @@ export function AmbientBackground() {
       // Tizen: a playing AVPlay preview cuts a hole through this layer (it
       // sits behind the hero) — see tizenPreviewPlayer.
       data-tizen-video-backdrop
-      className={`absolute top-0 left-0 right-0 h-[100vh] w-full pointer-events-none z-0 overflow-hidden transition-opacity duration-1000 ease-out ${
+      className={`absolute top-0 left-0 right-0 h-[100vh] w-full pointer-events-none z-0 overflow-hidden ${fade} ${
         hasActiveColor ? "opacity-100" : "opacity-0"
       }`}
     >
       {/* Ambient Layer A */}
       <div
-        className="absolute inset-0 w-full h-full transition-opacity duration-1000 ease-out"
+        className={`absolute inset-0 w-full h-full ${fade}`}
         style={{
           opacity: activeLayer === "A" && hasActiveColor ? 1 : 0,
           background: getGradient(layerA),
@@ -49,7 +53,7 @@ export function AmbientBackground() {
 
       {/* Ambient Layer B */}
       <div
-        className="absolute inset-0 w-full h-full transition-opacity duration-1000 ease-out"
+        className={`absolute inset-0 w-full h-full ${fade}`}
         style={{
           opacity: activeLayer === "B" && hasActiveColor ? 1 : 0,
           background: getGradient(layerB),

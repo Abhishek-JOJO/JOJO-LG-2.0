@@ -67,6 +67,14 @@ interface Props {
 // below therefore disables it on Tizen while preserving it elsewhere.
 const ENABLE_HERO_BACKGROUND_VIDEO = true;
 
+// Tizen draws the two text shades below as one pre-baked image
+// (scripts/gen-hero-shade.ts). The TV rasterizes in software: computing both
+// gradients per pixel was half the cost of redrawing the hero on every navbar
+// tab switch, and the UI waited on it. The bake matches the card at the TV's
+// 1920x1080 viewport only (1840x842.4, drawn 1:1); other sizes keep the CSS.
+const USE_BAKED_HERO_SHADE =
+  typeof window !== "undefined" && isTizen() && window.innerWidth === 1920 && window.innerHeight === 1080;
+
 export function HeroCarouselCard({ item, config, index, isActive, isFocused = false, onClick, onHoverChange, onVideoPlayChange, batchPricing }: Props) {
   const t = useTranslations("contentRails");
   const isTizenRuntime = isTizen();
@@ -510,20 +518,36 @@ export function HeroCarouselCard({ item, config, index, isActive, isFocused = fa
           )}
         </div>
         {/* We keep a subtle left shadow just for text readability if needed, but Hotstar relies more on bottom shadow */}
-        <div className={`absolute inset-y-0 left-0 w-full sm:w-[55%] md:w-[50%] lg:w-[46%] xl:w-[42%] bg-gradient-to-r from-black/80 via-black/40 to-transparent z-10 pointer-events-none transition-opacity duration-700 ${isActive ? "opacity-100" : "opacity-0"}`} />
+        {!USE_BAKED_HERO_SHADE && (
+          <div className={`absolute inset-y-0 left-0 w-full sm:w-[55%] md:w-[50%] lg:w-[46%] xl:w-[42%] bg-gradient-to-r from-black/80 via-black/40 to-transparent z-10 pointer-events-none transition-opacity duration-700 ${isActive ? "opacity-100" : "opacity-0"}`} />
+        )}
       </div>
       
       {/* Text shade: a bottom-left corner vignette sized to the title/badges/
           genres block, instead of a full-width black band over the bottom half
           that darkened the whole lower artwork (and preview video) too. The
           right side and the top of the slide stay clear. */}
-      <div
-        className={`absolute bottom-0 left-0 w-[75%] h-[75%] z-10 pointer-events-none transition-opacity duration-700 ${isActive ? "opacity-100" : "opacity-0"}`}
-        style={{
-          background:
-            "radial-gradient(ellipse at 0% 100%, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.55) 40%, rgba(0, 0, 0, 0) 72%)",
-        }}
-      />
+      {USE_BAKED_HERO_SHADE ? (
+        // Both shades in one image (the left one above too), natural size at
+        // the top-left so it's a plain 1:1 blit; the bottom pixel row clips.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src="/images/hero-shade.png"
+          alt=""
+          aria-hidden="true"
+          width={1840}
+          height={843}
+          className={`absolute left-0 top-0 max-w-none z-10 pointer-events-none ${isActive ? "opacity-100" : "opacity-0"}`}
+        />
+      ) : (
+        <div
+          className={`absolute bottom-0 left-0 w-[75%] h-[75%] z-10 pointer-events-none transition-opacity duration-700 ${isActive ? "opacity-100" : "opacity-0"}`}
+          style={{
+            background:
+              "radial-gradient(ellipse at 0% 100%, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.55) 40%, rgba(0, 0, 0, 0) 72%)",
+          }}
+        />
+      )}
 
 
 

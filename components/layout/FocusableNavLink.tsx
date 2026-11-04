@@ -16,6 +16,14 @@ import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useAmbientTintStore } from "@/store/useAmbientTintStore";
 import { ROUTES } from "@/lib/constants/routes";
+import { isTizen } from "@/src/platform/detectPlatform";
+
+// How long focus must rest on a tab before its page switches in (OK and Down
+// switch at once). A switch keeps a Tizen 8 TV busy ~0.75s (render, then
+// frames held until the new hero is rasterized): any tab passed while
+// tapping Left/Right less than this apart switched in, and the next press
+// waited behind it.
+const TAB_SWITCH_DWELL_MS = isTizen() ? 600 : 220;
 
 interface FocusableNavLinkProps {
   item: any;
@@ -136,7 +144,7 @@ export const FocusableNavLink = React.memo(({
       timerRef.current = null;
     }
 
-    // 220ms debounce: allows rapid remote navigation across tabs without
+    // Debounce: allows rapid remote navigation across tabs without
     // freezing the TV CPU by mounting/unmounting page trees on every step
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
@@ -168,7 +176,7 @@ export const FocusableNavLink = React.memo(({
       if (!isItemActive && (isCurrentBrowse || isSearchOpen || normCurrent === ROUTES.SEARCH)) {
         navigateTab();
       }
-    }, 220);
+    }, TAB_SWITCH_DWELL_MS);
   }, [index, item?.subnav_id, isItemActive, navigateTab]);
 
   const handleBlur = useCallback(() => {
