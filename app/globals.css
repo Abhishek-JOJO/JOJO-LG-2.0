@@ -1268,8 +1268,17 @@ html.tv-tizen section[data-section-index] {
    that before, and drew a dark ring round the hero over the ambient tint).
 ============================================================ */
 html.tv-tizen.tizen-video-passthrough,
-html.tv-tizen .tizen-video-passthrough {
+html.tv-tizen .tizen-video-passthrough,
+html.tv-tizen.tizen-video-hold,
+html.tv-tizen .tizen-video-hold {
   background: transparent !important;
+}
+
+/* .tizen-video-hold is set as soon as a preview opens (the poster still
+   covers the box): the poster gets its own GPU layer up front, so the reveal
+   below is a compositor-only fade instead of a software repaint. */
+html.tv-tizen .tizen-video-hold > [data-tizen-video-cover] {
+  will-change: opacity;
 }
 
 /* The page background is its own layer on Tizen (#tizen-page-backdrop,

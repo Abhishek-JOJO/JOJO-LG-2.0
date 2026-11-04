@@ -103,6 +103,10 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
     const preview = startTizenPreview({
       url: previewUrl,
       target,
+      // This overlay (z-10) sits above the card's poster: the AVPlay object
+      // goes into the card itself, under the poster, or it blanked the card
+      // black while the trailer loaded.
+      host: target.parentElement ?? undefined,
       autoPlay: false,
       onReady: () => setVideoReady(true),
       onEnded: () => setVideoReady(false),

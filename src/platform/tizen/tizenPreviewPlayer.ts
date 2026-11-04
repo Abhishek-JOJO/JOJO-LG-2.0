@@ -25,6 +25,8 @@
 import type { SamsungAVPlay } from "../types";
 
 const PASSTHROUGH_CLASS = "tizen-video-passthrough";
+/** Set from the start of a session: see holdPassthrough. */
+const HOLD_CLASS = "tizen-video-hold";
 /** Set on <html> by TizenAVPlayAdapter while a movie plays: drops the whole page backdrop. */
 export const TIZEN_VIDEO_FULLSCREEN_CLASS = "tizen-video-fullscreen";
 const BACKDROP_SELECTOR = "[data-tizen-video-backdrop]";
@@ -34,7 +36,13 @@ const DEFAULT_VIDEO_ASPECT = 16 / 9;
 // so while still buffering; going see-through then showed a black card until
 // the picture caught up. Reveal only once the clock has been seen advancing
 // across reports, by at least this much, with no buffering in progress.
-const REVEAL_AFTER_ADVANCE_MS = 250;
+// With the reveal now a GPU-only fade (holdPassthrough), 150ms is enough: the
+// poster's 500ms fade covers a picture that trails the clock slightly.
+const REVEAL_AFTER_ADVANCE_MS = 150;
+// How often the play position is read until the reveal, and for how long
+// (after that the ~500ms time reports carry on alone).
+const REVEAL_POLL_MS = 50;
+const REVEAL_POLL_LIMIT_MS = 5000;
 // A preview starts playing once this much is buffered instead of AVPlay's
 // default (sized for full playback), so the first frame comes sooner.
 const PREVIEW_START_BUFFER_SECONDS = 2;
@@ -50,6 +58,13 @@ export interface TizenPreviewOptions {
   url: string;
   /** Box the video fills; its on-screen rect becomes the AVPlay display rect. */
   target: HTMLElement;
+  /**
+   * Where the AVPlay <object> goes (default: target), filling it. The object
+   * punches a hole through everything painted before it, so it must come
+   * before the poster (data-tizen-video-cover) in paint order: placed above
+   * it, the poster was erased to black while the preview loaded.
+   */
+  host?: HTMLElement;
   /** First frames are on screen and the page above them is now see-through. */
   onReady?: () => void;
   onTimeUpdate?: (currentMs: number, durationMs: number) => void;
@@ -85,6 +100,8 @@ interface Session {
   buffering: boolean;
   prepared: boolean;
   playRequested: boolean;
+  /** Polls the play position until the reveal (see REVEAL_POLL_MS). */
+  revealPoll: ReturnType<typeof setInterval> | null;
 }
 
 let current: Session | null = null;
@@ -134,7 +151,9 @@ function getBackdrops(): HTMLElement[] {
 
 function teardown(session: Session): void {
   if (current === session) current = null;
-  for (const el of session.passthrough) el.classList.remove(PASSTHROUGH_CLASS);
+  if (session.revealPoll) clearInterval(session.revealPoll);
+  session.revealPoll = null;
+  for (const el of session.passthrough) el.classList.remove(PASSTHROUGH_CLASS, HOLD_CLASS);
   session.passthrough = [];
   for (const backdrop of getBackdrops()) backdrop.style.clipPath = "";
   window.removeEventListener("scroll", interruptPreview);
@@ -200,9 +219,16 @@ function frameRadius(target: HTMLElement): number {
   return parseFloat(getComputedStyle(frame).borderTopLeftRadius) || 0;
 }
 
-function applyPassthrough(session: Session): void {
+/**
+ * Everything the reveal needs, done when the session opens and hidden under
+ * the still-opaque poster: transparent box ancestors, the backdrop holes, and
+ * (globals.css) the poster on its own GPU layer. Doing it at the reveal cost
+ * ~0.5s of software raster before the next frame, so the preview's sound ran
+ * for ~1s before its picture appeared. Now the reveal is only a GPU fade.
+ */
+function holdPassthrough(session: Session): void {
   for (let el: HTMLElement | null = session.options.target; el; el = el.parentElement) {
-    el.classList.add(PASSTHROUGH_CLASS);
+    el.classList.add(HOLD_CLASS);
     session.passthrough.push(el);
   }
   // The plane may only show through the box itself: everywhere else these
@@ -223,6 +249,11 @@ function applyPassthrough(session: Session): void {
   }
   // Scrolling moves the box out from under the hole and the display rect.
   window.addEventListener("scroll", interruptPreview, { passive: true });
+}
+
+/** Fades the poster out (globals.css) over the now-playing video. */
+function applyPassthrough(session: Session): void {
+  for (const el of session.passthrough) el.classList.add(PASSTHROUGH_CLASS);
 }
 
 /**
@@ -349,7 +380,7 @@ export function startTizenPreview(options: TizenPreviewOptions): TizenPreviewHan
     pointerEvents: "none",
     backgroundColor: "transparent",
   });
-  options.target.prepend(objectEl);
+  (options.host ?? options.target).prepend(objectEl);
 
   const session: Session = {
     options,
@@ -361,13 +392,47 @@ export function startTizenPreview(options: TizenPreviewOptions): TizenPreviewHan
     buffering: false,
     prepared: false,
     playRequested: options.autoPlay !== false,
+    revealPoll: null,
   };
   current = session;
+  holdPassthrough(session);
   const isCurrent = () => current === session;
   const fail = () => {
     if (!isCurrent()) return;
     teardown(session);
     options.onStop?.("error");
+  };
+  /** True once the artwork has been dropped for this play position. */
+  const checkReveal = (milliseconds: number): boolean => {
+    if (session.ready) return true;
+    if (session.firstReportMs === null) session.firstReportMs = milliseconds;
+    if (session.buffering || milliseconds - session.firstReportMs < REVEAL_AFTER_ADVANCE_MS) return false;
+    // Only now drop the artwork: the plane is showing real frames.
+    session.ready = true;
+    if (session.revealPoll) clearInterval(session.revealPoll);
+    session.revealPoll = null;
+    applyPassthrough(session);
+    options.onReady?.();
+    return true;
+  };
+  // AVPlay reports the play position only every ~500ms, so waiting for a
+  // report revealed the video ~0.5s after it started: its sound (and opening
+  // moment) ran behind the artwork. Read the position directly until then.
+  const startRevealPoll = () => {
+    if (session.ready || session.revealPoll) return;
+    const stopAt = Date.now() + REVEAL_POLL_LIMIT_MS;
+    session.revealPoll = setInterval(() => {
+      if (!isCurrent() || session.ready || Date.now() > stopAt) {
+        if (session.revealPoll) clearInterval(session.revealPoll);
+        session.revealPoll = null;
+        return;
+      }
+      try {
+        checkReveal(avplay.getCurrentTime());
+      } catch {
+        // State change in progress; the time reports still reveal it.
+      }
+    }, REVEAL_POLL_MS);
   };
 
   try {
@@ -381,14 +446,7 @@ export function startTizenPreview(options: TizenPreviewOptions): TizenPreviewHan
       },
       oncurrentplaytime: (milliseconds) => {
         if (!isCurrent()) return;
-        if (!session.ready) {
-          if (session.firstReportMs === null) session.firstReportMs = milliseconds;
-          if (session.buffering || milliseconds - session.firstReportMs < REVEAL_AFTER_ADVANCE_MS) return;
-          // Only now drop the artwork: the plane is showing real frames.
-          session.ready = true;
-          applyPassthrough(session);
-          options.onReady?.();
-        }
+        if (!session.ready && !checkReveal(milliseconds)) return;
         let durationMs = 0;
         try {
           durationMs = avplay.getDuration();
@@ -422,7 +480,10 @@ export function startTizenPreview(options: TizenPreviewOptions): TizenPreviewHan
           session.videoAspect = readVideoAspect(avplay) ?? session.videoAspect;
           applyDisplayRect(avplay, session);
           session.prepared = true;
-          if (session.playRequested) avplay.play();
+          if (session.playRequested) {
+            avplay.play();
+            startRevealPoll();
+          }
         } catch {
           fail();
         }
@@ -440,6 +501,7 @@ export function startTizenPreview(options: TizenPreviewOptions): TizenPreviewHan
       if (!session.prepared) return; // prepareAsync's callback starts it
       try {
         avplay.play();
+        startRevealPoll();
       } catch {
         fail();
       }

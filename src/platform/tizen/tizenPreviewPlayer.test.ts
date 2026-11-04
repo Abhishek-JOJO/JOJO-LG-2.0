@@ -8,7 +8,7 @@ class FakeElement {
   private classes = new Set<string>();
   classList = {
     add: (name: string) => void this.classes.add(name),
-    remove: (name: string) => void this.classes.delete(name),
+    remove: (...names: string[]) => names.forEach((name) => this.classes.delete(name)),
     contains: (name: string) => this.classes.has(name),
   };
   children: FakeElement[] = [];
@@ -117,28 +117,34 @@ function setup(
 }
 
 const PASSTHROUGH = "tizen-video-passthrough";
+const HOLD = "tizen-video-hold";
 
-test("page goes see-through only once playback has advanced, and is restored on stop", () => {
+test("the poster fades only once playback has advanced, and everything is restored on stop", () => {
   const { avplay, html, page, targetEl, target } = setup();
   let readyCount = 0;
   const preview = startTizenPreview({ url: "https://cdn/p.m3u8", target, onReady: () => { readyCount += 1; } });
 
   assert.equal(targetEl.children.length, 1, "AVPlay <object> host is attached to the target");
+  // Prepared under the still-opaque poster, so the reveal is a GPU fade only.
+  for (const el of [targetEl, page, html]) assert.ok(el.classList.contains(HOLD), "held from the start");
   avplay.finishPrepare();
   assert.ok(avplay.calls.includes("play"));
-  assert.equal(page.classList.contains(PASSTHROUGH), false, "nothing changes before frames show");
+  assert.equal(page.classList.contains(PASSTHROUGH), false, "the poster stays before frames show");
 
   avplay.listener.oncurrentplaytime?.(400);
   assert.equal(readyCount, 0, "a single report — even a late one — is not proof of a picture");
+  avplay.listener.oncurrentplaytime?.(500);
+  assert.equal(readyCount, 0, "100ms of advance is not enough yet");
   avplay.listener.oncurrentplaytime?.(550);
-  assert.equal(readyCount, 0, "150ms of advance is not enough yet");
-  avplay.listener.oncurrentplaytime?.(700);
   avplay.listener.oncurrentplaytime?.(900);
   assert.equal(readyCount, 1);
   for (const el of [targetEl, page, html]) assert.ok(el.classList.contains(PASSTHROUGH));
 
   preview.stop();
-  for (const el of [targetEl, page, html]) assert.equal(el.classList.contains(PASSTHROUGH), false);
+  for (const el of [targetEl, page, html]) {
+    assert.equal(el.classList.contains(PASSTHROUGH), false);
+    assert.equal(el.classList.contains(HOLD), false);
+  }
   assert.equal(targetEl.children.length, 0, "<object> host removed");
   assert.equal(avplay.calls.at(-1), "pause", "silenced at once; the blocking close waits");
   stopTizenPreview(); // flush the deferred native close
@@ -247,13 +253,9 @@ test("the rect follows the stream's real aspect once prepared, in logical 1920x1
 });
 
 test("the page backdrop and ambient tint open only over the box, and close again on stop", () => {
-  const { avplay, backdrop, ambient, target } = setup(undefined, { left: 40, top: 114, right: 1880, bottom: 956 });
+  const { backdrop, ambient, target } = setup(undefined, { left: 40, top: 114, right: 1880, bottom: 956 });
   const preview = startTizenPreview({ url: "https://cdn/p.m3u8", target });
-  avplay.finishPrepare();
-  assert.equal(backdrop.style.clipPath ?? "", "", "opaque until frames show");
-
-  avplay.listener.oncurrentplaytime?.(0);
-  avplay.listener.oncurrentplaytime?.(500);
+  // Cut when the session opens, under the opaque poster (see holdPassthrough).
   assert.equal(
     backdrop.style.clipPath,
     "polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 40px 114px, 1880px 114px, 1880px 956px, 40px 956px, 40px 114px)",
