@@ -31,7 +31,6 @@ import { getAssetPricing } from "@/features/content/api/getAssetPricing";
 import { restorePageFocus } from "@/src/navigation/focusUtils";
 import { preloadRailItems } from "@/components/content-rail/utils/imagePreloader";
 import { isTizen } from "@/src/platform/detectPlatform";
-import { signalSplashAppReady } from "@/lib/boot/splash";
 
 // Global module-level cache to track route-to-subnav_id mapping for instant frame 1 loads on popstate / routing
 const routeSubnavMap: Record<string, number> = {
@@ -212,12 +211,6 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
   } = useContentRails(subnavId, isAppReady && isNavReady, 20);
 
   const showSkeleton = Boolean(isLoading || (isFetching && !data));
-
-  // A launch splash waiting on its logo (lib/boot/splash.ts) can play its
-  // ending now: the rails — hero included — have their data, or have failed.
-  useEffect(() => {
-    if (!showSkeleton) signalSplashAppReady();
-  }, [showSkeleton]);
 
   const statusRef = useRef({ hasNextPage, isFetchingNextPage, fetchNextPage });
   useEffect(() => {

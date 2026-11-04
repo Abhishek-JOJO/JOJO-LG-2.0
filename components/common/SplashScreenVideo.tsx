@@ -1,17 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { useRouter } from "next/navigation";
 import { ROUTES } from "@/lib/constants/routes";
 import { isTizenWebSimulator } from "@/src/platform/detectPlatform";
-import {
-  BOOT_SPLASH_CONTAINER_ID,
-  BOOT_SPLASH_VIDEO_ID,
-  SPLASH_FAILED_EVENT,
-  SPLASH_POSTER_SRC,
-  SPLASH_VIDEO_SRC,
-} from "@/lib/boot/splash";
+import { BOOT_SPLASH_CONTAINER_ID, SPLASH_DONE_EVENT } from "@/lib/boot/splash";
 
 declare global {
   interface Window {
@@ -21,25 +15,20 @@ declare global {
 }
 
 const SPLASH_SESSION_KEY = "jojo_splash_video_played";
-// Emergency safety cap: video is 1.9s; this 10s timeout ONLY fires if video decoder completely crashes
-const EMERGENCY_FALLBACK_TIMEOUT_MS = 10000;
+// Safety cap in case the boot script's "done" event never arrives. It must outlast
+// its logo hold (lib/boot/splash.ts, up to 15s) plus the zoom.
+const EMERGENCY_FALLBACK_TIMEOUT_MS = 20000;
 
+/**
+ * Owns the end of the launch splash. The splash itself is the boot curtain and
+ * script (lib/boot/splash.ts), running from the first paint, before React; this
+ * component waits for its zoom to finish, then removes it and moves on (Home
+ * focus, or Login for signed-out users).
+ */
 export function SplashScreenVideo() {
   const router = useRouter();
-  // The video has exactly one owner: the hydrated client. Rendering it in the
-  // static HTML lets webOS start decoding before React hydrates, then restart
-  // the same media element when React takes ownership. The synchronous boot
-  // curtain in layout.tsx covers Home until this single client mount is ready.
-  const [shouldRender, setShouldRender] = useState(false);
-
-  const [isFadingOut, setIsFadingOut] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  // The splash the inline boot script started at first paint (lib/boot/splash.ts).
-  // When present it is adopted rather than rendered; the React-rendered splash
-  // below is only the fallback for when that script didn't run.
-  const bootSplashRef = useRef<{ container: HTMLElement; video: HTMLVideoElement } | null>(null);
+  const bootContainerRef = useRef<HTMLElement | null>(null);
   const dismissedRef = useRef(false);
-  const playRequestedRef = useRef(false);
 
   const dismissSplash = useCallback(() => {
     if (dismissedRef.current) return;
@@ -65,37 +54,23 @@ export function SplashScreenVideo() {
       }
     } catch {}
 
-    // Clean up early boot curtain style from <head>
-    try {
-      document.getElementById("early-splash-curtain-style")?.remove();
-    } catch {}
-
-    // Release TV hardware video decoder pipeline
-    const splashVideo = videoRef.current ?? bootSplashRef.current?.video ?? null;
-    const releaseVideo = () => {
-      if (!splashVideo) return;
+    bootContainerRef.current?.remove();
+    const dropCurtain = () => {
       try {
-        splashVideo.pause();
-        splashVideo.removeAttribute("src");
-        splashVideo.load();
+        document.getElementById("early-splash-curtain-style")?.remove();
+        document.documentElement.classList.remove("jojo-splash-zoom", "jojo-splash-keep", "jojo-splash-out");
       } catch {}
     };
 
     if (isAuthenticated) {
-      // User is authenticated: fade out smoothly (350ms) to reveal Home screen
-      const bootSplash = bootSplashRef.current;
-      if (bootSplash) {
-        bootSplash.container.style.opacity = "0";
-        bootSplash.container.style.pointerEvents = "none";
-      } else {
-        setIsFadingOut(true);
-      }
-      // Released after the fade: clearing src first blanked the frame, so the
-      // logo handed over through a black flash instead of fading into Home.
+      // The zoom has already faded the curtain (the animated logo, app/layout.tsx);
+      // hold it at nothing, then drop its style from <head>.
+      try {
+        document.documentElement.classList.add("jojo-splash-out");
+        document.documentElement.classList.remove("jojo-splash-zoom");
+        setTimeout(dropCurtain, 350);
+      } catch {}
       setTimeout(() => {
-        releaseVideo();
-        if (bootSplash) bootSplash.container.remove();
-        else setShouldRender(false);
         try {
           document.dispatchEvent(new CustomEvent("tv-splash-finished"));
         } catch {}
@@ -115,9 +90,9 @@ export function SplashScreenVideo() {
         setTimeout(restoreFocus, 60);
       }, 350);
     } else {
-      releaseVideo();
       // Unauthenticated user: dispatch tv-splash-finished immediately so TV Auth Gate transitions to login.
-      // We keep the splash curtain solid black to prevent any flash of home page content!
+      // The curtain stays solid black (jojo-splash-keep) until Login loads, so the
+      // page underneath never flashes.
       try {
         document.dispatchEvent(new CustomEvent("tv-splash-finished"));
       } catch {}
@@ -128,6 +103,7 @@ export function SplashScreenVideo() {
           if (isTizenWebSimulator()) {
             // TVEntryContent swaps to login in the same document. Navigating
             // nested file URLs makes Samsung Web Simulator relaunch index.html.
+            dropCurtain();
             return;
           }
           if (window.location.protocol === "file:") {
@@ -140,6 +116,7 @@ export function SplashScreenVideo() {
             // transition inside the current document. A hard location.replace
             // here reloads the entire app immediately after the splash.
             router.replace(ROUTES.LOGIN);
+            setTimeout(dropCurtain, 300);
           }
         }, 120);
       }
@@ -150,7 +127,6 @@ export function SplashScreenVideo() {
     try {
       const alreadyPlayed = sessionStorage.getItem(SPLASH_SESSION_KEY);
       if (alreadyPlayed === "1") {
-        setShouldRender(false);
         if (typeof window !== "undefined") {
           window.__SPLASH_VIDEO_ACTIVE__ = false;
         }
@@ -163,95 +139,28 @@ export function SplashScreenVideo() {
         window.__SPLASH_VIDEO_ACTIVE__ = true;
       }
 
-      // Adopt the boot splash: it has been playing since first paint, and
-      // has already ended (or failed) if the app took longer than the clip.
-      // The global handle, not only the ids: React's rebuild of <body> after a
+      // The global handle, not only the id: React's rebuild of <body> after a
       // hydration mismatch detaches it for a moment (the boot script re-adds it).
-      const bootVideo = window.__JOJO_BOOT_SPLASH__?.video ?? (document.getElementById(BOOT_SPLASH_VIDEO_ID) as HTMLVideoElement | null);
       const bootContainer = window.__JOJO_BOOT_SPLASH__?.container ?? document.getElementById(BOOT_SPLASH_CONTAINER_ID);
-      if (bootVideo && bootContainer) {
-        bootSplashRef.current = { container: bootContainer, video: bootVideo };
-        if (bootVideo.ended || bootVideo.error || window.__JOJO_SPLASH_FAILED__) {
-          dismissSplash();
-          return;
-        }
-        bootVideo.addEventListener("ended", dismissSplash);
-        bootVideo.addEventListener("error", dismissSplash);
-        document.addEventListener(SPLASH_FAILED_EVENT, dismissSplash);
-        const bootEmergencyTimer = setTimeout(dismissSplash, EMERGENCY_FALLBACK_TIMEOUT_MS);
-        return () => {
-          clearTimeout(bootEmergencyTimer);
-          bootVideo.removeEventListener("ended", dismissSplash);
-          bootVideo.removeEventListener("error", dismissSplash);
-          document.removeEventListener(SPLASH_FAILED_EVENT, dismissSplash);
-        };
+      // No boot splash (its script didn't run) or its zoom already finished.
+      if (!bootContainer || window.__JOJO_SPLASH_DONE__) {
+        bootContainerRef.current = bootContainer;
+        dismissSplash();
+        return;
       }
-
-      setShouldRender(true);
+      bootContainerRef.current = bootContainer;
+      document.addEventListener(SPLASH_DONE_EVENT, dismissSplash);
+      const emergencyTimer = setTimeout(dismissSplash, EMERGENCY_FALLBACK_TIMEOUT_MS);
+      return () => {
+        clearTimeout(emergencyTimer);
+        document.removeEventListener(SPLASH_DONE_EVENT, dismissSplash);
+      };
     } catch {
-      // If storage is unavailable, still play the splash once for this mount.
-      setShouldRender(true);
-    }
-
-    // Emergency safety timeout: ONLY fires if video completely fails or stalls
-    const emergencyTimer = setTimeout(() => {
       dismissSplash();
-    }, EMERGENCY_FALLBACK_TIMEOUT_MS);
-
-    return () => {
-      clearTimeout(emergencyTimer);
-    };
+    }
   }, [dismissSplash]);
 
-  // Use one guarded playback trigger. Combining the autoplay attribute with an
-  // imperative play() call gives old webOS media pipelines two start requests.
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!shouldRender || !video || playRequestedRef.current) return;
-
-    playRequestedRef.current = true;
-    video.play().catch(dismissSplash);
-  }, [dismissSplash, shouldRender]);
-
-  if (!shouldRender) return null;
-
-  return (
-    <div
-      id="jojo-splash-container"
-      className={`fixed inset-0 z-[2147483647] flex items-center justify-center bg-black transition-opacity duration-350 ease-out ${
-        isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
-      }`}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100vw",
-        height: "100vh",
-        backgroundColor: "#000000",
-        zIndex: 2147483647,
-      }}
-    >
-      <video
-        ref={videoRef}
-        src={SPLASH_VIDEO_SRC}
-        poster={SPLASH_POSTER_SRC}
-        muted
-        playsInline
-        preload="auto"
-        controls={false}
-        disablePictureInPicture
-        onEnded={dismissSplash}
-        onError={dismissSplash}
-        className="w-full h-full object-cover"
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          backgroundColor: "#000000",
-        }}
-      />
-    </div>
-  );
+  return null;
 }
 
 export default SplashScreenVideo;

@@ -1,49 +1,68 @@
+import { SPLASH_LOGO_DATA_URI } from "./splashLogo";
+
 /**
- * Launch splash (public/video/APP_INTRO.mp4).
+ * Launch splash, all CSS: the JOJO logo grows in and gently pulses on a black
+ * curtain while the app loads, then zooms through its play button while the
+ * curtain fades to reveal the page underneath.
  *
- * It is started by BOOT_SPLASH_SCRIPT, inlined at the top of <body>
- * (app/layout.tsx), not by React: waiting for the JS bundle to load and
- * hydrate before even creating the <video> left a black screen for seconds on
- * TV hardware. The element is never rendered by React (a React-rendered
- * splash restarted when hydration took it over on webOS); SplashScreenVideo
- * adopts it once mounted and dismisses it.
+ * The curtain and logo (BOOT_CURTAIN_CSS) are inserted from <head> by
+ * app/layout.tsx, so they are there from the first paint. BOOT_SPLASH_SCRIPT,
+ * inlined at the top of <body>, adds the spinner and runs the hand-over.
+ * SplashScreenVideo cleans up once the zoom is done.
  *
- * Signed-in users land on Home behind the splash. The JOJO logo (the video's
- * poster) stays on screen until Home has its content (signalSplashAppReady),
- * and only then does the clip play its zoom-through — so the splash hands over
- * to the page, not to a black or skeleton screen. Signed-out users go on to
- * Login, so it plays at once.
+ * Not a video any more: a cold-starting Tizen 8 TV could only play the clip
+ * 7-9s in, and one started while Home was rendering stuttered and sat frozen on
+ * its last frame. CSS transform/opacity animations run on the compositor, so
+ * they stay smooth while the app's startup work keeps the main thread busy.
+ *
+ * Signed-in users land on Home behind the splash: the logo stays up until Home
+ * has painted its rows, so the zoom opens onto the page, not onto a skeleton.
+ * Signed-out users go on to Login after a short logo.
  */
 
 declare global {
   interface Window {
-    __JOJO_APP_READY__?: boolean;
-    __JOJO_SPLASH_FAILED__?: boolean;
+    /** Set by BOOT_SPLASH_SCRIPT once the zoom has finished. */
+    __JOJO_SPLASH_DONE__?: boolean;
     /** Set by BOOT_SPLASH_SCRIPT; found here even while momentarily detached. */
-    __JOJO_BOOT_SPLASH__?: { container: HTMLElement; video: HTMLVideoElement };
+    __JOJO_BOOT_SPLASH__?: { container: HTMLElement };
   }
 }
 
 export const BOOT_SPLASH_CONTAINER_ID = "jojo-splash-container";
-export const BOOT_SPLASH_VIDEO_ID = "jojo-splash-video";
-export const SPLASH_APP_READY_EVENT = "jojo-app-ready";
-export const SPLASH_FAILED_EVENT = "jojo-splash-failed";
+export const SPLASH_DONE_EVENT = "jojo-splash-done";
 
-// The 1.4s clip opens on the JOJO logo, zooms through its play icon and ends
-// on that bright frame (cut from the original 3.6s, whose first 1.4s and last
-// 0.1s were black). Its poster is that first frame, so the logo shows as soon
-// as the page paints — decoding the first frame took ~1.3s more on a Tizen 8 TV.
-export const SPLASH_VIDEO_SRC = "./video/APP_INTRO.mp4";
-export const SPLASH_POSTER_SRC = "./video/APP_INTRO_poster.jpg";
+const ZOOM_MS = 700;
+// Signed-out users have no page to wait for; still show the logo this long.
+const MIN_LOGO_MS = 1200;
 // Never wait on the logo longer than this — the page's own loading states take over.
-const MAX_HOLD_MS = 4000;
+// Cold starts on a Tizen 8 TV painted Home 14-16s after launch.
+const MAX_HOLD_MS = 15000;
 
-/** Home has its content: let a waiting splash play its ending. */
-export function signalSplashAppReady(): void {
-  if (typeof window === "undefined" || window.__JOJO_APP_READY__) return;
-  window.__JOJO_APP_READY__ = true;
-  document.dispatchEvent(new CustomEvent(SPLASH_APP_READY_EVENT));
-}
+/**
+ * The boot curtain: solid black over the page, with the JOJO logo on its own
+ * layer. Transform-only while waiting: the TV starts CSS animations late while
+ * it is busy, and an opacity fade-in left the logo invisible until then. The
+ * zoom's transform-origin is the play icon inside the logo.
+ */
+// Plain string concatenation only: joining template literals here (the logo's
+// and ZOOM_MS's) made the production minifier drop the logo's background and
+// animation from the built page — the TV showed the spinner with no logo.
+export const BOOT_CURTAIN_CSS =
+  "html,body{background:#000!important;overflow:hidden!important;}" +
+  "body:before{content:'';position:fixed;inset:0;z-index:2147483646;background:#000;}" +
+  "body:after{content:'';position:fixed;left:32.396vw;top:37.222vh;width:35.9375vw;height:26.111vh;z-index:2147483646;" +
+  "background:url(" + SPLASH_LOGO_DATA_URI + ") center/100% 100% no-repeat;will-change:transform,opacity;transform-origin:79.4% 50%;" +
+  "animation:jojoLogoIn .9s ease-out both,jojoLogoBreathe 1.4s ease-in-out .9s infinite alternate;}" +
+  "html.jojo-splash-zoom body:after{animation:jojoLogoZoom " + ZOOM_MS + "ms cubic-bezier(.55,0,.9,.35) forwards;}" +
+  "html.jojo-splash-zoom body:before{animation:jojoCurtainOut .4s ease-in .3s forwards;}" +
+  // Signed out: the page under the curtain is about to be replaced by Login; keep it hidden.
+  "html.jojo-splash-keep body:before{animation:none;opacity:1;}" +
+  "html.jojo-splash-out body:before,html.jojo-splash-out body:after{animation:none;opacity:0;}" +
+  "@keyframes jojoLogoIn{from{transform:scale(.88)}to{transform:scale(1)}}" +
+  "@keyframes jojoLogoBreathe{from{transform:scale(1)}to{transform:scale(1.04)}}" +
+  "@keyframes jojoLogoZoom{0%{transform:scale(1);opacity:1}75%{opacity:1}100%{transform:scale(16);opacity:0}}" +
+  "@keyframes jojoCurtainOut{from{opacity:1}to{opacity:0}}";
 
 /**
  * Inline, so plain ES5: it runs before (and without) the app bundle, on old
@@ -55,19 +74,9 @@ export const BOOT_SPLASH_SCRIPT = `(function(){try{
 if(!window.__SPLASH_VIDEO_ACTIVE__)return;
 var c=document.createElement("div");
 c.id="${BOOT_SPLASH_CONTAINER_ID}";
-// The poster is also the container background: drawn as a page layer, it shows
-// even where the video element (a TV media plane) has no frame yet.
-c.style.cssText="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000 url(${SPLASH_POSTER_SRC}) center/cover no-repeat;z-index:2147483647;transition:opacity 350ms ease-out;";
-var v=document.createElement("video");
-v.id="${BOOT_SPLASH_VIDEO_ID}";
-v.muted=true;v.setAttribute("muted","");v.setAttribute("playsinline","");
-v.preload="auto";v.disablePictureInPicture=true;
-v.style.cssText="width:100%;height:100%;object-fit:cover;background:transparent;";
-v.poster="${SPLASH_POSTER_SRC}";
-v.src="${SPLASH_VIDEO_SRC}";
-c.appendChild(v);
-// While it holds on the logo: a CSS-only spinner keeps turning even while the
-// app's startup work blocks the main thread (a still logo for 6s read as frozen).
+c.style.cssText="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483647;pointer-events:none;";
+// A CSS-only spinner keeps turning even while the app's startup work blocks the
+// main thread (a still logo for seconds read as frozen).
 var sp=document.createElement("div");
 sp.style.cssText="position:absolute;left:50%;top:70%;width:48px;height:48px;margin:-24px 0 0 -24px;box-sizing:border-box;border-radius:50%;border:4px solid rgba(255,255,255,.18);border-top-color:#f26e21;animation:jojoSplashSpin .9s linear infinite;";
 var ks=document.createElement("style");ks.textContent="@keyframes jojoSplashSpin{to{transform:rotate(360deg)}}";
@@ -75,25 +84,25 @@ document.head.appendChild(ks);
 c.appendChild(sp);
 var root=document.body||document.documentElement;
 root.appendChild(c);
-window.__JOJO_BOOT_SPLASH__={container:c,video:v};
+window.__JOJO_BOOT_SPLASH__={container:c};
 
 var signedIn=false;
 try{var tok=localStorage.getItem("ott_auth_token");var u=JSON.parse(localStorage.getItem("user")||"null");
 signedIn=!!(tok&&u&&!u.isGuest&&(u.id||u.user_id||u.email||u.phone||u.profiles));}catch(e){}
-function fail(){window.__JOJO_SPLASH_FAILED__=true;document.dispatchEvent(new CustomEvent("${SPLASH_FAILED_EVENT}"));}
-v.addEventListener("error",fail);
-// Held on the poster, not paused mid-clip: the page's startup work kept the
-// main thread too busy to stop the video at a set time.
-var started=false;
-function start(){if(started)return;started=true;if(sp.parentNode)sp.parentNode.removeChild(sp);var p=v.play();if(p&&p.catch)p.catch(fail);}
-document.addEventListener("${SPLASH_APP_READY_EVENT}",start);
-if(!signedIn||window.__JOJO_APP_READY__===true)start();else setTimeout(start,${MAX_HOLD_MS});
+var t0=Date.now(),zooming=false;
+function zoom(){if(zooming)return;zooming=true;if(sp.parentNode)sp.parentNode.removeChild(sp);
+  document.documentElement.classList.add("jojo-splash-zoom");if(!signedIn)document.documentElement.classList.add("jojo-splash-keep");
+  setTimeout(function(){window.__JOJO_SPLASH_DONE__=true;document.dispatchEvent(new CustomEvent("${SPLASH_DONE_EVENT}"));},${ZOOM_MS});}
+// Hand over once Home has actually painted its rows ("app ready" fired ~7s
+// before them), so the zoom opens onto the page.
+function painted(){return !!document.querySelector("section[data-section-index]");}
+function wait(){if(zooming)return;var t=Date.now()-t0;
+  if(t>=${MIN_LOGO_MS}&&(!signedIn||painted()||t>${MAX_HOLD_MS}))zoom();else setTimeout(wait,150);}
+wait();
 // When hydration fails React rebuilds <body>, deleting every node it didn't
-// render (this splash included). Put it straight back and keep it playing.
+// render (this splash included). Put it straight back.
 if(window.MutationObserver){var mo=new MutationObserver(function(){
   if(!window.__SPLASH_VIDEO_ACTIVE__){mo.disconnect();return;}
-  if(root.contains(c))return;
-  root.appendChild(c);
-  if(started&&!v.ended){var r=v.play();if(r&&r.catch)r.catch(function(){});}
+  if(!root.contains(c))root.appendChild(c);
 });mo.observe(root,{childList:true});}
 }catch(e){}})();`;
