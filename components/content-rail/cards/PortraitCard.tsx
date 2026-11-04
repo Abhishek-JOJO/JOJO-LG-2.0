@@ -251,7 +251,7 @@ export const PortraitCard = React.memo(function PortraitCard({
             <TitleLogoImage
               src={item.title_image}
               alt={item.title}
-              wrapperClassName="relative w-[200px] sm:w-[250px] max-w-[90%] h-[56px] sm:h-[70px] flex justify-center items-end mx-auto"
+              wrapperClassName="relative w-[200px] sm:w-[290px] max-w-[90%] h-[56px] sm:h-[100px] flex justify-center items-end mx-auto"
               className="w-full h-full object-contain object-bottom drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
               fallback={titleText}
             />

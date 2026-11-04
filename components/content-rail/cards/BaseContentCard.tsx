@@ -481,10 +481,10 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         <div
           className={`absolute z-20 flex items-center justify-center rounded-full bg-theme_11_60 transition-transform duration-300 group-hover:scale-110 shadow-md ${isLandscapeCard
             ? "top-3 right-3 sm:top-4 sm:right-4 h-10 w-10 sm:h-11 sm:w-11"
-            : "top-2 right-2 h-6 w-6"
+            : "top-2 right-2 h-6 w-6 sm:top-3 sm:right-3 sm:h-10 sm:w-10"
             }`}
         >
-          <div className={`relative ${isLandscapeCard ? "w-5.5 h-5.5 sm:w-6 sm:h-6" : "w-3 h-3"}`}>
+          <div className={`relative ${isLandscapeCard ? "w-5.5 h-5.5 sm:w-6 sm:h-6" : "w-3 h-3 sm:w-5 sm:h-5"}`}>
             {/* Plain <img>: a static 12px icon re-rendered with every card on
                 every rail step; next/image's per-render work cost ~1ms each. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -501,12 +501,12 @@ export const BaseContentCard = React.memo(function BaseContentCard({
         <div
           className={`absolute z-20 flex items-center justify-center rounded-full bg-theme_11_60 transition-transform duration-300 group-hover:scale-110 shadow-md ${isLandscapeCard
             ? "top-3 right-3 sm:top-4 sm:right-4 h-10 w-10 sm:h-11 sm:w-11"
-            : "top-2 right-2 h-6 w-6"
+            : "top-2 right-2 h-6 w-6 sm:top-3 sm:right-3 sm:h-10 sm:w-10"
             }`}
         >
           <TvodIcon
             size={isLandscapeCard ? 24 : 15}
-            className="shrink-0"
+            className={`shrink-0 ${isLandscapeCard ? "" : "sm:w-5 sm:h-5"}`}
           />
         </div>
       )}

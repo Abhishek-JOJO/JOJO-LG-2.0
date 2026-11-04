@@ -93,7 +93,7 @@ export const LandscapeCard = React.memo(function LandscapeCard({
             <TitleLogoImage
               src={item.title_image}
               alt={item.title}
-              wrapperClassName="relative w-[180px] h-[50px] mb-1 flex justify-start items-end"
+              wrapperClassName="relative w-[180px] h-[50px] sm:w-[260px] sm:h-[80px] mb-1 flex justify-start items-end"
               className="w-full h-full object-contain object-left-bottom drop-shadow-[0_0_10px_rgba(0,0,0,0.8)]"
               fallback={titleText}
             />

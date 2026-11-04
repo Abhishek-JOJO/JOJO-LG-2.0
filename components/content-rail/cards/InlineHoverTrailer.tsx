@@ -251,7 +251,7 @@ export const InlineHoverTrailer = React.memo(function InlineHoverTrailer({ item,
             alt={item?.title || ""}
             wrapperClassName={`relative mb-3 flex justify-start items-end ${
               isLandscape
-                ? "w-[280px] h-[90px]"
+                ? "w-[400px] h-[130px]"
                 : "w-[160px] sm:w-[220px] lg:w-[280px] h-[50px] sm:h-[65px] lg:h-[80px]"
             }`}
             className={`w-full h-full object-contain object-left-bottom ${videoEnabled ? "drop-shadow-[0_0_15px_rgba(0,0,0,0.8)]" : ""}`}
