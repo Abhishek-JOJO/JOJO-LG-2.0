@@ -35,6 +35,7 @@ import { useRouter } from "next/navigation";
 import { analyticsService } from "@/shared/analytics";
 import { EVENT_NAMES } from "@/shared/analytics/constants/analytics.constants";
 import { useBrowseHiddenStore } from "@/store/useBrowseHiddenStore";
+import { isTizen, isWebOS } from "@/src/platform/detectPlatform";
 
 // ─── shared grid ──────────────────────────────────────────────────────────────
 // Fixed at 5 columns from md up (never more) so every poster keeps a large,
@@ -63,10 +64,16 @@ function resolveSearchPosterCandidates(item: any): string[] {
 
   const mappedItem = toSearchMappedItem(item);
 
-  // Real portrait poster first: POSTER Ratio 4 (first in the rail order) is a
-  // 16:9 frame and was cut off in this 2:3 grid.
+  // Home's portrait-card order (poster art, title logo on top) whenever the
+  // item has poster art. Search API records have none and no title logo:
+  // their only wide image is the cover with the title printed on it, which a
+  // 2:3 card cut mid-title, so those show their portrait poster first.
+  const raw = item?.asset || item;
+  const hasPosterArt = Boolean(mappedItem.posterImageRatio4) || (Array.isArray(raw?.poster) && raw.poster.length > 0);
   const candidates = mappedItem.portraitFallbackImages?.length > 0
-    ? [...(mappedItem.portraitArtImages ?? []), ...mappedItem.portraitFallbackImages]
+    ? hasPosterArt
+      ? mappedItem.portraitFallbackImages
+      : [...(mappedItem.portraitArtImages ?? []), ...mappedItem.portraitFallbackImages]
     : [
         mappedItem.posterImageRatio4,
         mappedItem.portraitImage,
@@ -310,12 +317,15 @@ const PosterCard = memo(function PosterCard({
   totalCols = 5,
   hasRecents = false,
   onClick,
+  onFocused,
 }: {
   item: any;
   index?: number;
   totalCols?: number;
   hasRecents?: boolean;
   onClick: () => void;
+  /** TV: loads the next page of results when focus nears the end. */
+  onFocused?: (index: number) => void;
 }) {
   const title = resolveTitle(item);
   const titleImage = resolveTitleImage(item);
@@ -354,6 +364,9 @@ const PosterCard = memo(function PosterCard({
   const { ref, focused, focusKey } = useFocusable({
     focusKey: customFocusKey,
     onEnterPress: handleClick,
+    onFocus: () => {
+      if (typeof index === "number") onFocused?.(index);
+    },
     onArrowPress: (direction) => {
       try {
         tvSoundManager.play("nav");
@@ -403,7 +416,7 @@ const PosterCard = memo(function PosterCard({
       )}
       {titleImage && !showsPortraitArt && (
         <div className="absolute bottom-0 left-0 right-0 z-20 p-3 pb-3.5 sm:p-4 sm:pb-4.5 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center justify-end text-center pointer-events-none">
-          <div className="relative w-[200px] sm:w-[250px] max-w-[90%] h-[56px] sm:h-[70px] flex justify-center items-end mx-auto">
+          <div className="relative w-[200px] sm:w-[290px] max-w-[90%] h-[56px] sm:h-[100px] flex justify-center items-end mx-auto">
             <JOJOCommonImage
               src={titleImage}
               alt={title}
@@ -1008,6 +1021,37 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
   const totalPages: number = Number(meta?.total_pages ?? 1);
   const totalRecords: number = Number(meta?.total_record ?? searchResults.length);
 
+  // TV: no page buttons. Every loaded page stays in the grid and the next one
+  // loads as focus nears the bottom (handlePosterFocus), like a rail.
+  const isTvApp = isTizen() || isWebOS();
+  const [tvPages, setTvPages] = useState<{ query: string; byPage: Record<number, typeof searchResults> }>({ query: "", byPage: {} });
+  useEffect(() => {
+    if (!isTvApp || !debouncedQuery || isFetching || !searchData) return;
+    setTvPages((prev) => {
+      const byPage = prev.query === debouncedQuery ? prev.byPage : {};
+      if (byPage[currentPage] === searchResults) return prev;
+      return { query: debouncedQuery, byPage: { ...byPage, [currentPage]: searchResults } };
+    });
+  }, [isTvApp, debouncedQuery, currentPage, searchData, searchResults, isFetching]);
+  const tvResults = useMemo(() => {
+    if (tvPages.query !== debouncedQuery) return [];
+    const all: typeof searchResults = [];
+    for (let page = 1; tvPages.byPage[page]; page++) all.push(...tvPages.byPage[page]);
+    return all;
+  }, [tvPages, debouncedQuery]);
+  const shownResults = isTvApp ? tvResults : searchResults;
+
+  // Focus within the last two rows (5 columns) asks for the next page, so it
+  // is usually in before the remote reaches the bottom.
+  const loadMoreRef = useRef<(index: number) => void>(() => {});
+  useEffect(() => {
+    loadMoreRef.current = (index: number) => {
+      if (!isTvApp || isFetching || currentPage >= totalPages || !tvPages.byPage[currentPage]) return;
+      if (index >= tvResults.length - 10) setCurrentPage(currentPage + 1);
+    };
+  });
+  const handlePosterFocus = useCallback((index: number) => loadMoreRef.current(index), []);
+
   useEffect(() => {
     if (debouncedQuery && searchResults?.length > 0) addRecent(debouncedQuery);
   }, [debouncedQuery, searchResults?.length]);
@@ -1040,6 +1084,8 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
 
   const hasQuery = inputValue?.trim()?.length > 0;
   const showSpinner = searchLoading || isFetching;
+  // TV keeps the grid while the next page loads; a skeleton only for a new search.
+  const showGridSkeleton = isTvApp ? showSpinner && tvResults.length === 0 : showSpinner;
   const railsBusy = railsLoading || isFetchingNextPage;
 
   const rails: any[] = useMemo(() => {
@@ -1184,7 +1230,22 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
           console.error("[SearchModal] Failed to track content_clicked:", e);
         }
 
-        openAssetDetail(id, contentType, title);
+        // Pass the card's item as the page's first data, as Home does. Without
+        // it the detail page started from a skeleton: focus landed on the
+        // first control ready (the Cast & Crew tab, which opens its sheet) and
+        // the backdrop fell back to the landscape art with the title printed on it.
+        // No artwork from search, though: its cards show portrait art, and a
+        // search record's only wide image is the title-printed cover. The page
+        // shows the asset's own hero once it loads.
+        openAssetDetail(id, contentType, title, {
+          ...toSearchMappedItem(item),
+          heroImage: undefined,
+          landscapeImage: undefined,
+          landscapeFallbackImages: undefined,
+          posterImage: undefined,
+          image: undefined,
+          thumbnailImage: undefined,
+        });
       }
     },
     [openAssetDetail, router]
@@ -1335,10 +1396,10 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                     <div ref={resultsTopRef} />
 
                     {/* Skeleton while fetching */}
-                    {showSpinner && <PosterGridSkeleton count={10} />}
+                    {showGridSkeleton && <PosterGridSkeleton count={10} />}
 
                     {/* Error */}
-                    {!showSpinner && error && (
+                    {!showGridSkeleton && error && (
                       <div className="flex flex-col items-center py-16 gap-3 text-center">
                         <p className="text-xl text-red-400">
                           {t("error")}
@@ -1347,35 +1408,44 @@ export function SearchModal({ isOpen, onClose, limit = 20, initialQuery = "", on
                     )}
 
                     {/* No results */}
-                    {!showSpinner && !error && searchResults.length === 0 && (
+                    {!showGridSkeleton && !error && shownResults.length === 0 && (
                       <NoResults query={debouncedQuery} />
                     )}
 
                     {/* Results grid + pagination */}
-                    {!showSpinner && searchResults.length > 0 && (
+                    {!showGridSkeleton && shownResults.length > 0 && (
                       <div>
                         <h3 className="text-3xl font-semibold text-white/90 mb-4">
                           {t("results_for")} &ldquo;{debouncedQuery}&rdquo;
                         </h3>
 
                         <div className={POSTER_GRID}>
-                          {searchResults.map((item: any, idx: number) => (
+                          {shownResults.map((item: any, idx: number) => (
                             <PosterCard
                               key={idx}
                               item={item}
                               index={idx}
                               onClick={() => handleCardClick(item, idx)}
+                              onFocused={isTvApp ? handlePosterFocus : undefined}
                             />
                           ))}
                         </div>
 
-                        <SearchPagination
-                          currentPage={currentPage}
-                          totalPages={totalPages}
-                          totalRecords={totalRecords}
-                          onPageChange={handlePageChange}
-                          isLoading={showSpinner}
-                        />
+                        {isTvApp ? (
+                          showSpinner && (
+                            <div className="flex justify-center py-8">
+                              <div className="h-10 w-10 rounded-full border-4 border-white/15 border-t-theme_13_samecolour animate-spin" />
+                            </div>
+                          )
+                        ) : (
+                          <SearchPagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalRecords={totalRecords}
+                            onPageChange={handlePageChange}
+                            isLoading={showSpinner}
+                          />
+                        )}
                       </div>
                     )}
                   </div>

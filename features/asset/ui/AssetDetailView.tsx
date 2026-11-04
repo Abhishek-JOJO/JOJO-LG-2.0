@@ -544,10 +544,10 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
         id: "main-preview",
         type: "video",
         videoUrl: asset.previewUrl,
-        // The hero is landscape. Prefer the landscape artwork so the loaded
-        // asset does not replace the rail's wide hero image with a portrait
-        // poster and visibly recalculate the crop.
-        poster: asset.landscape?.url || asset.heroImage || asset.landscapeImage || asset.poster?.url || asset.posterImage || "",
+        // The asset's poster is its wide hero art (the image Home's hero
+        // shows); its landscape image is often the cover with the title
+        // printed on it, which doubled the title logo.
+        poster: asset.heroImage || asset.poster?.url || asset.landscape?.url || asset.landscapeImage || asset.posterImage || "",
         title: asset.title,
       });
     }
@@ -596,11 +596,11 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
     // 4. Last resort: static poster image
     if (list.length === 0) {
       const fallbackPoster =
+        asset?.heroImage ||
+        asset?.poster?.url ||
         asset?.landscape?.url ||
         (typeof asset?.landscape === "string" ? asset.landscape : "") ||
-        asset?.heroImage ||
         asset?.landscapeImage ||
-        asset?.poster?.url ||
         (typeof asset?.poster === "string" ? asset.poster : "") ||
         asset?.posterImage ||
         asset?.image ||
@@ -1499,6 +1499,9 @@ export function AssetDetailView({ assetId, onClose, isStandalone = false, initia
   const bgPosterUrl =
     (currentSlideIndex === 0 ? initialHeroPosterUrl : "") ||
     activePreview?.poster ||
+    // The asset's hero poster before its landscape art: the landscape image is
+    // often the cover with the title printed on it, doubled by the title logo.
+    asset?.poster?.url ||
     asset?.landscape?.url ||
     (typeof asset?.landscape === "string" ? asset.landscape : "") ||
     asset?.heroImage ||
