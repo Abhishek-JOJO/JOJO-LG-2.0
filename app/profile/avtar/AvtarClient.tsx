@@ -15,7 +15,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { useFocusable, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import {
   selectSelectedAvatar,
   selectSetSelectedAvatar,
@@ -66,6 +66,29 @@ export default function AvtarClient() {
     trackChildren: true,
     focusKey: "avatar-page-container",
   });
+
+  // Start on an avatar, not the back arrow: with focus left on the arrow, the
+  // first OK on a remote went back to the form with nothing chosen.
+  const avatars = avatarsQuery.data;
+  useEffect(() => {
+    if (!avatars?.length) return;
+    const selectedIndex = avatars.findIndex(
+      (avatar) => selectedAvatar?.url === avatar.url || (!!selectedAvatar?.avatar_id && selectedAvatar.avatar_id === avatar.avatar_id)
+    );
+    const index = Math.max(0, selectedIndex);
+    const target = avatars[index];
+    const key = `avatar-grid-${target.avatar_id || target.url || String(index)}`;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const attempt = () => {
+      if (doesFocusableExist(key)) setFocus(key);
+      else if (++tries < 10) timer = setTimeout(attempt, 80);
+    };
+    timer = setTimeout(attempt, 50);
+    return () => clearTimeout(timer);
+    // Once per load of the list; a later selection change navigates away anyway.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avatars]);
 
   return (
     <FocusContext.Provider value={containerFocusKey}>

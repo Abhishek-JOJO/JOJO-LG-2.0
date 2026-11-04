@@ -21,7 +21,7 @@ import { Pencil } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { useFocusable, FocusContext } from "@noriginmedia/norigin-spatial-navigation";
+import { useFocusable, FocusContext, setFocus, doesFocusableExist } from "@noriginmedia/norigin-spatial-navigation";
 import { selectAge, selectAgeError, selectCanSubmit, selectGender, selectGenderError, selectName, selectNameError, selectNameTouched, selectReset, selectSelectedAvatar, selectSetAge, selectSetGender, selectSetName, selectSubmit, selectTouchName, useCreateAccountStore } from "../../register/create-account/store";
 
 export default function AddProfileClient() {
@@ -85,6 +85,20 @@ export default function AddProfileClient() {
             reset();
         }
     }, [reset]);
+
+    // Start at the top of the form. Left to itself, focus could land on the
+    // name field, and the OK that opened this page then put the browser's own
+    // focus in the input, where arrow keys moved the caret too.
+    useEffect(() => {
+        let tries = 0;
+        let timer: ReturnType<typeof setTimeout>;
+        const attempt = () => {
+            if (doesFocusableExist("add-profile-avatar")) setFocus("add-profile-avatar");
+            else if (++tries < 10) timer = setTimeout(attempt, 80);
+        };
+        timer = setTimeout(attempt, 50);
+        return () => clearTimeout(timer);
+    }, []);
 
     const handleAvatarNavigation = () => {
         if (isSubmitting) return;
@@ -184,14 +198,14 @@ export default function AddProfileClient() {
                 "px-4 py-8",
                 "mt-12 md:mt-0"
             )}>
-                <JOJOCustomCard className="w-full max-w-sm sm:max-w-md overflow-hidden">
+                <JOJOCustomCard className="w-full max-w-sm sm:max-w-[640px] overflow-hidden sm:!p-10">
                     <form
                         onSubmit={handleSubmit as any}
                         noValidate
                         className={`w-full ${isSubmitting ? 'pointer-events-none opacity-75' : ''}`}
                     >
                         <JOJOCardHeader className="pb-6">
-                            <JOJOCardTitle>{t("add-profile")}</JOJOCardTitle>
+                            <JOJOCardTitle className="sm:!text-4xl sm:!font-bold">{t("add-profile")}</JOJOCardTitle>
                         </JOJOCardHeader>
                         <JOJOCardContent className="w-full space-y-2" gap="5px">
 
@@ -225,7 +239,7 @@ export default function AddProfileClient() {
                                         </>
                                     ) : (
                                         <div className="flex h-full w-full items-center justify-center rounded-full">
-                                            <span className="text-5xl font-light leading-none text-theme_1 transition group-hover:text-theme_13_samecolour">
+                                            <span className="text-5xl sm:text-7xl font-light leading-none text-theme_1 transition group-hover:text-theme_13_samecolour">
                                                 +
                                             </span>
                                         </div>
@@ -234,7 +248,7 @@ export default function AddProfileClient() {
                             </div>
 
                             <div className="w-full">
-                                <label className="mb-2 block text-[15px] font-bold text-theme_1">
+                                <label className="mb-2 sm:mb-3 block text-[15px] sm:text-2xl font-bold text-theme_1">
                                     {t("full_name_label")}
                                 </label>
                                 <FocusableNameInput
@@ -251,7 +265,7 @@ export default function AddProfileClient() {
                                             <FieldError msg={t(nameError)} />
                                         )}
                                     </div>
-                                    <span className={`text-xs ${name.length >= 25 ? 'text-red-500' : 'text-theme_5'}`}>
+                                    <span className={`text-xs sm:text-lg ${name.length >= 25 ? 'text-red-500' : 'text-theme_5'}`}>
                                         {`${name.length}/25`}
                                     </span>
                                 </div>
@@ -259,11 +273,11 @@ export default function AddProfileClient() {
 
 
                             <div className="flex flex-col gap-2">
-                                <label className="text-[15px] font-bold text-theme_1">
+                                <label className="text-[15px] sm:text-2xl font-bold text-theme_1">
                                     {t("age_label")}
                                 </label>
 
-                                <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                                <div className="grid grid-cols-3 gap-2 sm:gap-4">
                                     {AGE_RANGES.map((range) => (
                                         <Chip
                                             key={range}
@@ -281,11 +295,11 @@ export default function AddProfileClient() {
                             </div>
 
                             <div className="flex flex-col gap-2.5">
-                                <label className="text-[15px] font-bold text-theme_1">
+                                <label className="text-[15px] sm:text-2xl font-bold text-theme_1">
                                     {t("gender_label")}
                                 </label>
 
-                                <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                                <div className="grid grid-cols-3 gap-2 sm:gap-4">
                                     {GENDERS.map((g) => (
                                         <Chip
                                             key={g}
@@ -339,11 +353,12 @@ function FocusableAvatarPicker({
             ref={ref as any}
             onClick={onSelect}
             className={cn(
-                "group relative h-32 w-32 overflow-hidden rounded-full bg-theme_10_80 transition sm:h-36 sm:w-36",
+                "group relative h-32 w-32 overflow-hidden rounded-full bg-theme_10_80 transition sm:h-44 sm:w-44",
                 "border border-theme_1/10 hover:border-theme_13_samecolour",
                 "focus-visible:outline-none",
                 disabled && "cursor-not-allowed opacity-60",
-                focused ? "ring-2 ring-white border-theme_13_samecolour scale-105" : ""
+                // outline, not ring: ring box-shadows don't render on the Tizen TV.
+                focused ? "outline-4 outline-offset-4 outline-theme_13_samecolour border-theme_13_samecolour scale-105" : ""
             )}
             aria-label={ariaLabel}
         >
@@ -370,6 +385,9 @@ function FocusableNameInput({
     const { ref, focused } = useFocusable({
         focusKey: "add-profile-name",
         onEnterPress: () => (ref.current as HTMLInputElement | null)?.focus(),
+        // Moving on with the D-pad must also take the browser's focus (and the
+        // TV keyboard) out of the input, or later arrows still edit its caret.
+        onBlur: () => (ref.current as HTMLInputElement | null)?.blur(),
     });
     return (
         <>
@@ -381,7 +399,8 @@ function FocusableNameInput({
                 value={value}
                 onChange={onChange}
                 onBlur={onBlur}
-                className={cn("w-full body-sm-regular bg-theme_10", focused ? "ring-2 ring-white" : "")}
+                // !: body-sm-regular is an unlayered class and beats plain text-* utilities.
+                className={cn("w-full body-sm-regular bg-theme_10 sm:!h-16 sm:!text-2xl sm:!px-6", focused ? "!border-[3px] !border-theme_13_samecolour" : "")}
                 error={error}
                 disabled={disabled}
                 maxLength={25}
@@ -415,8 +434,9 @@ function FocusableSaveButton({
             disabled={disabled}
             isLoading={isLoading}
             className={cn(
-                "mx-auto w-1/4 rounded-[100px] border-none body-sm-medium hover:opacity-90",
-                focused ? "ring-2 ring-white scale-105" : ""
+                "mx-auto w-1/4 sm:w-1/3 rounded-[100px] border-none body-sm-medium hover:opacity-90 sm:!h-16 sm:!text-2xl sm:!font-bold",
+                // The app's focused-button look (Exit / Resume popups): orange fill, white ring.
+                focused ? `!bg-theme_13_samecolour !text-white ring-4 ring-white scale-105 ${active ? "" : "opacity-60"}` : ""
             )}
         >
             {label}

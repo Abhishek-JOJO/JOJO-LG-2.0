@@ -24,6 +24,7 @@ import { useFocusable, setFocus, doesFocusableExist } from "@noriginmedia/norigi
 import { useProfileStore } from "@/store/useProfileStore";
 import { deepLinkManager } from "@/lib/deeplink/useDeepLinkHandler";
 import { tvNavigate } from "@/src/navigation/tvNavigate";
+import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 
 interface WatchingPageProps {
   onProfileSelected?: () => void;
@@ -141,6 +142,16 @@ export default function WatchingPage({ onProfileSelected }: WatchingPageProps = 
 
   // Handle add profile button click
   const handleAddProfile = () => {
+    // On TV this screen is an overlay over Home, and the page under an overlay
+    // is display:none: the Add Profile page rendered there, unseen, while Who's
+    // Watching stayed up. Drop the overlay and take over its history entry so
+    // Back from Add Profile returns to Home.
+    const overlay = useTvOverlayStore.getState();
+    if (overlay.screen) {
+      overlay.clear();
+      router.replace(ROUTES.ADD_PROFILE);
+      return;
+    }
     router.push(ROUTES.ADD_PROFILE);
   };
 
