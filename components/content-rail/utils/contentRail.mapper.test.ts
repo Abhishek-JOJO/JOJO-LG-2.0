@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { getPortraitGridImages } from "./cardImageUrls";
 import { mapApiRailItem } from "./contentRail.mapper";
 
 // Image orders follow the Android app's Landscape2 rail config.
@@ -44,4 +45,9 @@ test("portrait art shown only as a last resort, and then without the logo", () =
   const item = mapApiRailItem({ details: { ...asset, poster: [], landscape: [] } }, 0, 16);
   assert.equal(item.portraitFallbackImages?.[0], "portrait-r4.webp");
   assert.equal(item.hasPortraitArt, true);
+});
+
+test("grids (search, genre): real portrait poster first, then the rail order", () => {
+  const item = mapApiRailItem({ details: asset }, 0, 16);
+  assert.deepEqual(getPortraitGridImages(item).slice(0, 3), ["portrait-r4.webp", "portrait-r2.webp", "poster-r4.webp"]);
 });

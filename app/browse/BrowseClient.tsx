@@ -455,14 +455,14 @@ function BrowseClientContent() {
                         return <GenreCard {...commonProps} />;
 
                       case RailCardVariant.SERIES_MIXED:
-                        return <PortraitCard {...commonProps} />;
+                        return <PortraitCard {...commonProps} artFirst />;
 
                       case RailCardVariant.TOP_TEN:
                       case RailCardVariant.ARTIST:
                       case RailCardVariant.UPCOMING:
                       case RailCardVariant.PORTRAIT:
                       default:
-                        return <PortraitCard {...commonProps} />;
+                        return <PortraitCard {...commonProps} artFirst />;
                     }
                   })()}
                 </div>

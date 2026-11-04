@@ -45,6 +45,27 @@ export class TizenAdapter implements TVPlatformAdapter {
     const url = customUrl || `samsungapps://ProductDetail/${appId}`;
     const tizen = window.tizen;
 
+    // Samsung's deep link to an app's page in the TV store (Seller Office App ID).
+    if (!customUrl && tizen?.ApplicationControl && tizen.ApplicationControlData && tizen.application?.launchAppControl) {
+      try {
+        const detail = new tizen.ApplicationControl("http://tizen.org/appcontrol/operation/view", null, null, null, [
+          new tizen.ApplicationControlData("Sub_Menu", ["DETAIL"]),
+          new tizen.ApplicationControlData("widget_id", [appId]),
+        ]);
+        tizen.application.launchAppControl(detail, "com.samsung.tv.store", undefined, (error) => {
+          console.warn("[Tizen] Samsung store DETAIL page failed; trying samsungapps://", error);
+          this.launchStoreUrl(url);
+        });
+        return;
+      } catch (error) {
+        console.warn("[Tizen] Failed to create store DETAIL control", error);
+      }
+    }
+    this.launchStoreUrl(url);
+  }
+
+  private launchStoreUrl(url: string): void {
+    const tizen = window.tizen;
     if (tizen?.ApplicationControl && tizen.application?.launchAppControl) {
       try {
         const control = new tizen.ApplicationControl(
@@ -60,8 +81,8 @@ export class TizenAdapter implements TVPlatformAdapter {
       }
     }
 
-    if (customUrl?.startsWith("http://") || customUrl?.startsWith("https://")) {
-      window.open(customUrl, "_blank");
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      window.open(url, "_blank");
     }
   }
 

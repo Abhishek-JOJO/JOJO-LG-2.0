@@ -75,3 +75,12 @@ export function getPortraitCardImageUrl(
 ): string {
   return images[0] || item.posterImageRatio4 || item.portraitImage || item.image || "";
 }
+
+/**
+ * Portrait grids (search, genre, browse): the real 2:3 portrait poster first,
+ * then the rail order above. POSTER Ratio 4 is a 16:9 frame; a whole grid of
+ * them cropped to 2:3 showed cut-off slices.
+ */
+export function getPortraitGridImages(item: ContentRailItem): string[] {
+  return uniqueUrls([...(item.portraitArtImages ?? []), ...getPortraitCardImages(item)]);
+}

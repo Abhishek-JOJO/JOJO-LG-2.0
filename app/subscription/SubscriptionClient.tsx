@@ -131,7 +131,7 @@ function getQrPlanTitle(product: any) {
 function PlanFeatureIcon({ src, alt }: { src?: string; alt?: string }) {
     if (!src) return null;
     return (
-        <div className="relative h-9 w-9">
+        <div className="relative h-11 w-11">
             <JOJOCommonImage
                 src={src}
                 alt={alt || ""}
@@ -158,8 +158,8 @@ function QrPlanCard({
             className="w-full rounded-2xl bg-black/28 px-7 py-6 text-left text-white backdrop-blur-md"
         >
             <div className="mb-7 flex items-center justify-between gap-4">
-                <span className="text-2xl font-extrabold">{title}</span>
-                <span className="text-2xl font-extrabold">
+                <span className="text-3xl font-extrabold">{title}</span>
+                <span className="text-3xl font-extrabold">
                     {sku.currencySymbol}{formatPrice(sku.price)} / month
                 </span>
             </div>
@@ -168,7 +168,7 @@ function QrPlanCard({
                 {product.features?.slice(0, featureLimit).map((feature: any, idx: number) => (
                     <div key={feature.featureId || idx} className="flex min-w-0 flex-col items-center gap-2 text-center">
                         <PlanFeatureIcon src={feature.featureImageUrl} alt={feature.featureName} />
-                        <span className="text-sm font-bold leading-tight text-white/90">{String(feature.featureName || "").replace("Upto", "Upto ")}</span>
+                        <span className="text-lg font-bold leading-tight text-white/90">{String(feature.featureName || "").replace("Upto", "Upto ")}</span>
                     </div>
                 ))}
             </div>
@@ -222,7 +222,7 @@ function SubscriptionQrPage({ products }: { products: any[] }) {
                             wrapperClassName="w-full h-full"
                         />
                     </div>
-                    <p className="mb-6 text-center text-2xl font-bold text-white">Premium Deals, Unlimited Entertainment!</p>
+                    <p className="mb-6 text-center text-3xl font-bold text-white">Premium Deals, Unlimited Entertainment!</p>
 
                     <div className="flex w-full max-w-[560px] flex-col gap-5">
                         {products.map((product) => (
@@ -235,7 +235,7 @@ function SubscriptionQrPage({ products }: { products: any[] }) {
                 </div>
 
                 <div className="flex flex-col items-center rounded-3xl border border-white/22 bg-white/[0.08] p-9 text-center backdrop-blur-2xl">
-                    <h1 className="mb-6 text-center text-4xl font-extrabold leading-tight text-white">Continue Watching on JOJO</h1>
+                    <h1 className="mb-6 text-center text-[2.75rem] font-extrabold leading-tight text-white">Continue Watching on JOJO</h1>
 
                     <div className="mb-8 flex w-full justify-center">
                         <div className="flex h-[344px] w-[344px] items-center justify-center rounded-2xl bg-white/10 p-3 backdrop-blur-xl">
@@ -244,16 +244,16 @@ function SubscriptionQrPage({ products }: { products: any[] }) {
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={qrDataUrl} alt="JOJO Gold subscription QR code" className="h-full w-full object-contain" />
                                 ) : (
-                                    <span className="text-base font-semibold text-black/60">Generating QR...</span>
+                                    <span className="text-xl font-semibold text-black/60">Generating QR...</span>
                                 )}
                             </div>
                         </div>
                     </div>
 
-                    <p className="max-w-[620px] text-center text-3xl font-extrabold leading-tight text-white">
+                    <p className="max-w-[620px] text-center text-4xl font-extrabold leading-tight text-white">
                         Continue with JOJO Gold Plan
                     </p>
-                    <p className="mt-5 max-w-[650px] text-center text-base font-semibold leading-snug text-white/82">
+                    <p className="mt-5 max-w-[650px] text-center text-xl font-semibold leading-snug text-white/82">
                         Use the QR code to open the JOJO app and finish your purchase with the same account as your TV. Restart the app to start watching.
                     </p>
                 </div>

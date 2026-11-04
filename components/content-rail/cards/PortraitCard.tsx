@@ -6,7 +6,7 @@ import { ROUTES } from "@/lib/constants/routes";
 
 import JOJOCommonImage from "@/components/ui/JOJOCommonImage";
 import { TitleLogoImage } from "@/components/ui/TitleLogoImage";
-import { getPortraitCardImages, getPortraitCardImageUrl } from "../utils/cardImageUrls";
+import { getPortraitCardImages, getPortraitCardImageUrl, getPortraitGridImages } from "../utils/cardImageUrls";
 import { ContentRailItem, RailCardVariant } from "../config/contentRail.types";
 import { RailCardDesignConfig } from "../config/contentRail.config";
 
@@ -24,6 +24,8 @@ interface Props {
   forceFocusRing?: boolean;
   railActive?: boolean;
   onArrowLeftRight?: (direction: "left" | "right") => void;
+  /** Grids (search, genre, browse): real portrait poster first (getPortraitGridImages). */
+  artFirst?: boolean;
 }
 
 export const PortraitCard = React.memo(function PortraitCard({
@@ -39,6 +41,7 @@ export const PortraitCard = React.memo(function PortraitCard({
   forceFocusRing,
   railActive,
   onArrowLeftRight,
+  artFirst = false,
 }: Props) {
   const t = useTranslations("contentRails");
   
@@ -211,8 +214,13 @@ export const PortraitCard = React.memo(function PortraitCard({
   // Resolve image for portrait card according to the client-specified fallback
   // cascade (see getPortraitCardImages) — shared with the image preloader so
   // its lookahead warms this exact URL.
-  const portraitFallbackList = React.useMemo(() => getPortraitCardImages(item), [item]);
+  const portraitFallbackList = React.useMemo(
+    () => (artFirst ? getPortraitGridImages(item) : getPortraitCardImages(item)),
+    [item, artFirst]
+  );
   const imageUrl = getPortraitCardImageUrl(item, portraitFallbackList);
+  // Portrait art has the title printed on it; the logo on top would repeat it.
+  const showsPortraitArt = artFirst ? !!item.portraitArtImages?.includes(imageUrl) : !!item?.hasPortraitArt;
 
   const titleText = (
     <h3 className="line-clamp-1 text-lg font-semibold text-white drop-shadow-md text-center px-1">
@@ -237,7 +245,7 @@ export const PortraitCard = React.memo(function PortraitCard({
       onArrowLeftRight={onArrowLeftRight}
     >
       {/* Title & Logo overlay for portrait cards (centered with larger width) */}
-      {!item?.hasPortraitArt && (item?.title_image || (Boolean((config as any)?.isMixedSeries) && item?.title)) && (
+      {!showsPortraitArt && (item?.title_image || (Boolean((config as any)?.isMixedSeries) && item?.title)) && (
         <div className="absolute bottom-0 left-0 right-0 z-20 p-3 pb-3.5 sm:p-4 sm:pb-4.5 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col items-center justify-end text-center pointer-events-none">
           {item?.title_image ? (
             <TitleLogoImage

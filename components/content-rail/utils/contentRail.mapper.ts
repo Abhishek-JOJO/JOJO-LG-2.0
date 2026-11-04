@@ -517,6 +517,9 @@ export function mapApiRailItem(
     // logo overlay only when that's the image they show.
     hasPortraitArt:
       portraitFallbackImages.length > 0 && getPortraitArtImages(asset, cr_item).includes(portraitFallbackImages[0]),
+    portraitArtImages: isGenre
+      ? []
+      : getPortraitArtImages(asset, cr_item).filter((url): url is string => typeof url === "string" && url.length > 0),
     heroImage,
     thumbnailImage: image,
     title_image: (() => {

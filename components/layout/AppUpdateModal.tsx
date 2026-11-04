@@ -84,32 +84,33 @@ export function AppUpdateModal() {
     );
   }
 
-  // ── SOFT / OPTIONAL UPDATE MODAL (Smaller Popup) ───────────────────────────
+  // ── SOFT / OPTIONAL UPDATE MODAL ───────────────────────────────────────────
+  // Same look as the other TV popups (LogoutModal): Update Now opens the app's
+  // page in the TV store; Cancel (or Back) closes it for this session.
   return (
-    <JOJOModal isOpen={isOpen} onClose={handleClose} showCloseButton={false} className="max-w-[460px] p-8 sm:p-9">
-      <div className="flex flex-col items-center text-center w-full">
-        {/* Version Comparison Pill */}
+    <JOJOModal isOpen={isOpen} onClose={handleClose} showCloseButton={false} className="sm:max-w-[720px] sm:!p-12">
+      <div className="flex flex-col items-center text-center w-full space-y-3">
         {newVersion && (
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/[0.06] border border-white/10 px-3.5 py-1 text-xs font-mono text-white/70">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] border border-white/10 px-4 py-1.5 text-xs sm:text-xl font-mono text-white/70">
             <span>v{APP_VERSION}</span>
             <span className="text-theme_13_samecolour font-bold">→</span>
             <span className="text-theme_13_samecolour font-semibold">v{newVersion}</span>
           </div>
         )}
 
-        <h3 className="text-2xl font-bold text-white tracking-tight leading-snug">
+        <h3 className="text-[22px] sm:text-4xl font-bold text-theme_1 tracking-tight leading-snug">
           {updateInfo?.title || "Update Available"}
         </h3>
 
-        <p className="mt-3 text-[15px] text-white/70 font-normal leading-relaxed max-w-[360px]">
+        <p className="text-[14px] sm:text-2xl text-theme_6 font-normal leading-relaxed">
           {updateInfo?.message || "A new version of JOJO is available in your TV app store. Update now for better performance, faster loading, and new features."}
         </p>
-
-        <SoftUpdateButtons
-          onCancel={handleClose}
-          onUpdate={handleUpdate}
-        />
       </div>
+
+      <SoftUpdateButtons
+        onCancel={handleClose}
+        onUpdate={handleUpdate}
+      />
     </JOJOModal>
   );
 }
@@ -291,34 +292,33 @@ function SoftUpdateButtons({
     onEnterPress: onUpdate,
   });
 
-  return (
-    <div className="flex w-full items-center justify-center gap-3.5 mt-6">
-      <button
-        ref={cancelBtnRef as any}
-        data-focuskey="app-update-cancel-btn"
-        tabIndex={0}
-        onClick={onCancel}
-        className={`flex-1 h-[48px] rounded-xl font-semibold text-sm transition-all cursor-pointer outline-none flex items-center justify-center border ${
-          cancelFocused
-            ? "border-white bg-white text-[#121218] scale-[1.03] shadow-[0_0_0_3px_rgba(242,110,33,0.8)] z-50"
-            : "border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white"
-        }`}
-      >
-        Later
-      </button>
+  const buttonClass = (focused: boolean) =>
+    `flex-1 py-3 sm:py-5 px-6 rounded-full font-bold text-sm sm:text-2xl transition-all cursor-pointer outline-none ${
+      focused
+        ? "bg-theme_13_samecolour text-white scale-105 shadow-xl ring-4 ring-white z-50"
+        : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
+    }`;
 
+  return (
+    <div className="flex w-full items-center justify-center gap-4 mt-4">
       <button
         ref={updateBtnRef as any}
         data-focuskey="app-update-confirm-btn"
         tabIndex={0}
         onClick={onUpdate}
-        className={`flex-1 h-[48px] rounded-xl font-bold text-sm transition-all cursor-pointer outline-none flex items-center justify-center gap-2 ${
-          updateFocused
-            ? "bg-theme_13_samecolour text-white scale-[1.03] ring-4 ring-white ring-offset-2 ring-offset-[#121218] shadow-[0_8px_24px_rgba(242,110,33,0.4)] z-50"
-            : "bg-theme_13_samecolour text-white hover:brightness-110 shadow-[0_4px_16px_rgba(242,110,33,0.25)]"
-        }`}
+        className={buttonClass(updateFocused)}
       >
         Update Now
+      </button>
+
+      <button
+        ref={cancelBtnRef as any}
+        data-focuskey="app-update-cancel-btn"
+        tabIndex={0}
+        onClick={onCancel}
+        className={buttonClass(cancelFocused)}
+      >
+        Cancel
       </button>
     </div>
   );

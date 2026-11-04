@@ -13,6 +13,8 @@
   <tizen:privilege name="http://tizen.org/privilege/internet" />
   <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice" />
   <tizen:privilege name="http://tizen.org/privilege/application.info" />
+  <!-- Opens the app's Samsung store page for updates (AppUpdateModal). -->
+  <tizen:privilege name="http://tizen.org/privilege/application.launch" />
   <tizen:privilege name="http://developer.samsung.com/privilege/drmplay" />
   <tizen:privilege name="http://developer.samsung.com/privilege/avplay" />
   <tizen:privilege name="http://tizen.org/privilege/tv.audio" />

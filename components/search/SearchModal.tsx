@@ -63,8 +63,10 @@ function resolveSearchPosterCandidates(item: any): string[] {
 
   const mappedItem = toSearchMappedItem(item);
 
+  // Real portrait poster first: POSTER Ratio 4 (first in the rail order) is a
+  // 16:9 frame and was cut off in this 2:3 grid.
   const candidates = mappedItem.portraitFallbackImages?.length > 0
-    ? mappedItem.portraitFallbackImages
+    ? [...(mappedItem.portraitArtImages ?? []), ...mappedItem.portraitFallbackImages]
     : [
         mappedItem.posterImageRatio4,
         mappedItem.portraitImage,
@@ -327,9 +329,9 @@ const PosterCard = memo(function PosterCard({
   // The real portrait poster (first candidate) has the title printed on it;
   // the title logo on top only duplicated it. Shown again if that art fails.
   const showsPortraitArt = useMemo(
-    () => !item?.genre && !!toSearchMappedItem(item)?.hasPortraitArt,
-    [item]
-  ) && fallbackIndex === 0;
+    () => !item?.genre && !!toSearchMappedItem(item)?.portraitArtImages?.includes(activeUrl),
+    [item, activeUrl]
+  );
 
   const handleImageError = useCallback(() => {
     setFallbackState((previous) => {

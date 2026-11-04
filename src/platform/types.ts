@@ -39,8 +39,20 @@ export interface TizenTVInputDevice {
 
 export type TizenApplicationControlInstance = object;
 
+export type TizenApplicationControlDataInstance = object;
+
+export interface TizenApplicationControlDataConstructor {
+  new (key: string, value: string[]): TizenApplicationControlDataInstance;
+}
+
 export interface TizenApplicationControlConstructor {
-  new (operation: string, uri?: string): TizenApplicationControlInstance;
+  new (
+    operation: string,
+    uri?: string | null,
+    mime?: string | null,
+    category?: string | null,
+    data?: TizenApplicationControlDataInstance[],
+  ): TizenApplicationControlInstance;
 }
 
 export interface TizenCurrentApplication {
@@ -63,6 +75,7 @@ export interface TizenAPI {
   tvinputdevice?: TizenTVInputDevice;
   application?: TizenApplicationManager;
   ApplicationControl?: TizenApplicationControlConstructor;
+  ApplicationControlData?: TizenApplicationControlDataConstructor;
   tvaudiocontrol?: {
     getVolume(): number;
     setVolume(volume: number): void;

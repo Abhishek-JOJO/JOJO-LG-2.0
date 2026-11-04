@@ -261,6 +261,7 @@ export default function GenreListingClient() {
                 index={index}
                 itemsLength={filteredItems.length}
                 onClick={() => handleItemClick(item, index)}
+                artFirst
               />
             ))}
           </div>
