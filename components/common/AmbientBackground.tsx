@@ -30,6 +30,11 @@ export function AmbientBackground() {
   // in once the hero's colour is sampled) promoted and re-rastered two
   // full-viewport layers, about a third of a tab switch's main-thread time.
   const fade = isTizenRuntime ? "" : "transition-opacity duration-1000 ease-out";
+  // Tizen: ends at 90vh (972px). On the rails the page sits at scrollY 893
+  // and the solid header covers page y 893-997, so the tint now ends under
+  // it. At 100vh its last ~83px showed below the header as a tinted band with
+  // a hard edge: the header and the rail background looked different colours.
+  const height = isTizenRuntime ? "h-[90vh]" : "h-[100vh]";
 
   return (
     <div
@@ -37,7 +42,7 @@ export function AmbientBackground() {
       // Tizen: a playing AVPlay preview cuts a hole through this layer (it
       // sits behind the hero) — see tizenPreviewPlayer.
       data-tizen-video-backdrop
-      className={`absolute top-0 left-0 right-0 h-[100vh] w-full pointer-events-none z-0 overflow-hidden ${fade} ${
+      className={`absolute top-0 left-0 right-0 ${height} w-full pointer-events-none z-0 overflow-hidden ${fade} ${
         hasActiveColor ? "opacity-100" : "opacity-0"
       }`}
     >
