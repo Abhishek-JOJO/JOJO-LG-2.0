@@ -25,7 +25,6 @@ import { useEffect } from "react";
 import { usePlayerStore } from "@/store/usePlayerStore";
 import { useTvOverlayStore } from "@/store/useTvOverlayStore";
 import { useLocaleStore } from "@/store/useLocaleStore";
-import { useNavStore } from "@/store/useNavStore";
 import { normalizePathname } from "@/lib/utils/pathname";
 
 function LogoSkeleton({ isGoldSlot = false }: { isGoldSlot?: boolean }) {
@@ -314,10 +313,12 @@ export function Navbar() {
 
   const isSearchPage = normalizedPath === ROUTES.SEARCH || normalizedPath.startsWith(ROUTES.SEARCH);
   const isSearchActive = !isTvOverlayOpen && (isSearchOpen || isSearchPage);
-  const isHeroLoaded = useNavStore((s) => s.isHeroLoaded);
-  const isHomeRoute = isHome || isLanding || normalizedPath === "/" || normalizedPath === ROUTES.HOME || normalizedPath === ROUTES.HOMEPAGE;
-  // While hero content is loading on Home / browse page, the header MUST remain transparent.
-  const isHeaderTransparent = (!isHeroLoaded && isHomeRoute) || !isScrolled || isSearchActive;
+  // Transparent only at the top of the page (over the hero) and on search.
+  // Once scrolled, the hero is out of view and the bar is always solid: it
+  // used to stay transparent while isHeroLoaded was false, and a stale false
+  // (reset after the hero had set it) left the cut-off hero showing through
+  // the bar above the rails.
+  const isHeaderTransparent = !isScrolled || isSearchActive;
   // Tizen has no backdrop blur: the scrolled bar was 95% black, so the hero's
   // bottom edge (and, during the 300ms fade, the whole hero) showed through it
   // above the rails. Solid page black there, switched without a fade.

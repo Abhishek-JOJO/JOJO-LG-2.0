@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { flushSync } from "react-dom";
+import { isTizen } from "@/src/platform/detectPlatform";
 import { useRouter } from "next/navigation";
 import { useActivePathname } from "@/hooks/useActivePathname";
 import { useGuestLogin } from "@/features/auth/hooks/useGuestLogin";
@@ -79,7 +81,15 @@ export function useNavbar() {
   const activeBrowseTab = useNavStore((s) => s.activeBrowseTab);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 30);
+    // Tizen: applied within the scroll event, so the bar turns solid in the
+    // same frame the page scrolls. A normal update landed a frame later, and on
+    // the TV that frame (100ms+) showed the cut-off hero through the bar.
+    const sync = isTizen();
+    const handleScroll = () => {
+      const scrolled = window.scrollY > 30;
+      if (sync) flushSync(() => setIsScrolled(scrolled));
+      else setIsScrolled(scrolled);
+    };
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);

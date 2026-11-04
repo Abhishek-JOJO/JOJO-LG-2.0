@@ -62,9 +62,17 @@ export const FocusableNavLink = React.memo(({
 
     if (isTargetBrowse && (isCurrentBrowse || isTvOverlayOpen || normCurrent === ROUTES.SEARCH || isSearchOpen)) {
       const navStore = useNavStore.getState();
-      if (navStore.activeBrowseTab !== normTarget) {
+      // Reset the hero state only when the page really changes. OK on the tab
+      // already showing (activeBrowseTab starts unset on Home) cleared
+      // isHeroLoaded while the same hero stayed mounted, so nothing set it back
+      // and the header stayed transparent over the cut-off hero after scrolling.
+      const homeAsRoot = (p: string) => (p === ROUTES.HOMEPAGE ? ROUTES.HOME : p);
+      const shownTab = homeAsRoot(normalizePathname(navStore.activeBrowseTab ?? normCurrent));
+      if (shownTab !== homeAsRoot(normTarget)) {
         navStore.setIsHeroLoaded(false);
         useAmbientTintStore.getState().resetAmbientColor();
+      }
+      if (navStore.activeBrowseTab !== normTarget) {
         navStore.setActiveBrowseTab(normTarget);
       }
       if (isTvOverlayOpen) {
