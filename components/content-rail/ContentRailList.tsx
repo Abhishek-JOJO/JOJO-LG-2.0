@@ -164,7 +164,10 @@ function renderSpotlightRailItem(
     if (isTopTen) {
       const rank = effectiveItem.rank ?? slotIdx + 1;
       return (
-        <div key={keyId} className="relative flex shrink-0 items-end pl-8 sm:pl-10 md:pl-12">
+        <div key={keyId} className={`relative flex shrink-0 items-end ${
+          // Two digits ("10") need room, or the card covers the second one.
+          String(rank).length > 1 ? "pl-16 sm:pl-20 md:pl-24" : "pl-8 sm:pl-10 md:pl-12"
+        }`}>
           <span
             className="absolute left-0 -bottom-4 z-20 text-[80px] sm:text-[95px] md:text-[125px] font-black leading-none text-neutral-950 [-webkit-text-stroke:2px_var(--theme_1)] sm:[-webkit-text-stroke:3px_var(--theme_1)] drop-shadow-[0_0_10px_rgba(0,0,0,0.8)]"
           >

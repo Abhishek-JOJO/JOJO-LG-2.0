@@ -219,19 +219,19 @@ export function getPortraitFallbackImages(asset: any, cr_item?: any): string[] {
     (typeof cr_item?.image === "string" ? cr_item.image : undefined) ||
     (typeof cr_item?.thumbnail === "string" ? cr_item.thumbnail : undefined);
 
-  // Real portrait art first: POSTER ratio 4 is a 16:9 frame (e.g.
-  // "preview-image-1920x1080"), and cropped to a 2:3 card it showed a zoomed
-  // middle slice. The poster-type images remain the fallback.
+  // Same order as the Android app's Landscape2 rail (portraitFallback): the
+  // poster/landscape art, with the title logo drawn over it (PortraitCard).
+  // Portrait art has the title printed on it, so it's only a last resort.
   const rawList: (string | undefined)[] = [
-    portraitRatio4,
-    portraitRatio2,
-    portraitDefault,
     posterRatio4,
     posterRatio3,
     posterRatio1,
     posterDefault,
     landscapeRatio1,
     landscapeDefault,
+    portraitRatio4,
+    portraitRatio2,
+    portraitDefault,
     genericImage,
   ];
 
@@ -513,8 +513,10 @@ export function mapApiRailItem(
     posterImageRatio4,
     portraitFallbackImages,
     landscapeFallbackImages,
-    // Portrait art carries its own title typography; portrait cards skip the logo overlay.
-    hasPortraitArt: getPortraitArtImages(asset, cr_item).some(Boolean),
+    // Portrait art carries its own title typography: portrait cards skip the
+    // logo overlay only when that's the image they show.
+    hasPortraitArt:
+      portraitFallbackImages.length > 0 && getPortraitArtImages(asset, cr_item).includes(portraitFallbackImages[0]),
     heroImage,
     thumbnailImage: image,
     title_image: (() => {

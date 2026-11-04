@@ -58,12 +58,13 @@ export function LogoutModal({ isOpen, onClose }: LogoutModalProps) {
     <JOJOModal
       isOpen={isOpen}
       onClose={isLoggingOut ? () => { } : onClose}
+      className="sm:max-w-[720px] sm:!p-12"
     >
       <div className="space-y-3 text-center">
-        <h3 className="text-[22px] sm:text-2xl font-bold text-theme_1 tracking-tight leading-snug">
+        <h3 className="text-[22px] sm:text-4xl font-bold text-theme_1 tracking-tight leading-snug">
           {t("logout_confirm")}
         </h3>
-        <p className="text-[14px] sm:text-[15px] text-theme_6 font-normal leading-relaxed">
+        <p className="text-[14px] sm:text-2xl text-theme_6 font-normal leading-relaxed">
           {t("logout_desc")}
         </p>
       </div>
@@ -136,7 +137,7 @@ function LogoutModalButtons({
         data-focuskey="logout-modal-confirm-btn"
         onClick={onLogout}
         disabled={isLoggingOut}
-        className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${
+        className={`flex-1 py-3 sm:py-5 px-6 rounded-full font-bold text-sm sm:text-2xl transition-all cursor-pointer outline-none ${
           logoutFocused
             ? "bg-theme_13_samecolour text-white scale-105 shadow-xl ring-4 ring-white z-50"
             : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"
@@ -165,7 +166,7 @@ function LogoutModalButtons({
         // turns red *away* from on focus — with Logout unfocused (neutral)
         // and Cancel always orange, it read backwards: the un-highlighted
         // button looked like the active one.
-        className={`flex-1 py-3 px-6 rounded-full font-bold text-sm sm:text-base transition-all cursor-pointer outline-none ${
+        className={`flex-1 py-3 sm:py-5 px-6 rounded-full font-bold text-sm sm:text-2xl transition-all cursor-pointer outline-none ${
           cancelFocused
             ? "bg-theme_13_samecolour text-white scale-105 shadow-xl ring-4 ring-white z-50"
             : "bg-neutral-800 text-white/80 hover:bg-neutral-700 hover:text-white"

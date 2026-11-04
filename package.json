@@ -26,6 +26,7 @@
     "typecheck": "tsc --noEmit",
     "test:platform": "tsx --test src/platform/*.test.ts src/platform/**/*.test.ts",
     "test:player": "tsx --test features/player/**/*.test.ts",
+    "test:rails": "tsx --test components/content-rail/**/*.test.ts",
     "lint": "eslint"
   },
   "dependencies": {
