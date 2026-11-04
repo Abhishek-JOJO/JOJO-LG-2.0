@@ -52,8 +52,9 @@ export const useWatchlistStore = create<WatchlistStore>((set, get) => ({
 
   fetchWatchlist: (page = 1) => {
     if (page === 1) {
+      // Keep the current list (incl. items just added) until a successful
+      // response replaces it: a failed fetch used to leave it empty.
       set({
-        assets: [],
         currentPage: 1,
         totalPages: 1,
         totalItems: 0,
