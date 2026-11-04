@@ -217,7 +217,11 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     statusRef.current = { hasNextPage, isFetchingNextPage, fetchNextPage };
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Restore focus when returning to home page, switching subnavs, or when data loading completes after login
+  // Restore focus when returning to home page, switching subnavs, or when data loading completes after login.
+  // Keyed on having data, not on `data`: each later page (fetched while the user
+  // scrolls the rails) re-ran this, and with no card to return to it fell back
+  // to the hero, throwing the user back to the top mid-scroll.
+  const hasData = Boolean(data);
   useEffect(() => {
     if (isLoading) return;
     const isModalOpen = useAssetDetailStore.getState().isOpen;
@@ -232,7 +236,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
       return;
     }
     restorePageFocus();
-  }, [pathname, subnavId, isLoading, data]);
+  }, [pathname, subnavId, isLoading, hasData]);
 
   // Scroll-to-bottom pagination — listener is removed when there are no more pages
   useEffect(() => {
@@ -440,7 +444,22 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
 
   const [activeRailIndex, setActiveRailIndex] = useState(0);
   const activeRailIndexRef = useRef(0);
-  activeRailIndexRef.current = activeRailIndex;
+  const railSwitchFrameRef = useRef<number | null>(null);
+  // While a switch waits for its frame the ref is ahead of the state; keep it.
+  if (railSwitchFrameRef.current === null) activeRailIndexRef.current = activeRailIndex;
+
+  // Up/Down apply at most one rail switch per frame, to the latest requested
+  // rail. A fast or held Up/Down queues keys faster than a TV renders a switch
+  // (~0.2-1s each on a Tizen 8 TV); rendering every one left the rows seconds
+  // behind the remote, still moving after the key was released.
+  const switchRail = useCallback((nextIndex: number) => {
+    activeRailIndexRef.current = nextIndex;
+    if (railSwitchFrameRef.current !== null) return;
+    railSwitchFrameRef.current = requestAnimationFrame(() => {
+      railSwitchFrameRef.current = null;
+      setActiveRailIndex(activeRailIndexRef.current);
+    });
+  }, []);
 
   // Track subnavId to reset activeRailIndex synchronously during render (no extra effect round-trip)
   const prevSubnavIdRef = useRef(subnavId);
@@ -524,19 +543,14 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
     if (direction === "down") {
       const nextIndex = Math.min(activeRailIndexRef.current + 1, contentRails.length - 1);
       if (nextIndex !== activeRailIndexRef.current) {
-        // Update the ref synchronously so repeat events received before React's
-        // next commit continue from the latest requested rail.
-        activeRailIndexRef.current = nextIndex;
-        setActiveRailIndex(nextIndex);
+        switchRail(nextIndex);
         preserveLegacyRailPosition();
       }
       return true;
     }
     if (direction === "up") {
       if (activeRailIndexRef.current > 0) {
-        const nextIndex = activeRailIndexRef.current - 1;
-        activeRailIndexRef.current = nextIndex;
-        setActiveRailIndex(nextIndex);
+        switchRail(activeRailIndexRef.current - 1);
         preserveLegacyRailPosition();
         return true;
       }
@@ -564,7 +578,7 @@ export function ContentRailsView({ subnavId: propSubnavId }: ContentRailsViewPro
       return true;
     }
     return true;
-  }, [contentRails.length, isFirstHero, isTizenRuntime]);
+  }, [contentRails.length, isFirstHero, isTizenRuntime, switchRail]);
 
   // Listen for tv-rail-step events triggered by remote slider or channel/page keys
   useEffect(() => {

@@ -124,19 +124,22 @@ export const ContentRailSection = memo(function ContentRailSection({
 
 
   const listRef = useRef<HTMLDivElement>(null);
-  const [showArrows, setShowArrows] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
+  // The spotlight row never scrolls; ContentRailList pages it as the user
+  // cycles. Measuring it here forced a layout and fetched the next page of
+  // every rail passed on a fast Up/Down.
+  const isSpotlightRow =
+    isFirstContentRail &&
+    !isHeroSection &&
+    type !== ContentRailType.GENRE &&
+    config?.variant !== RailCardVariant.GENRE;
 
   useEffect(() => {
+    if (isSpotlightRow) return;
     const listEl = listRef.current;
     const checkScroll = () => {
       if (listEl) {
         const { scrollLeft, scrollWidth, clientWidth } = listEl;
-        setCanScrollLeft(scrollLeft > 5);
-        setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 5);
-        setShowArrows(scrollWidth > clientWidth);
         // Fetch the next page if the user scrolls near the right end of the loaded list (within 400px)
         const isNearRightEnd = scrollWidth - scrollLeft - clientWidth < 400;
         if (isNearRightEnd) {
@@ -160,7 +163,7 @@ export const ContentRailSection = memo(function ContentRailSection({
       }
       clearTimeout(timer);
     };
-  }, [items, isExpanded, loadNextPage, railId, cr_title]);
+  }, [items, isExpanded, loadNextPage, railId, cr_title, isSpotlightRow]);
 
   // Boolean selectors: a section only re-renders when its own dimming state
   // flips, not on every activeSectionIndex change. Called before the early
@@ -173,18 +176,6 @@ export const ContentRailSection = memo(function ContentRailSection({
   if (!config || !items?.length) return null;
 
   const isHero = config.variant === RailCardVariant.HERO;
-
-  const handleScroll = (direction: "left" | "right") => {
-    if (listRef.current) {
-      const scrollAmount = direction === "left"
-        ? -listRef.current.clientWidth * 0.75
-        : listRef.current.clientWidth * 0.75;
-      listRef.current.scrollBy({
-        left: scrollAmount,
-        behavior: "smooth",
-      });
-    }
-  };
 
   const isLandscape = config.variant === RailCardVariant.LANDSCAPE || config.variant === RailCardVariant.CONTINUE_WATCHING;
   const isGenre = config.variant === RailCardVariant.GENRE;

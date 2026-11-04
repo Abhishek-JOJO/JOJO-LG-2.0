@@ -56,6 +56,25 @@ interface SpotlightCommonProps {
   onClick: (item: ContentRailItem) => void;
 }
 
+// How long Up/Down must rest on a spotlight rail before it fetches and warms
+// that rail's next items. Longer than the remote's key repeat (~150ms).
+const RAIL_SETTLE_MS = 400;
+
+/**
+ * Runs `work` at once while the user cycles a spotlight rail. Right after
+ * landing on a rail (index 0) it waits for Up/Down to settle: a fast scroll
+ * fetched page 2 and warmed ~13 images for every rail it passed, and the TV
+ * fell seconds behind the remote. Returns the effect cleanup.
+ */
+function whenRailSettled(spotlightIndex: number, work: () => void): (() => void) | undefined {
+  if (spotlightIndex > 0) {
+    work();
+    return undefined;
+  }
+  const timer = setTimeout(work, RAIL_SETTLE_MS);
+  return () => clearTimeout(timer);
+}
+
 /**
  * Renders one slot of a spotlight rail. Slot 0 is a sticky landscape frame
  * (CSS `sticky left-0`, pinned while the rest of the row scrolls behind it)
@@ -438,37 +457,39 @@ export function ContentRailList({
   useEffect(() => {
     if (!isSpotlightRail || !items?.length) return;
     if (isTvFileRuntime && !railActive) return;
-    const si = spotlightIndex;
-    const len = items.length;
-    const lookaheadIndices = isTizenRuntime
-      ? [(si + 1) % len, (si + 2) % len, (si + 3) % len, (si - 1 + len) % len]
-      : [
-          (si + 1) % len,
-          (si + 2) % len,
-          (si + 3) % len,
-          (si + 4) % len,
-          (si - 1 + len) % len,
-          (si - 2 + len) % len,
-        ];
-    // Same URLs the lead/portrait cards render (cardImageUrls) — these used
-    // to warm different fields, so the cards still loaded cold.
-    lookaheadIndices.forEach((idx) => {
-      preloadRailItemImages(items[idx], { portrait: !isTizenRuntime });
-    });
-    // A Left press moves the current lead into portrait slot 1, which renders
-    // its portrait-size poster — warm it so that slot doesn't flash dark.
-    if (isTizenRuntime) {
-      preloadRailItemImages(items[si], { lead: false, portrait: true });
-      // Each Right press slides a portrait in from the off-screen slot 4. A
-      // held Right (a step every ~150ms) outran a short lookahead on a slow
-      // connection (~1s per poster) and slid cards in still empty. Warm the
-      // next 8 beyond it (~40KB each at the Tizen image quality); these are
-      // low priority, so the on-screen cards still load first. Already
-      // preloaded URLs are skipped.
-      for (let ahead = 5; ahead <= 12; ahead++) {
-        preloadRailItemImages(items[(si + ahead) % len], { lead: false, portrait: true });
+    return whenRailSettled(spotlightIndex, () => {
+      const si = spotlightIndex;
+      const len = items.length;
+      const lookaheadIndices = isTizenRuntime
+        ? [(si + 1) % len, (si + 2) % len, (si + 3) % len, (si - 1 + len) % len]
+        : [
+            (si + 1) % len,
+            (si + 2) % len,
+            (si + 3) % len,
+            (si + 4) % len,
+            (si - 1 + len) % len,
+            (si - 2 + len) % len,
+          ];
+      // Same URLs the lead/portrait cards render (cardImageUrls) — these used
+      // to warm different fields, so the cards still loaded cold.
+      lookaheadIndices.forEach((idx) => {
+        preloadRailItemImages(items[idx], { portrait: !isTizenRuntime });
+      });
+      // A Left press moves the current lead into portrait slot 1, which renders
+      // its portrait-size poster — warm it so that slot doesn't flash dark.
+      if (isTizenRuntime) {
+        preloadRailItemImages(items[si], { lead: false, portrait: true });
+        // Each Right press slides a portrait in from the off-screen slot 4. A
+        // held Right (a step every ~150ms) outran a short lookahead on a slow
+        // connection (~1s per poster) and slid cards in still empty. Warm the
+        // next 8 beyond it (~40KB each at the Tizen image quality); these are
+        // low priority, so the on-screen cards still load first. Already
+        // preloaded URLs are skipped.
+        for (let ahead = 5; ahead <= 12; ahead++) {
+          preloadRailItemImages(items[(si + ahead) % len], { lead: false, portrait: true });
+        }
       }
-    }
+    });
   }, [isSpotlightRail, items, spotlightIndex, isTvFileRuntime, railActive, isTizenRuntime]);
 
   // Fetch the next page of this rail's items well before the user reaches the end of what's
@@ -476,9 +497,8 @@ export function ContentRailList({
   // remote) never outruns a pagination request — mirrors the rail (row) pagination lookahead.
   useEffect(() => {
     if (!isSpotlightRail || !hasMore || !loadNextPage || !items?.length) return;
-    if (spotlightIndex >= items.length - 10) {
-      loadNextPage();
-    }
+    if (spotlightIndex < items.length - 10) return;
+    return whenRailSettled(spotlightIndex, loadNextPage);
   }, [isSpotlightRail, hasMore, loadNextPage, items?.length, spotlightIndex]);
 
 
