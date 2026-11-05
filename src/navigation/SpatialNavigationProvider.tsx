@@ -15,7 +15,9 @@ import { isTizen } from '@/src/platform/detectPlatform';
 if (typeof window !== 'undefined') {
   let debugEnabled = false;
   try {
-    debugEnabled = localStorage.getItem('jojo_debug_overlay') === '1';
+    // Off in prod: a flag saved by an older build would draw focus boxes for good.
+    debugEnabled =
+      process.env.NEXT_PUBLIC_ENV_TYPE !== 'prod' && localStorage.getItem('jojo_debug_overlay') === '1';
   } catch {
     // ignore — localStorage unavailable
   }

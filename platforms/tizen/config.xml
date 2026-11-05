@@ -1,28 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget xmlns="http://www.w3.org/ns/widgets"
         xmlns:tizen="http://tizen.org/ns/widgets"
-        id="http://jojoapp.in/tv"
-        version="2.1.0"
-        viewmodes="maximized">
-  <tizen:application id="J0J0TV2026.JOJO" package="J0J0TV2026" required_version="4.0" />
-  <content src="index.html" />
-  <feature name="http://tizen.org/feature/screen.size.all" />
-  <icon src="icon.png" />
-  <name>JOJO</name>
-  <access origin="*" subdomains="true" />
-  <tizen:privilege name="http://tizen.org/privilege/internet" />
-  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice" />
-  <tizen:privilege name="http://tizen.org/privilege/application.info" />
-  <!-- Opens the app's Samsung store page for updates (AppUpdateModal). -->
-  <tizen:privilege name="http://tizen.org/privilege/application.launch" />
-  <tizen:privilege name="http://developer.samsung.com/privilege/drmplay" />
-  <tizen:privilege name="http://developer.samsung.com/privilege/avplay" />
-  <tizen:privilege name="http://tizen.org/privilege/tv.audio" />
-  <tizen:profile name="tv-samsung" />
-  <tizen:setting screen-orientation="landscape"
-                 context-menu="disable"
-                 background-support="disable"
-                 encryption="disable"
-                 install-location="auto"
-                 hwkey-event="enable" />
+        id="in.jojoapp"
+        version="1.0.14"
+        viewmodes="fullscreen">
+
+    <!-- ✅ Application ID and Package -->
+    <tizen:application id="EGy8Igm3no.JOJO"
+                       package="EGy8Igm3no"
+                       required_version="2.3" />
+
+    <!-- ✅ Entry Point -->
+    <content src="index.html"/>
+
+    <!-- ✅ Screen Size Support -->
+    <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
+
+    <!-- ✅ App Icon -->
+    <icon src="icon.png"/>
+
+    <!-- ✅ Base Screen Resolution -->
+    <tizen:metadata key="http://tizen.org/metadata/app_ui_type/base_screen_resolution"
+                    value="extensive"/>
+
+    <!-- ✅ App Name -->
+    <name>JOJO APP Movies, Shows, Natak</name>
+
+    <!-- ✅ Profile -->
+    <tizen:profile name="tv-samsung"/>
+
+    <!-- ✅ Settings -->
+    <tizen:setting screen-orientation="landscape"
+                   context-menu="enable"
+                   background-support="disable"
+                   encryption="disable"
+                   install-location="auto"
+                   hwkey-event="enable"/>
+
+    <!-- ✅ CRITICAL: Privileges for Network Access & TV Controls -->
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://tizen.org/privilege/network.get"/>
+    <tizen:privilege name="http://tizen.org/privilege/network.public"/>
+    <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:privilege name="http://developer.samsung.com/privilege/drmplay"/>
+
+    <!-- ✅ Production CSP: Full Socket + Video + API Support (No store rejection risks) -->
+    <tizen:content-security-policy>
+        default-src 'self' https: http: data: blob:;
+        script-src 'self' https: http: 'unsafe-inline';
+        style-src 'self' https://fonts.googleapis.com 'unsafe-inline';
+        font-src 'self' https://fonts.gstatic.com data:;
+        img-src 'self' https: http: data: blob:;
+        media-src 'self' https: http: blob:;
+        connect-src 'self' https: http: wss: ws:;
+        frame-src 'none';
+    </tizen:content-security-policy>
+
+    <!-- ✅ Allow Navigation -->
+    <tizen:allow-navigation>*</tizen:allow-navigation>
+
+    <!-- ✅ CRITICAL: Cross-Origin Access for APIs & WebSockets -->
+    <access origin="*" subdomains="true"></access>
+
+    <!-- ✅ App Control (for deep linking) -->
+    <tizen:app-control>
+        <tizen:src name="index.html"/>
+        <tizen:operation name="http://tizen.org/appcontrol/operation/default"/>
+    </tizen:app-control>
+
 </widget>

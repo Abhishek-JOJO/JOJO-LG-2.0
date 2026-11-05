@@ -5,7 +5,7 @@ import { useAppUpdateStore } from "@/store/useAppUpdateStore";
 import { APP_VERSION } from "@/lib/constants/version";
 import { getCachedRuntimeConfig, AppConfig, DevicesConfig } from "@/lib/config/app.config";
 import { logger } from "@/lib/logger/logger";
-import { isTizenWebSimulator } from "@/src/platform/detectPlatform";
+import { isTizen, isTizenWebSimulator } from "@/src/platform/detectPlatform";
 
 /**
  * Compares two semantic version strings (e.g. "1.0.1" > "1.0.0")
@@ -53,7 +53,12 @@ export interface AppUpdateCheckResult {
  *     }
  * }
  */
-export function evaluateAppUpdate(devices?: DevicesConfig | null): AppUpdateCheckResult {
+export function evaluateAppUpdate(
+  devices?: DevicesConfig | null,
+  // Samsung's version is static (config.xml), so the backend's version numbers
+  // don't apply to it: only its explicit update flags do.
+  compareVersionNumbers: boolean = !isTizen(),
+): AppUpdateCheckResult {
   if (!devices) {
     return { hasUpdate: false, isForceUpdate: false, latestVersion: "" };
   }
@@ -77,8 +82,8 @@ export function evaluateAppUpdate(devices?: DevicesConfig | null): AppUpdateChec
   );
 
   // Safety fallback: semantic version comparison against compiled client APP_VERSION
-  const hasSemverUpdate = latest ? compareVersions(latest, APP_VERSION) > 0 : false;
-  const hasSemverForce = minimum ? compareVersions(minimum, APP_VERSION) > 0 : false;
+  const hasSemverUpdate = compareVersionNumbers && latest ? compareVersions(latest, APP_VERSION) > 0 : false;
+  const hasSemverForce = compareVersionNumbers && minimum ? compareVersions(minimum, APP_VERSION) > 0 : false;
 
   const hasUpdate = isUpdateAvailable || hasSemverUpdate;
   const isForceUpdate = hasUpdate && (isForceUpdateAvailable || hasSemverForce);

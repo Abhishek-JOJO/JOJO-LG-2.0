@@ -744,10 +744,6 @@ function LoginPageContent() {
           )}
         </div>
 
-        {/* Bottom right app version badge matching screenshot */}
-        <span className="fixed bottom-3 right-6 text-[11px] font-mono text-white/30 pointer-events-none select-none z-50">
-          v2.2.32
-        </span>
 
         {/* Account Not Found Modal */}
         <AccountNotFoundModal

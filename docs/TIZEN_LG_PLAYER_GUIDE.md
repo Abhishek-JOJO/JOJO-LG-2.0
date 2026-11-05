@@ -170,11 +170,11 @@ npm run build:tizen:prod -- --version=1.0.0
 3. **Update Version in `config.xml`**:
    Verify/update the `version="x.x.x"` attribute in [platforms/tizen/config.xml](file:///Users/parthvaishnavappjojo.in/Desktop/Projects/LG-TV-2.0/platforms/tizen/config.xml) to match the release store version.
 
-*Output package*: `dist/JOJO.wgt` (Signed with specified security profile).
+*Output package*: `dist/JOJO APP Movies, Shows, Natak.wgt` (Signed with specified security profile).
 
 #### Step 3: Sync to Tizen Studio Workspace Project
 ```bash
-cp -R dist/tizen/* /Users/parthvaishnavappjojo.in/workspace/JOJO/ && cp dist/JOJO.wgt /Users/parthvaishnavappjojo.in/workspace/JOJO/
+cp -R dist/tizen/* /Users/parthvaishnavappjojo.in/workspace/JOJO/ && cp "dist/JOJO APP Movies, Shows, Natak.wgt" /Users/parthvaishnavappjojo.in/workspace/JOJO/
 ```
 
 #### Step 4: Run or Test
@@ -269,9 +269,9 @@ Use this checklist prior to building, testing, or submitting release builds for 
 ### 6.2 Samsung Tizen TV Pre-Flight Checklist
 
 #### Configuration & Manifest (`platforms/tizen/config.xml`)
-- [ ] **Application ID**: `<tizen:application id="J0J0TV2026.JOJO" package="J0J0TV2026" required_version="4.0" />`.
+- [ ] **Application ID**: `<tizen:application id="EGy8Igm3no.JOJO" package="EGy8Igm3no" required_version="2.3" />`.
 - [ ] **Version**: `version="x.x.x"` updated to match release target.
-- [ ] **AVPlay Privilege**: `<tizen:privilege name="http://developer.samsung.com/privilege/avplay" />` is present.
+- [ ] **Privileges**: each `<tizen:privilege>` sits directly under `<widget>` (a `<tizen:privileges>` wrapper is ignored by the TV) and includes `http://developer.samsung.com/privilege/drmplay` (`setDrm`). Samsung no longer uses the `avplay` privilege for web apps.
 - [ ] **DRM Privilege**: `<tizen:privilege name="http://developer.samsung.com/privilege/drmplay" />` is present.
 - [ ] **Input Device Privilege**: `<tizen:privilege name="http://tizen.org/privilege/tv.inputdevice" />` is present.
 - [ ] **Audio Privilege**: `<tizen:privilege name="http://tizen.org/privilege/tv.audio" />` is present.
@@ -288,8 +288,8 @@ Use this checklist prior to building, testing, or submitting release builds for 
 - [ ] Injected WebAPIs script: Verify `<script src="$WEBAPIS/webapis/webapis.js"></script>` is present in `<head>` of `dist/tizen/index.html` and `dist/tizen/watch/index.html`.
 - [ ] Cleaned assets: `appinfo.json` and `webOSTV.js` are removed from `dist/tizen/`.
 - [ ] Project descriptors: `.project` and `.tproject` copied to `dist/tizen/`.
-- [ ] Package created: `dist/JOJO.wgt` generated and non-empty.
-- [ ] Synced to Studio: Copied `dist/tizen/*` and `dist/JOJO.wgt` into `/Users/parthvaishnavappjojo.in/workspace/JOJO/`.
+- [ ] Package created: `dist/JOJO APP Movies, Shows, Natak.wgt` generated and non-empty.
+- [ ] Synced to Studio: Copied `dist/tizen/*` and `dist/JOJO APP Movies, Shows, Natak.wgt` into `/Users/parthvaishnavappjojo.in/workspace/JOJO/`.
 
 ---
 

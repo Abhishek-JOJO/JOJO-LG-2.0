@@ -81,7 +81,7 @@ export function Providers({ children, locale: serverLocale = "en", isMobileServe
                     {/* Version update detection — polls /api/version and auto-reloads on mismatch */}
                     <VersionUpdateBanner />
                     {/* On-TV diagnostic HUD — toggle with the remote's INFO key. See components/debug/DebugOverlay.tsx */}
-                    <DebugOverlay />
+                    {process.env.NEXT_PUBLIC_ENV_TYPE !== "prod" && <DebugOverlay />}
                   </SpatialNavigationProvider>
                 </ProductionSecurityGuard>
               </AppProvider>
